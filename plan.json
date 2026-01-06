@@ -1,0 +1,103 @@
+{
+  "name": "UliKit2D Game Engine Roadmap",
+  "version": "1.0.0",
+  "phases": [
+    {
+      "id": "1",
+      "name": "Foundation & Setup",
+      "status": "completed",
+      "tasks": [
+        "Initialize Vite + Vue + TypeScript project",
+        "Configure Electron main process",
+        "Set up TailwindCSS and ESLint/Prettier",
+        "Install Core Libs: PixiJS, Pinia, Vue Router, @vueuse/core"
+      ]
+    },
+    {
+      "id": "2",
+      "name": "Editor Layout System",
+      "status": "completed",
+      "tasks": [
+        "Integrate Dockview",
+        "Create Layout Manager Service",
+        "Implement Base Panels: Scene, Hierarchy, Inspector, Assets, Console",
+        "Implement Theme System (Dark/Light)"
+      ]
+    },
+    {
+      "id": "3",
+      "name": "Core Engine Architecture",
+      "status": "completed",
+      "tasks": [
+        "Design Entity Component System (ECS)",
+        "Implement Scene Graph/Manager",
+        "Implement Game Loop (RAF, DeltaTime)",
+        "Integrate Matter.js Physics Engine"
+      ]
+    },
+    {
+      "id": "4",
+      "name": "Editor Logic & Interactivity",
+      "status": "completed",
+      "tasks": [
+        "Implement Selection Manager",
+        "Implement Transform Gizmos (Translate, Rotate, Scale)",
+        "Implement Command System (Undo/Redo)",
+        "Implement Clipboard (Cut/Copy/Paste)"
+      ]
+    },
+    {
+      "id": "5",
+      "name": "Asset & Project Management",
+      "status": "completed",
+      "tasks": [
+        "Implement File Watcher (Chokidar)",
+        "Create Asset Loader/Parser map",
+        "Implement Drag & Drop Import"
+      ]
+    },
+    {
+      "id": "6",
+      "name": "Game Logic & Scripting",
+      "status": "completed",
+      "tasks": [
+        "Implement Script Component",
+        "Setup Hot Reload for User Scripts",
+        "Play/Stop/Pause Simulation Stats"
+      ]
+    },
+    {
+      "id": "7",
+      "name": "UI Overhaul & Project Structure",
+      "status": "pending",
+      "tasks": [
+        "Implement Application Menu (File, Edit, etc.)",
+        "Move Toolbar to Scene Panel",
+        "Implement Status Bar",
+        "Project Management (Open/New Project)"
+      ]
+    },
+    {
+      "id": "8",
+      "name": "Asset Management 2.0",
+      "status": "pending",
+      "tasks": [
+        "Implement Folder Navigation (Enter/Up)",
+        "Breadcrumbs Navigation",
+        "Create Folder / Rename Asset",
+        "Context Menu (Right-click actions)",
+        "Drag & Drop into specific folders"
+      ]
+    },
+    {
+      "id": "9",
+      "name": "Scene Tools",
+      "status": "pending",
+      "tasks": [
+        "Grid Rendering",
+        "Snap to Grid",
+        "Rotate/Scale Gizmos"
+      ]
+    }
+  ]
+}

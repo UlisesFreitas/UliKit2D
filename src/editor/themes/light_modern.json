@@ -1,0 +1,19 @@
+{
+    "name": "Light Modern",
+    "type": "light",
+    "colors": {
+        "--bg-base": "#ffffff",
+        "--bg-panel": "#f3f3f3",
+        "--bg-header": "#dddddd",
+        "--bg-input": "#ffffff",
+        "--bg-hover": "#e8e8e8",
+        "--bg-selection": "#a6d2ff",
+        "--text-primary": "#333333",
+        "--text-secondary": "#666666",
+        "--text-accent": "#000000",
+        "--border-color": "#e5e5e5",
+        "--accent-color": "#007acc",
+        "--scrollbar-bg": "#f3f3f3",
+        "--scrollbar-thumb": "#c1c1c1"
+    }
+}

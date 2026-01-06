@@ -1,0 +1,127 @@
+@import "tailwindcss";
+
+html, body, #app {
+  height: 100%;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  background-color: var(--bg-base);
+  color: var(--text-primary);
+  font-family: 'Inter', sans-serif;
+}
+
+@layer base {
+  :root {
+      --bg-base: #1e1e1e;
+      --bg-panel: #252526;
+      --bg-header: #1e1e1e;
+      --bg-input: #3c3c3c;
+      --bg-hover: #2a2d2e;
+      --bg-selection: #094771;
+      --text-primary: #cccccc;
+      --text-secondary: #858585;
+      --text-accent: #ffffff;
+      --border-color: #2a2a2a; /* Dark default */
+      --accent-color: #007acc;
+  }
+  
+  *, ::before, ::after {
+    border-color: var(--border-color);
+  }
+}
+
+@layer components {
+  /* Global Input Styles */
+  .u-input {
+    @apply border rounded px-2 py-1 text-xs outline-none w-full transition-colors;
+    background-color: var(--bg-input);
+    border-color: var(--border-color);
+    color: var(--text-primary);
+  }
+  .u-input:focus {
+      border-color: var(--accent-color);
+  }
+  
+  .u-label {
+    @apply text-xs mb-1 block uppercase tracking-wider font-semibold;
+    color: var(--text-secondary);
+  }
+
+  .u-button {
+     @apply px-3 py-1 rounded text-xs transition-colors border border-transparent;
+     background-color: var(--bg-input);
+     color: var(--text-primary);
+  }
+  .u-button:hover {
+      background-color: var(--bg-hover);
+      border-color: var(--border-color);
+  }
+}
+
+/* Dockview Theme Bridge */
+/* Dockview Theme Bridge */
+.dockview-theme-light {
+    --dv-group-view-background-color: var(--bg-base);
+    --dv-tabs-and-actions-container-background-color: var(--bg-panel);
+    --dv-activegroup-visiblepanel-tab-background-color: var(--bg-base);
+    --dv-activegroup-hiddenpanel-tab-background-color: var(--bg-panel); /* Inactive tabs */
+    --dv-inactivegroup-visiblepanel-tab-background-color: var(--bg-base);
+    --dv-inactivegroup-hiddenpanel-tab-background-color: var(--bg-panel);
+    
+    --dv-activegroup-visiblepanel-tab-color: var(--text-primary);
+    --dv-activegroup-hiddenpanel-tab-color: var(--text-secondary);
+    --dv-inactivegroup-visiblepanel-tab-color: var(--text-secondary);
+    --dv-inactivegroup-hiddenpanel-tab-color: var(--text-secondary);
+    
+    --dv-tab-divider-color: var(--border-color);
+    --dv-separator-border: var(--border-color);
+    --dv-paneview-header-border-color: var(--border-color);
+    
+    --dv-tabs-container-scrollbar-color: var(--border-color);
+    --dv-scrollbar-background-color: transparent;
+}
+
+/* Force Tab Colors to overcome specificity issues */
+.dockview-theme-light .dv-tab {
+    background-color: var(--bg-panel) !important;
+    color: var(--text-secondary) !important;
+    border-right: 1px solid var(--border-color);
+}
+
+.dockview-theme-light .dv-tab.dv-active-tab {
+    background-color: var(--bg-base) !important;
+    color: var(--text-primary) !important;
+    font-weight: 600;
+}
+
+.dockview-theme-light .dv-tabs-and-actions-container {
+    background-color: var(--bg-panel) !important;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.dockview-theme-abyss {
+    /* Map Abyss identifiers to our variables so they stay consistent too */
+    --dv-group-view-background-color: var(--bg-base);
+    --dv-tabs-and-actions-container-background-color: var(--bg-panel);
+    --dv-activegroup-visiblepanel-tab-background-color: var(--bg-base);
+    --dv-activegroup-hiddenpanel-tab-background-color: var(--bg-panel);
+    --dv-tab-divider-color: var(--border-color);
+}
+
+/* Scrollbar Updated to use vars */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+  background-color: var(--bg-base); /* was hardcoded #1e1e1e */
+}
+::-webkit-scrollbar-thumb {
+  background-color: var(--bg-hover);
+  border-radius: 5px;
+  border: 2px solid var(--bg-base);
+}
+::-webkit-scrollbar-thumb:hover {
+  background-color: var(--accent-color);
+}
+
+

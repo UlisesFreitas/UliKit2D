@@ -1,0 +1,19 @@
+{
+    "name": "Dark Modern",
+    "type": "dark",
+    "colors": {
+        "--bg-base": "#1e1e1e",
+        "--bg-panel": "#252526",
+        "--bg-header": "#1e1e1e",
+        "--bg-input": "#3c3c3c",
+        "--bg-hover": "#2a2d2e",
+        "--bg-selection": "#094771",
+        "--text-primary": "#cccccc",
+        "--text-secondary": "#858585",
+        "--text-accent": "#ffffff",
+        "--border-color": "#2a2a2a",
+        "--accent-color": "#007acc",
+        "--scrollbar-bg": "#1e1e1e",
+        "--scrollbar-thumb": "#424242"
+    }
+}
