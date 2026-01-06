@@ -36,6 +36,30 @@ export type Entity = {
       isPrimary: boolean;
       backgroundColor?: string;
   };
+  audioSource?: {
+      clip: string;
+      volume: number;
+      loop: boolean;
+      playOnAwake: boolean;
+  };
+  label?: {
+      text: string;
+      fontSize: number;
+      fontFamily: string;
+      color: string;
+      align: 'left' | 'center' | 'right';
+  };
+  animator?: {
+      currentAnim: string;
+      isPlaying: boolean;
+      speed: number;
+      elapsedTime: number;
+      animations: Record<string, {
+          frames: string[];
+          loop: boolean;
+          speed?: number;
+      }>;
+  };
   // Runtime only
   physicsBody?: any; // Matter.js body declaration
 };

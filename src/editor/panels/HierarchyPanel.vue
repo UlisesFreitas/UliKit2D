@@ -56,7 +56,7 @@ const select = (id: string | undefined) => {
 };
 
 // Deprecated in favor of Create Asset Menu for direct usage, but kept for logic reference
-const createEntity = (type: 'Empty' | 'Sprite' | 'Camera' = 'Empty') => {
+const createEntity = (type: 'Empty' | 'Sprite' | 'Camera' | 'Text' | 'Animator' = 'Empty') => {
     const id = crypto.randomUUID();
     let data: any = {
         id,
@@ -68,6 +68,23 @@ const createEntity = (type: 'Empty' | 'Sprite' | 'Camera' = 'Empty') => {
         data.sprite = { texture: '' }; // Will be visualizable with cyan box even if empty
     } else if (type === 'Camera') {
         data.camera = { zoom: 1, isPrimary: false, backgroundColor: '#000000' };
+    } else if (type === 'Text') {
+        data.label = { 
+            text: 'New Text', 
+            fontSize: 24, 
+            fontFamily: 'Arial', 
+            color: '#ffffff', 
+            align: 'center' 
+        };
+    } else if (type === 'Animator') {
+        data.sprite = { texture: '' }; // Animator needs a sprite
+        data.animator = {
+            currentAnim: '',
+            isPlaying: true,
+            speed: 1,
+            elapsedTime: 0,
+            animations: {}
+        };
     }
 
     world.add(data);
@@ -113,14 +130,14 @@ const showCreateMenu = (e: MouseEvent) => {
 
     setTimeout(() => {
         const close = () => {
-            createMenuState.value.visible = false;
-            window.removeEventListener('click', close);
+             createMenuState.value.visible = false;
+             window.removeEventListener('click', close);
         };
         window.addEventListener('click', close);
     }, 0);
 };
 
-const createAsset = (type: 'Empty' | 'Sprite' | 'Camera') => {
+const createAsset = (type: 'Empty' | 'Sprite' | 'Camera' | 'Text' | 'Animator') => {
     createEntity(type);
     createMenuState.value.visible = false;
 };
@@ -199,6 +216,8 @@ const duplicateEntity = () => {
                     <span class="mr-1.5 opacity-70">
                         <span v-if="entity.camera">📷</span>
                         <span v-else-if="entity.sprite">🖼️</span>
+                        <span v-else-if="entity.animator">🎬</span>
+                        <span v-else-if="entity.label">📝</span>
                         <span v-else>📦</span>
                     </span>
                     <span class="truncate">{{ entity.name || 'Unnamed Entity' }}</span>
@@ -223,9 +242,11 @@ const duplicateEntity = () => {
     <div v-if="createMenuState.visible" 
          class="fixed bg-bg-panel border border-border shadow-lg rounded z-50 py-1 min-w-[160px]"
          :style="{ top: createMenuState.y + 'px', left: createMenuState.x + 'px' }">
-        <div class="px-3 py-1 text-[10px] font-bold text-text-secondary uppercase tracking-wider">Create Asset</div>
+        <div class="px-3 py-1 text-[10px] font-bold text-text-secondary uppercase tracking-wider">Create Entity</div>
         <button @click="createAsset('Sprite')" class="w-full text-left px-3 py-1.5 hover:bg-bg-hover text-xs flex items-center"><span class="mr-2">🖼️</span> Sprite</button>
         <button @click="createAsset('Camera')" class="w-full text-left px-3 py-1.5 hover:bg-bg-hover text-xs flex items-center"><span class="mr-2">📷</span> Camera</button>
+        <button @click="createAsset('Animator')" class="w-full text-left px-3 py-1.5 hover:bg-bg-hover text-xs flex items-center"><span class="mr-2">🎬</span> Animator</button>
+        <button @click="createAsset('Text')" class="w-full text-left px-3 py-1.5 hover:bg-bg-hover text-xs flex items-center"><span class="mr-2">📝</span> Text Label</button>
         <button @click="createAsset('Empty')" class="w-full text-left px-3 py-1.5 hover:bg-bg-hover text-xs flex items-center"><span class="mr-2">📦</span> Empty Entity</button>
     </div>
   </div>

@@ -1,5 +1,7 @@
 import { PhysicsSystem } from '../physics/PhysicsSystem';
 import { ScriptSystem } from '../scripting/ScriptSystem';
+import { AudioSystem } from '../audio/AudioSystem';
+import { AnimationSystem } from '../systems/AnimationSystem';
 import { RenderSystem } from '../systems/RenderSystem';
 import { EditorDebugSystem } from '../systems/EditorDebugSystem';
 import { Application } from 'pixi.js';
@@ -11,6 +13,8 @@ export class Engine {
     private lastTime: number = 0;
     private physicsSystem: PhysicsSystem;
     private scriptSystem: ScriptSystem;
+    private audioSystem: AudioSystem;
+    private animationSystem: AnimationSystem;
     public renderSystem: RenderSystem;
     public editorDebugSystem: EditorDebugSystem;
 
@@ -21,6 +25,8 @@ export class Engine {
         this.app = new Application();
         this.physicsSystem = new PhysicsSystem();
         this.scriptSystem = new ScriptSystem();
+        this.audioSystem = new AudioSystem();
+        this.animationSystem = new AnimationSystem();
         // RenderSystem initialized later or passed app reference? 
         // We need app to be init first usually, but we can pass existing instance.
         // Actually app is created in constructor, so we can pass it.
@@ -51,10 +57,12 @@ export class Engine {
 
     public startSimulation() {
         this.isSimulationRunning = true;
+        this.audioSystem.start();
     }
 
     public stopSimulation() {
         this.isSimulationRunning = false;
+        this.audioSystem.stopAll();
     }
 
     public getPhysics() {
@@ -70,6 +78,7 @@ export class Engine {
         if (this.isSimulationRunning) {
             this.physicsSystem.update(deltaTime);
             this.scriptSystem.update(deltaTime);
+            this.animationSystem.update(deltaTime / 1000); // Pass seconds
         }
 
         // Custom Logic Update

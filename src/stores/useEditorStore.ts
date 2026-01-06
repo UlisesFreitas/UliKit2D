@@ -107,6 +107,8 @@ export const useEditorStore = defineStore('editor', () => {
                  sprite: entity.sprite ? { ...entity.sprite } : undefined,
                  rigidBody: entity.rigidBody ? { ...entity.rigidBody } : undefined,
                  boxCollider: entity.boxCollider ? { ...entity.boxCollider } : undefined,
+                 audioSource: entity.audioSource ? { ...entity.audioSource } : undefined,
+                 label: entity.label ? { ...entity.label } : undefined,
                  script: entity.script && Array.isArray(entity.script) ? entity.script.map(s => ({...s})) : undefined
              };
              clipboardData.value = data;

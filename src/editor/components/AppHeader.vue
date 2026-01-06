@@ -26,7 +26,7 @@ const onOpenProject = () => ProjectManager.openProject();
 const onSaveProject = () => ProjectManager.saveProject();
 const onExit = () => window.close(); // Simple mock
 
-const createAsset = (type: 'Empty' | 'Sprite' | 'Camera') => {
+const createAsset = (type: 'Empty' | 'Sprite' | 'Camera' | 'Text' | 'Animator') => {
     const id = crypto.randomUUID();
     let data: any = {
         id,
@@ -39,6 +39,23 @@ const createAsset = (type: 'Empty' | 'Sprite' | 'Camera') => {
         data.sprite = { texture: '' };
     } else if (type === 'Camera') {
         data.camera = { zoom: 1, isPrimary: false, backgroundColor: '#000000' };
+    } else if (type === 'Text') {
+        data.label = { 
+            text: 'New Text', 
+            fontSize: 24, 
+            fontFamily: 'Arial', 
+            color: '#ffffff', 
+            align: 'center' 
+        };
+    } else if (type === 'Animator') {
+        data.sprite = { texture: '' };
+        data.animator = {
+            currentAnim: '',
+            isPlaying: true,
+            speed: 1,
+            elapsedTime: 0,
+            animations: {}
+        };
     }
 
     world.add(data);
@@ -126,6 +143,12 @@ const createAsset = (type: 'Empty' | 'Sprite' | 'Camera') => {
                                         </MenubarItem>
                                         <MenubarItem class="menu-item" @select="createAsset('Camera')">
                                             <span class="mr-2">📷</span> Camera
+                                        </MenubarItem>
+                                        <MenubarItem class="menu-item" @select="createAsset('Animator')">
+                                            <span class="mr-2">🎬</span> Animator
+                                        </MenubarItem>
+                                        <MenubarItem class="menu-item" @select="createAsset('Text')">
+                                            <span class="mr-2">📝</span> Text Label
                                         </MenubarItem>
                                         <MenubarItem class="menu-item" @select="createAsset('Empty')">
                                              <span class="mr-2">📦</span> Empty Entity

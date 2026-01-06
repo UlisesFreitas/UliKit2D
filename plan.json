@@ -101,6 +101,17 @@
     },
     {
       "id": "10",
+      "name": "Vital Components Implementation",
+      "status": "pending",
+      "tasks": [
+        "Implement AudioSource Component & System",
+        "Implement Text/Label Component & System",
+        "Implement Sprite Animator Component",
+        "Implement Tilemap Component & Editor"
+      ]
+    },
+    {
+      "id": "11",
       "name": "Advanced Scripting System (Scripting 2.0)",
       "status": "pending",
       "tasks": [
@@ -111,7 +122,7 @@
       ]
     },
     {
-      "id": "11",
+      "id": "12",
       "name": "Visual Scripting System (Event Sheets)",
       "status": "pending",
       "tasks": [

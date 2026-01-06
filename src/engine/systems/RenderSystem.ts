@@ -1,10 +1,11 @@
-import { Application, Sprite, Texture, Assets } from 'pixi.js';
+import { Application, Sprite, Texture, Assets, Text, TextStyle } from 'pixi.js';
 import { world } from '../ecs/ECS';
 import { getFileSystem } from '../../api/FileSystem';
 
 export class RenderSystem {
     private app: Application;
     private spriteCache: Map<string, Sprite> = new Map();
+    private textCache: Map<string, Text> = new Map();
     private textureCache: Map<string, Texture> = new Map();
     private pendingLoads: Set<string> = new Set();
     private failedLoads: Set<string> = new Set();
@@ -23,6 +24,12 @@ export class RenderSystem {
                 this.app.stage.removeChild(sprite);
                 sprite.destroy();
                 this.spriteCache.delete(entity.id);
+            }
+            if (entity.id && this.textCache.has(entity.id)) {
+                 const text = this.textCache.get(entity.id)!;
+                 this.app.stage.removeChild(text);
+                 text.destroy();
+                 this.textCache.delete(entity.id);
             }
         });
     }
@@ -158,6 +165,56 @@ export class RenderSystem {
                     }
                 }
             }
+        }
+        
+        // Add/Update Text Labels
+        const labelEntities = world.with('transform', 'label');
+        for (const entity of labelEntities) {
+            let textFn = this.textCache.get(entity.id!);
+
+            if (!textFn) {
+                 // Create new Text
+                 textFn = new Text({
+                     text: entity.label.text,
+                     style: {
+                         fontSize: entity.label.fontSize,
+                         fontFamily: entity.label.fontFamily,
+                         fill: entity.label.color,
+                         align: entity.label.align
+                     }
+                 });
+                 textFn.anchor.set(0.5);
+                 
+                 // Interaction
+                 textFn.eventMode = 'static';
+                 textFn.cursor = 'pointer';
+                 textFn.on('pointerdown', (e) => {
+                        e.stopPropagation();
+                        if (this.onEntityClicked && entity.id) {
+                            this.onEntityClicked(entity.id);
+                        }
+                 });
+
+                 this.app.stage.addChild(textFn);
+                 this.textCache.set(entity.id!, textFn);
+            }
+
+            // Sync Properties
+            if (textFn.text !== entity.label.text) textFn.text = entity.label.text;
+            
+            // Sync Style
+            if (textFn.style.fontSize !== entity.label.fontSize) textFn.style.fontSize = entity.label.fontSize;
+            if (textFn.style.fontFamily !== entity.label.fontFamily) textFn.style.fontFamily = entity.label.fontFamily;
+            if (textFn.style.fill !== entity.label.color) textFn.style.fill = entity.label.color;
+            if (textFn.style.align !== entity.label.align) textFn.style.align = entity.label.align;
+
+            // Sync Transform
+            textFn.x = entity.transform.x;
+            textFn.y = entity.transform.y;
+            textFn.rotation = entity.transform.rotation;
+            textFn.scale.set(entity.transform.scale.x, entity.transform.scale.y);
+            
+            textFn.visible = entity.visible !== false;
         }
     }
 

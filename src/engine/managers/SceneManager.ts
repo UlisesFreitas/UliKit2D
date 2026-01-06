@@ -29,6 +29,9 @@ export class SceneManager {
                  camera: entity.camera ? { ...entity.camera } : undefined,
                  rigidBody: entity.rigidBody ? { ...entity.rigidBody } : undefined,
                  boxCollider: entity.boxCollider ? { ...entity.boxCollider } : undefined,
+                 audioSource: entity.audioSource ? { ...entity.audioSource } : undefined,
+                 label: entity.label ? { ...entity.label } : undefined,
+                 animator: entity.animator ? JSON.parse(JSON.stringify(entity.animator)) : undefined,
                  script: entity.script ? (Array.isArray(entity.script) ? entity.script.map(s => ({...s})) : []) : undefined
             };
              entities.push(serializable);

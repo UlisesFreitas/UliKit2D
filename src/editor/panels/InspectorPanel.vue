@@ -11,6 +11,9 @@ import CameraEditor from '../components/inspectors/CameraEditor.vue';
 import SpriteEditor from '../components/inspectors/SpriteEditor.vue';
 import RigidBodyEditor from '../components/inspectors/RigidBodyEditor.vue';
 import BoxColliderEditor from '../components/inspectors/BoxColliderEditor.vue';
+import AudioSourceEditor from '../components/inspectors/AudioSourceEditor.vue';
+import LabelEditor from '../components/inspectors/LabelEditor.vue';
+import AnimatorEditor from '../components/inspectors/AnimatorEditor.vue';
 import ScriptInspector from '../components/inspectors/ScriptInspector.vue';
 import AddComponentModal from '../components/modals/AddComponentModal.vue';
 
@@ -194,6 +197,12 @@ const handleAddComponent = async (payload: { type: string, data: any }) => {
                 // If has sprite, try to match size? (Ideally read image, but this is async/complex here)
                 // For now stick to safe default
             }
+        } else if (payload.type === 'audioSource' && Object.keys(data).length === 0) {
+             data = { clip: '', volume: 1.0, loop: false, playOnAwake: true };
+        } else if (payload.type === 'label' && Object.keys(data).length === 0) {
+             data = { text: 'New Text', fontSize: 24, fontFamily: 'Arial', color: '#ffffff', align: 'center' };
+        } else if (payload.type === 'animator' && Object.keys(data).length === 0) {
+             data = { currentAnim: '', isPlaying: false, speed: 1, elapsedTime: 0, animations: {} };
         }
 
         world.addComponent(rawEntity, payload.type as any, data);
@@ -299,6 +308,24 @@ const existingComponentKeys = computed(() => {
                     <BoxColliderEditor 
                         v-else-if="item.key === 'boxCollider'" 
                         :collider="item.data" 
+                        @update="onComponentUpdate" 
+                    />
+
+                    <AudioSourceEditor 
+                        v-else-if="item.key === 'audioSource'" 
+                        :audio="item.data" 
+                        @update="onComponentUpdate" 
+                    />
+
+                    <LabelEditor 
+                        v-else-if="item.key === 'label'" 
+                        :label="item.data" 
+                        @update="onComponentUpdate" 
+                    />
+
+                    <AnimatorEditor 
+                        v-else-if="item.key === 'animator'" 
+                        :entity="(selectedEntity as any)" 
                         @update="onComponentUpdate" 
                     />
 

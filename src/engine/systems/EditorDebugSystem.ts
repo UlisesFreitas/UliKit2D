@@ -25,10 +25,11 @@ export class EditorDebugSystem {
             activeIds.add(id);
 
             // Check if entity needs a debug placeholder
-            // Condition: No Sprite OR Empty Sprite Texture
+            // Condition: No Sprite AND No Label
             const hasVisibleSprite = entity.sprite && entity.sprite.texture && entity.sprite.texture.trim() !== '';
+            const hasVisibleLabel = entity.label && entity.label.text && entity.label.text.trim() !== '';
             
-            if (!hasVisibleSprite) {
+            if (!hasVisibleSprite && !hasVisibleLabel) {
                 let graphics = this.debugGraphics.get(id);
                 if (!graphics) {
                     graphics = new Graphics();
