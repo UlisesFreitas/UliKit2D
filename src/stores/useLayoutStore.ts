@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia';
 import { ref } from 'vue';
 
-const LAYOUT_KEY = 'editor-layout-v5';
+const LAYOUT_KEY = 'editor-layout-v16';
 
 export const useLayoutStore = defineStore('layout', () => {
     const layoutState = ref<any>(null);

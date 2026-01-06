@@ -42,6 +42,9 @@ export class ScriptSystem {
         const entities = world.with('script');
 
         for (const entity of entities) {
+            // DEBUG: Check if we are processing a removed script
+            // console.log('[ScriptSystem] Processing Entity:', entity.id, 'Has script component:', !!entity.script);
+
             if (!entity.script || entity.script.length === 0) continue;
 
             for (const scriptData of entity.script) {

@@ -106,54 +106,61 @@ onMounted(() => {
         }
     });
     
+        
     layoutStore.setApi(api);
-
+    
     // Restore Layout or Default
     const savedLayout = layoutStore.loadLayout();
     if (savedLayout) {
         api.fromJSON(savedLayout);
     } else {
-        // --- Default Layout Construction (3 Columns) ---
+        // --- Default Layout Construction (Explicit JSON Strategy v15) ---
+        // We use a hardcoded JSON schema derived from a successful layout dump,
+        // but with corrected 'size' weights to enforce 25% | 50% | 25%.
+        // Total Width base: 1460 (365 + 730 + 365)
         
-        // 1. Create the 3 base columns first
-        const hierarchy = api.addPanel({
-            id: 'hierarchy',
-            component: 'hierarchy',
-            title: 'Hierarchy',
-            position: { referencePanel: '', direction: 'left' }
-        });
-        
-        const scene = api.addPanel({
-            id: 'scene',
-            component: 'scene',
-            title: 'Scene View',
-            position: { referencePanel: hierarchy, direction: 'right', size: 75 } as any // Hierarchy 25%, Scene 75%
-        });
-        
-        // Inspector (Right)
-        api.addPanel({
-            id: 'inspector',
-            component: 'inspector',
-            title: 'Inspector',
-            position: { referencePanel: scene, direction: 'right', size: 33.33 } as any // Scene 50%, Inspector 25% (33% of 75)
-        });
-
-        // 2. Split the columns vertically
-        // Add Assets below Hierarchy (Col 1)
-        api.addPanel({
-            id: 'assets',
-            component: 'assets',
-            title: 'Assets',
-            position: { referencePanel: hierarchy, direction: 'below' }
-        });
-        
-        // Add Console below Scene (Col 2)
-        api.addPanel({
-            id: 'console',
-            component: 'console',
-            title: 'Console',
-            position: { referencePanel: scene, direction: 'below', size: 25 } as any
-        });
+        api.fromJSON({
+            grid: {
+                root: {
+                    type: 'branch',
+                    data: [
+                        {
+                            type: 'branch',
+                            data: [
+                                { type: 'leaf', data: { views: ['hierarchy'], id: 'group-hierarchy' }, size: 600 },
+                                { type: 'leaf', data: { views: ['assets'], id: 'group-assets' }, size: 300 }
+                            ],
+                            size: 365
+                        },
+                        {
+                            type: 'branch',
+                            data: [
+                                { type: 'leaf', data: { views: ['scene'], id: 'group-scene' }, size: 600 },
+                                { type: 'leaf', data: { views: ['console'], id: 'group-console' }, size: 200 }
+                            ],
+                            size: 730
+                        },
+                        {
+                            type: 'leaf',
+                            data: { views: ['inspector'], id: 'group-inspector' },
+                            size: 365
+                        }
+                    ],
+                    size: 800
+                },
+                width: 1460,
+                height: 800,
+                orientation: 'HORIZONTAL'
+            },
+            panels: {
+                'hierarchy': { id: 'hierarchy', title: 'Hierarchy', component: 'hierarchy', contentComponent: 'hierarchy' },
+                'assets': { id: 'assets', title: 'Assets', component: 'assets', contentComponent: 'assets' },
+                'scene': { id: 'scene', title: 'Scene View', component: 'scene', contentComponent: 'scene' },
+                'console': { id: 'console', title: 'Console', component: 'console', contentComponent: 'console' },
+                'inspector': { id: 'inspector', title: 'Inspector', component: 'inspector', contentComponent: 'inspector' }
+            },
+            activeGroup: 'group-scene'
+        } as any);
     }
 
     // Auto-save layout on change

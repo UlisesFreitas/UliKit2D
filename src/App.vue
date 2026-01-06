@@ -12,7 +12,7 @@ onMounted(() => {
 
 <template>
   <div class="app-container">
-    <div class="title-bar">
+    <div class="title-bar" v-if="projectState.currentProjectPath">
         <AppHeader />
     </div>
     

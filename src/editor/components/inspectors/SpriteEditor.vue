@@ -34,6 +34,12 @@ const onSelectAsset = (path: string) => {
 const onDrop = (e: DragEvent) => {
     const path = e.dataTransfer?.getData('text/plain');
     if (path) {
+        // Validate Image Extension
+        if (!/\.(png|jpg|jpeg|webp|bmp|gif)$/i.test(path)) {
+            console.warn('[SpriteEditor] Ignored non-image drop:', path);
+            return;
+        }
+
         props.sprite.texture = path;
         thumbnailUrl.value = '';
         updateThumbnail();

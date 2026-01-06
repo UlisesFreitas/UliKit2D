@@ -69,7 +69,7 @@
     {
       "id": "7",
       "name": "UI Overhaul & Project Structure",
-      "status": "pending",
+      "status": "completed",
       "tasks": [
         "Implement Application Menu (File, Edit, etc.)",
         "Move Toolbar to Scene Panel",
@@ -80,7 +80,7 @@
     {
       "id": "8",
       "name": "Asset Management 2.0",
-      "status": "pending",
+      "status": "completed",
       "tasks": [
         "Implement Folder Navigation (Enter/Up)",
         "Breadcrumbs Navigation",
@@ -92,11 +92,33 @@
     {
       "id": "9",
       "name": "Scene Tools",
-      "status": "pending",
+      "status": "completed",
       "tasks": [
         "Grid Rendering",
         "Snap to Grid",
         "Rotate/Scale Gizmos"
+      ]
+    },
+    {
+      "id": "10",
+      "name": "Advanced Scripting System (Scripting 2.0)",
+      "status": "pending",
+      "tasks": [
+        "Implement AST-based Script Parsing (acorn/typescript)",
+        "Strict Script Lifecycle (onEnable, onDisable, onDestroy)",
+        "Support for TypeScript Scripts & Compilation",
+        "Script Properties Decorators or Metadata"
+      ]
+    },
+    {
+      "id": "11",
+      "name": "Visual Scripting System (Event Sheets)",
+      "status": "pending",
+      "tasks": [
+        "Design Event Block Data Structure (JSON)",
+        "Create Visual Block Editor (Drag & Drop)",
+        "Implement 'Block to JS' Transpiler",
+        "Integrate Event Sheets as 'Script Components'"
       ]
     }
   ]
