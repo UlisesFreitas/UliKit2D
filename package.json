@@ -19,6 +19,7 @@
     "lucide-vue-next": "^0.562.0",
     "matter-js": "^0.20.0",
     "miniplex": "^2.0.0",
+    "nanoid": "^5.1.6",
     "pinia": "^3.0.4",
     "pixi.js": "^8.14.3",
     "radix-vue": "^1.9.17",

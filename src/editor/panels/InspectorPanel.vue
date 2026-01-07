@@ -216,6 +216,14 @@ const existingComponentKeys = computed(() => {
     return Object.keys(selectedEntity.value).filter(k => !['id', 'name', 'visible', 'script'].includes(k));
 });
 
+// Collapsible State
+import { reactive } from 'vue';
+const collapsedState = reactive<Record<string, boolean>>({});
+
+const toggleCollapse = (key: string) => {
+    collapsedState[key] = !collapsedState[key];
+};
+
 </script>
 
 <template>
@@ -267,11 +275,14 @@ const existingComponentKeys = computed(() => {
 
             <!-- B. Standard Components -->
             <div v-else class="p-2 border border-border rounded bg-bg-panel group">
-                <div class="flex justify-between items-center mb-2">
-                    <div class="font-bold text-sm capitalize">{{ item.key }}</div>
+                <div class="flex justify-between items-center mb-2 cursor-pointer select-none" @click="toggleCollapse(item.key)">
+                    <div class="flex items-center">
+                        <span class="mr-2 text-xs text-text-secondary">{{ collapsedState[item.key] ? '▶' : '▼' }}</span>
+                        <div class="font-bold text-sm capitalize">{{ item.key }}</div>
+                    </div>
                     <button 
-                        v-if="item.key !== 'transform'" 
-                        @click="removeComponent(item.key)"
+                        v-if="item.key !== 'transform' && !(item.key === 'sprite' && (selectedEntity as any).animator)" 
+                        @click.stop="removeComponent(item.key)"
                         class="text-xs text-text-secondary hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
                         title="Remove Component"
                     >
@@ -279,7 +290,7 @@ const existingComponentKeys = computed(() => {
                     </button>
                 </div>
 
-                <div class="p-2">
+                <div class="p-2" v-show="!collapsedState[item.key]">
                     <TransformEditor 
                         v-if="item.key === 'transform'"
                         :transform="item.data" 

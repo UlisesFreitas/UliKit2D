@@ -56,6 +56,11 @@ const updateThumbnail = async () => {
         return;
     }
 
+    if (rawPath.startsWith('blob:') || rawPath.startsWith('data:')) {
+        thumbnailUrl.value = rawPath;
+        return;
+    }
+
     try {
         const fs = getFileSystem();
         thumbnailUrl.value = await fs.getAssetURL(rawPath);

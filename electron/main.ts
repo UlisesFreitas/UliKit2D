@@ -71,15 +71,26 @@ ipcMain.handle('project:watch', async (_event, projectPath) => {
     return { success: true, watchedPath: watchPath };
 });
 
-ipcMain.handle('import:file', async (_event, sourcePath, destDir) => {
+ipcMain.handle('import:file', async (_event, sourcePath, destDir, customFilename) => {
+    console.log(`[Main] import:file call. Source: ${sourcePath}, DestDir: ${destDir}, CustomName: ${customFilename}`);
     const fs = await import('fs/promises');
-    const filename = path.basename(sourcePath);
+    const filename = customFilename || path.basename(sourcePath);
     const destPath = path.join(destDir, filename);
+    console.log(`[Main] DestPath resolved to: ${destPath}`);
     
     try {
+        // Ensure destination directory exists
+        const dir = path.dirname(destPath);
+        console.log(`[Main] Ensuring directory exists: ${dir}`);
+        await fs.mkdir(dir, { recursive: true });
+        
+        console.log(`[Main] Copying file...`);
         await fs.copyFile(sourcePath, destPath);
+        
+        console.log(`[Main] Copy success! File at: ${destPath}`);
         return { success: true, path: destPath };
     } catch (e: any) {
+        console.error(`[Main] Copy failed:`, e);
         return { success: false, error: e.message };
     }
 });
@@ -104,10 +115,17 @@ ipcMain.handle('dialog:openFolder', async () => {
 
 ipcMain.handle('project:create', async (_event, folderPath: string) => {
     const fs = await import('fs/promises');
+    console.log(`[Main] project:create called for: ${folderPath}`);
     try {
         // Create basic structure
         const assetsPath = path.join(folderPath, 'assets');
+        console.log(`[Main] Creating assets at: ${assetsPath}`);
         await fs.mkdir(assetsPath, { recursive: true });
+        
+        // Ensure imported folder exists
+        const importedPath = path.join(assetsPath, 'imported');
+        console.log(`[Main] Creating imported at: ${importedPath}`);
+        await fs.mkdir(importedPath, { recursive: true });
         
         const projectConfig = {
             name: path.basename(folderPath),

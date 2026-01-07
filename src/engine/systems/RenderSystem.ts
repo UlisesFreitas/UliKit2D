@@ -1,4 +1,4 @@
-import { Application, Sprite, Texture, Assets, Text, TextStyle } from 'pixi.js';
+import { Application, Sprite, Texture, Assets, Text } from 'pixi.js';
 import { world } from '../ecs/ECS';
 import { getFileSystem } from '../../api/FileSystem';
 
@@ -37,6 +37,24 @@ export class RenderSystem {
     public update() {
         const entities = world.with('transform', 'sprite');
 
+        // Preload Animators
+        const animators = world.with('animator');
+        for (const entity of animators) {
+             if (entity.animator && entity.animator.animations) {
+                 for (const animName in entity.animator.animations) {
+                     const anim = entity.animator.animations[animName];
+                     if (anim && anim.frames) {
+                         for (const framePath of anim.frames) {
+                             if (!this.resolvedPathCache.has(framePath) && !this.pendingLoads.has(framePath) && !this.textureCache.has(framePath)) {
+                                 // Trigger load in background
+                                 this.resolveAndLoad(framePath);
+                             }
+                         }
+                     }
+                 }
+             }
+        }
+
         // Add/Update Sprites
         for (const entity of entities) {
             let sprite = this.spriteCache.get(entity.id!);
@@ -50,14 +68,17 @@ export class RenderSystem {
                 
                 // If we don't have a resolved URL yet, start resolving
                 if (!this.resolvedPathCache.has(cacheKey)) {
-                    if (!this.pendingPaths.has(cacheKey)) {
+                    if (rawPath.startsWith('blob:') || rawPath.startsWith('data:')) {
+                        // Direct usage
+                        this.resolvedPathCache.set(cacheKey, rawPath);
+                    } else if (!this.pendingPaths.has(cacheKey)) {
                         this.pendingPaths.add(cacheKey);
                         fs.getAssetURL(rawPath).then((url: string) => {
                             this.resolvedPathCache.set(cacheKey, url);
                             this.pendingPaths.delete(cacheKey);
                         });
                     }
-                    continue; // Skip until resolved
+                    if (!this.resolvedPathCache.has(cacheKey)) continue; // Skip until resolved
                 }
 
                 const texturePath = this.resolvedPathCache.get(cacheKey)!;
@@ -84,10 +105,10 @@ export class RenderSystem {
                 } else if (!this.pendingLoads.has(texturePath) && !this.failedLoads.has(texturePath)) {
                     // Start loading
                     this.pendingLoads.add(texturePath);
-                    console.log('[RenderSystem] Loading texture:', texturePath);
+                    //console.log('[RenderSystem] Loading texture:', texturePath);
                     
                     this.loadTexture(texturePath).then((texture) => {
-                        console.log('[RenderSystem] Loaded texture:', texturePath);
+                        //console.log('[RenderSystem] Loaded texture:', texturePath);
                         if (!texture) throw new Error('Texture loaded as null');
                         
                         this.textureCache.set(texturePath, texture);
@@ -100,7 +121,7 @@ export class RenderSystem {
 
                         this.pendingLoads.delete(texturePath);
                     }).catch(e => {
-                        console.error('[RenderSystem] Failed to load texture:', texturePath, e);
+                        //console.error('[RenderSystem] Failed to load texture:', texturePath, e);
                         this.pendingLoads.delete(texturePath);
                         this.failedLoads.add(texturePath);
                     });
@@ -127,7 +148,9 @@ export class RenderSystem {
                 const cacheKey = rawPath;
 
                 if (!this.resolvedPathCache.has(cacheKey)) {
-                    if (!this.pendingPaths.has(cacheKey)) {
+                    if (rawPath.startsWith('blob:') || rawPath.startsWith('data:')) {
+                         this.resolvedPathCache.set(cacheKey, rawPath);
+                    } else if (!this.pendingPaths.has(cacheKey)) {
                         this.pendingPaths.add(cacheKey);
                         fs.getAssetURL(rawPath).then((url: string) => {
                             this.resolvedPathCache.set(cacheKey, url);
@@ -139,16 +162,21 @@ export class RenderSystem {
 
                     if ((sprite as any)._texturePath !== texturePath) {
                         // Texture changed!
+                        //console.log(`[RenderSystemDebug] Texture mismatch for entity ${entity.id}. Current: ${(sprite as any)._texturePath}, New: ${texturePath}`);
+                        
                         if (this.textureCache.has(texturePath)) {
+                            // console.log(`[RenderSystemDebug] Applying cached texture: ${texturePath}`);
                             sprite.texture = this.textureCache.get(texturePath)!;
                             (sprite as any)._texturePath = texturePath;
                         } else if (!this.pendingLoads.has(texturePath) && !this.failedLoads.has(texturePath)) {
+                            // console.log(`[RenderSystemDebug] Texture not cached, triggering load: ${texturePath}`);
                             this.pendingLoads.add(texturePath);
                             
                             this.loadTexture(texturePath).then((texture) => {
                                 if (!texture) return;
                                 this.textureCache.set(texturePath, texture);
                                 if (this.spriteCache.get(entity.id!) === sprite) {
+                                    // console.log(`[RenderSystemDebug] Late apply texture: ${texturePath}`);
                                     sprite!.texture = texture;
                                     (sprite as any)._texturePath = texturePath;
                                     if (entity.sprite) {
@@ -161,6 +189,8 @@ export class RenderSystem {
                                  this.pendingLoads.delete(texturePath);
                                  this.failedLoads.add(texturePath);
                             });
+                        } else {
+                            //console.log(`[RenderSystemDebug] Texture pending or failed: ${texturePath}`);
                         }
                     }
                 }
@@ -219,27 +249,66 @@ export class RenderSystem {
     }
 
     private async loadTexture(url: string): Promise<Texture | null> {
+        // console.log('[RenderSystem] loadTexture called for:', url);
         try {
-            // Blob URL Handling for Web
-            if (url.startsWith('blob:')) {
-                // Return directly with hints
-                return await Assets.load({
-                    src: url,
-                    alias: [url], // Ensure string lookup works
-                    format: 'png', // Explicitly tell Pixi it's a PNG
-                    loadParser: 'loadTextures' // Hint to Pixi
-                });
+            if (url.startsWith('blob:') || url.startsWith('data:')) {
+                // Use HTML Image for 100% robust blob loading
+                const img = new Image();
+                img.src = url;
+                await img.decode(); // Wait for decode
+                const tex = Texture.from(img);
+                // console.log(`[RenderSystemDebug] Loaded blob texture via Image: ${tex.width}x${tex.height}`);
+                return tex;
             }
             return await Assets.load(url);
-         } catch (e) {
-             // Retry with explicit loadTextures detection if failed
-             console.warn('Initial load failed, retrying with explicit image detection...', e);
-             try {
-                return await Assets.load({ src: url, format: 'png', loadParser: 'loadTextures' });
-             } catch (e2) {
-                 console.error('Retry failed', e2);
-                 return null;
+        } catch (e) {
+            //console.error('[RenderSystem] loadTexture Error:', e);
+            return null;
+        }
+    }
+
+    private resolveAndLoad(rawPath: string) {
+        if (this.resolvedPathCache.has(rawPath)) {
+            const resolved = this.resolvedPathCache.get(rawPath)!;
+            if (!this.textureCache.has(resolved) && !this.pendingLoads.has(resolved)) {
+                 this.pendingLoads.add(resolved);
+                 this.loadTexture(resolved).then(tex => {
+                     if (tex) this.textureCache.set(resolved, tex);
+                     this.pendingLoads.delete(resolved);
+                 });
+            }
+            return;
+        }
+
+        if (this.pendingPaths.has(rawPath)) return;
+        
+        if (rawPath.startsWith('blob:') || rawPath.startsWith('data:')) {
+             this.resolvedPathCache.set(rawPath, rawPath);
+             // Trigger load immediately
+             if (!this.textureCache.has(rawPath) && !this.pendingLoads.has(rawPath)) {
+                  this.pendingLoads.add(rawPath);
+                  this.loadTexture(rawPath).then(tex => {
+                      if (tex) this.textureCache.set(rawPath, tex);
+                      this.pendingLoads.delete(rawPath);
+                  });
              }
-         }
+             return;
+        }
+
+        this.pendingPaths.add(rawPath);
+        
+        const fs = getFileSystem();
+        fs.getAssetURL(rawPath).then(async (url: string) => {
+            this.resolvedPathCache.set(rawPath, url);
+            this.pendingPaths.delete(rawPath);
+            
+            // Trigger load immediately
+            if (!this.textureCache.has(url) && !this.pendingLoads.has(url)) {
+                 this.pendingLoads.add(url);
+                 const tex = await this.loadTexture(url);
+                 if (tex) this.textureCache.set(url, tex);
+                 this.pendingLoads.delete(url);
+            }
+        });
     }
 }

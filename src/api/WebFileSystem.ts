@@ -139,6 +139,15 @@ export class WebFileSystem implements IFileSystem {
             });
         }
 
+        // Explicitly create assets/imported folder
+        files.put({
+            key: `${path}::assets/imported`,
+            project: path,
+            path: 'assets/imported',
+            content: null,
+            type: 'directory'
+        });
+
         return new Promise((resolve) => {
             tx.oncomplete = () => {
                 console.log('[WebFileSystem] Transaction complete: Project created');
@@ -332,13 +341,166 @@ export class WebFileSystem implements IFileSystem {
     }
 
     // Asset Management
-    async importFile(sourcePath: string, destDir: string): Promise<{success: boolean, path?: string, error?: string}> {
-        // Not used in Web (DragDrop uses writeFile directly)
-        return { success: false, error: 'Not supported' };
+    async importFile(sourcePath: string, destDir: string, customFilename?: string): Promise<{success: boolean, path?: string, error?: string}> {
+        if (!this.db || !this.currentProject) return { success: false, error: 'No project' };
+        
+        console.log(`[WebFileSystem] Importing file. Source: ${sourcePath}, DestDir: ${destDir}, CustomName: ${customFilename}`);
+
+        try {
+            // 1. Fetch the blob from the source URL (likely a Blob URL)
+            const response = await fetch(sourcePath);
+            if (!response.ok) throw new Error(`Fetch failed: ${response.statusText}`);
+            const blob = await response.blob();
+            
+            // 2. Determine destination path
+            let fileName = customFilename;
+            
+            if (!fileName) {
+                 const urlParts = sourcePath.split('/');
+                 const popped = urlParts.pop();
+                 fileName = (popped && popped.length > 0) ? popped : 'imported_file.png';
+                 // Clean query params if any
+                 fileName = fileName.split('?')[0] ?? fileName;
+            }
+
+            // If it's a UUID blob, maybe append extension if missing?
+            if (!fileName.includes('.')) {
+                // Peek mimetype
+                if (blob.type === 'image/png') fileName += '.png';
+                else if (blob.type === 'image/jpeg') fileName += '.jpg';
+                else if (blob.type === 'image/webp') fileName += '.webp';
+                else if (blob.type === 'image/gif') fileName += '.gif';
+            }
+
+            const cleanDestDir = destDir.replace(/\\/g, '/');
+            const destPath = `${cleanDestDir}/${fileName}`;
+            // Ensure relative to project root? 
+            // destDir passed from Animator is `projectPath/assets/imported/AnimName`.
+            // So destPath should be relative from project root? 
+            // Wait, In WebFileSystem, keys are `project::path`. 
+            // `path` argument in createProject is the "root". 
+            // In AnimatorModal: `const destDir = ${projectPath}/assets/imported/${animName...`
+            // So destDir is fully qualified "Project/assets/...".
+            // That matches our key structure.
+
+            // 3. Write to DB
+            // key is implicitly used in put, but we construct it inline to avoid lint error if not needed separately
+            
+            // Extract relative path
+            let relativeDestPath = destPath;
+            if (relativeDestPath.startsWith(this.currentProject + '/')) {
+                relativeDestPath = relativeDestPath.substring(this.currentProject.length + 1);
+            }
+
+            // 3. Ensure Directory Exists (Recursive-ish for one level)
+            // If destDir is "MyProject/assets/imported", we want to ensure it exists as a directory entry
+            // This fixes issues where existing projects don't have the explicit folder entry
+            const tx = this.db.transaction(['files'], 'readwrite');
+            const store = tx.objectStore('files');
+
+            let relativeDestDir = destDir;
+            if (relativeDestDir.startsWith(this.currentProject + '/')) {
+                relativeDestDir = relativeDestDir.substring(this.currentProject.length + 1);
+            }
+            
+            // Check/Create Main Dir
+            // We assume "assets" likely exists, but "assets/imported" might not.
+            // Ideally should split and ensure all parts, but for now specific fix for imported:
+            if (relativeDestDir === 'assets/imported') {
+                const dirKey = `${this.currentProject}::assets/imported`;
+                const dirReq = store.get(dirKey);
+                dirReq.onsuccess = () => {
+                     if (!dirReq.result) {
+                         console.log('[WebFileSystem] Auto-creating missing folder: assets/imported');
+                         store.put({
+                            key: dirKey,
+                            project: this.currentProject,
+                            path: 'assets/imported',
+                            content: null,
+                            type: 'directory'
+                        });
+                     }
+                };
+            }
+
+            // 4. Store File
+            // key is implicitly used in put, but we construct it inline to avoid lint error if not needed separately
+            
+            // Extract relative path (re-use variable logic, but don't redeclare if already present in scope? No, it was shadowed in my mind)
+            // The previous block was inserted ABOVE the original declaration.
+            // But wait, the original code had:
+            // let relativeDestPath = destPath; 
+            // ...
+            
+            // My replacement block INCLUDED the original declaration at the end.
+            // "store.put" block uses it.
+            
+            // If the error says "Cannot redeclare", it means it appears twice in the same scope.
+            
+            // Let's remove the second declaration or merge.
+            // I will just remove the "let" keyword if it's already declared, OR ensure it's only declared once.
+            
+            // Looking at the file content (via mental model or previous read):
+            // I replaced lines 395-405.
+            // Line 390 had: `let relativeDestPath = destPath;`
+            // Wait, looking at the DIFF:
+            // I added the block, and the "4. Store" section is repeated? 
+            
+            // Ah, I see:
+            // My replacement content ended with:
+            // `let relativeDestPath = destPath; ... store.put(...)`
+            
+            // But I replaced the block STARTING at line 395.
+            // Did line 390 EXIST before?
+            // Yes, line 390: `let relativeDestPath = destPath;` was OUTSIDE my target range?
+            // No, wait. 
+            // In step 2054 view:
+            // 389: // Extract relative path
+            // 390: let relativeDestPath = destPath;
+            // ...
+            // 395: // 4. Store
+            
+            // I replaced starting at 395.
+            // So `let relativeDestPath` at 390 is STILL THERE.
+            // And my replacement ADDS `let relativeDestPath` again at the end of the block.
+            
+            // Solution: Remove the duplicate declaration and logic from my replacement block, 
+            // relying on the one that exists at line 390 (which is before my block).
+            
+            // Wait, my replacement block is inserted at 395.
+            // So the structure is now:
+            // 390: let relativeDestPath = destPath; ...
+            // 395: // 3. Ensure Directory Exists ...
+            // ...
+            // 430: let relativeDestPath = destPath;
+            
+            // Yes. I will remove the re-declaration.
+            
+            store.put({
+                key: `${this.currentProject}::${relativeDestPath}`,
+                project: this.currentProject,
+                path: relativeDestPath,
+                content: blob,
+                type: 'file'
+            });
+
+            await new Promise<void>((resolve, reject) => {
+                tx.oncomplete = () => resolve();
+                tx.onerror = () => reject(tx.error);
+            });
+
+            console.log(`[WebFileSystem] Imported successfully to: ${destPath}`);
+            return { success: true, path: destPath }; // Return full "absolute" path (Project/...) logic
+
+        } catch (e: any) {
+            console.error('[WebFileSystem] Import failed:', e);
+            return { success: false, error: e.message };
+        }
     }
 
     getPathForFile(file: File): string {
-        return file.name;
+        // Return object URL for reading
+        return URL.createObjectURL(file);
     }
 
     async showItemInFolder(path: string): Promise<void> {
@@ -366,7 +528,7 @@ export class WebFileSystem implements IFileSystem {
         });
     }
 
-    async saveFileDialog(filters: {name: string, extensions: string[]}[]): Promise<string | null> {
+    async saveFileDialog(_filters: {name: string, extensions: string[]}[]): Promise<string | null> {
          return "web-save-dialog";
     }
 

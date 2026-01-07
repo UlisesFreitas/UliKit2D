@@ -26,7 +26,7 @@ export interface IFileSystem {
     readdir(path: string): Promise<FileEntry[]>;
     
     // Asset Management
-    importFile(sourcePath: string, destDir: string): Promise<{success: boolean, path?: string, error?: string}>;
+    importFile(sourcePath: string, destDir: string, customFilename?: string): Promise<{success: boolean, path?: string, error?: string}>;
     getPathForFile(file: File): string;
     showItemInFolder(path: string): Promise<void>;
 

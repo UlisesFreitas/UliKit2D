@@ -6,7 +6,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
       ipcRenderer.removeAllListeners('file:event');
       ipcRenderer.on('file:event', callback);
   },
-  importFile: (source: string, project: string) => ipcRenderer.invoke('import:file', source, project),
+  importFile: (source: string, project: string, customName?: string) => ipcRenderer.invoke('import:file', source, project, customName),
   getPathForFile: (file: File) => webUtils.getPathForFile(file),
   // Project Management
   selectFolder: () => ipcRenderer.invoke('dialog:openFolder'),
