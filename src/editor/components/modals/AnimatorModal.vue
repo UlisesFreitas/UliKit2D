@@ -273,41 +273,39 @@ const previewIndex = ref(0);
 const previewTimer = ref<number | null>(null);
 const zoomLevel = ref(1);
 
+// Async URL Cache
+const frameUrlCache = ref<Map<string, string>>(new Map());
+const pendingResolves = new Set<string>();
+
 const resolveFrame = (path: string) => {
     if (!path) return '';
     if (path.startsWith('blob:') || path.startsWith('data:')) return path;
 
-    // Normalize slashes immediately to avoid regex/path join headaches
-    path = path.replace(/\\/g, '/');
-    
-    // Check if it's an absolute path
-    const isAbsolute = /^[a-zA-Z]:\/|^\//.test(path);
-    const fs = getFileSystem();
-    
-    let url = path;
-
-    // If it's a relative path and we have a project open, resolve to full URL
-    if (!isAbsolute && projectState.currentProjectPath && typeof projectState.currentProjectPath === 'string') {
-        const projectPath = projectState.currentProjectPath.replace(/\\/g, '/');
-        // Check if we need to prepend /@fs/ for Electron renderer
-        if (fs.isElectron) {
-             // Use encodeURI to handle spaces
-             url = encodeURI(`/@fs/${projectPath}/${path}`); 
-        } else {
-             url = path; 
-        }
-    }
-    // If it's absolute, wrap in /@fs/ for Electron
-    else if (isAbsolute && fs.isElectron) {
-        url = encodeURI(`/@fs/${path}`);
+    // Check cache
+    if (frameUrlCache.value.has(path)) {
+        return frameUrlCache.value.get(path)!;
     }
 
-    // Debug Log
-    if (path.includes('imported')) {
-        console.log(`[Animator] ResolveFrame: ${path} -> ${url}`);
+    // Return placeholder and trigger resolved
+    if (!pendingResolves.has(path)) {
+        pendingResolves.add(path);
+        const fs = getFileSystem();
+        
+        // Use the centralized, robust getAssetURL from FileSystem
+        fs.getAssetURL(path).then(url => {
+            frameUrlCache.value.set(path, url);
+            pendingResolves.delete(path);
+        }).catch(err => {
+            console.error(`[Animator] Failed to resolve URL for ${path}`, err);
+            pendingResolves.delete(path);
+        });
     }
 
-    return url;
+    // Return a temporary placeholder or the raw path (which might fail initially but will update)
+    // For Electron, we can try a best-guess sync construct as backup, but for Web it will fail.
+    // Let's just return empty string or a spinner? 
+    // Or return path for now to reduce flicker if it accidentally works.
+    return ''; 
 };
 
 const handleWheel = (e: WheelEvent) => {
@@ -551,7 +549,7 @@ onUnmounted(() => {
                                 <!-- Thumb -->
                                 <div class="w-full h-full flex items-center justify-center p-1 bg-checkerboard">
                                      <!-- Ensure we display something -->
-                                     <img v-if="frame.startsWith('blob:') || frame.startsWith('data:') || frame.includes('/') || frame.includes('\\')" :src="frame" class="max-w-full max-h-full object-contain pixelated" />
+                                     <img v-if="frame.startsWith('blob:') || frame.startsWith('data:') || frame.includes('/') || frame.includes('\\')" :src="resolveFrame(frame)" class="max-w-full max-h-full object-contain pixelated" />
                                      <div v-else class="text-[10px] text-center break-all p-1">{{ frame.split(/[/\\]/).pop() }}</div>
                                 </div>
                             </div>
