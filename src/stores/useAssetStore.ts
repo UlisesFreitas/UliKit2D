@@ -27,7 +27,9 @@ export const useAssetStore = defineStore('assets', () => {
                 currentPath.value = ''; // Reset navigation
                 
                 await fs.watchProject(newPath as any, (event: FileChangeEvent) => {
-                    if (event.event === 'initial' && event.files) {
+                    // Handle bulk updates (initial or manual re-scan)
+                    if ((event.event === 'initial' || event.event === 'change') && event.files) {
+                        console.log('AssetStore: Received bulk update', event.files.length, 'files');
                         files.value = event.files.map(f => ({
                             name: f.name,
                             path: f.path,
@@ -35,6 +37,7 @@ export const useAssetStore = defineStore('assets', () => {
                             type: f.type
                         }));
                     } else {
+                        // Incremental updates (Electron usually)
                         handleFileEvent(event.event, event.path, event.fullPath || event.path);
                     }
                 });

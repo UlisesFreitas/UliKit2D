@@ -3,7 +3,6 @@ import { ref, computed, onUnmounted } from 'vue';
 import { type Entity } from '../../../engine/ecs/ECS';
 import { projectState } from '../../managers/ProjectManager';
 import { getFileSystem } from '../../../api/FileSystem';
-import { nanoid } from 'nanoid';
 
 const props = defineProps<{
     isOpen: boolean;
@@ -115,60 +114,86 @@ const importExternalFile = async (rawPath: string, _animName: string): Promise<s
     const projectPath = typeof projectState.currentProjectPath === 'string' ? projectState.currentProjectPath.replace(/\\/g, '/') : '';
 
     console.log(`[Animator] Checking file: ${finalPath}`);
-    console.log(`[Animator] isElectron: ${fs.isElectron}, ProjectPath: ${projectPath}`);
+    console.log(`[Animator] isElectron: ${fs.isElectron}, ProjectPath: '${projectPath}'`);
     
-    if (finalPath && projectPath) {
+    if (projectPath) {
             // Check if file is outside project assets
             // We normalize everything to forward slashes for comparison
-            if (!finalPath.startsWith(projectPath)) {
-                console.log(`[Animator] Creating import for external file: ${finalPath}`);
+            // For Web, if it's a blob URL, it is definitely 'outside'
+            const isBlob = finalPath.startsWith('blob:') || finalPath.startsWith('data:');
+            const isOutside = !finalPath.startsWith(projectPath) || isBlob;
+
+            if (isOutside) {
+                console.log(`[Animator] Creating import for external file (Blob/Outside): ${finalPath}`);
                 
                 // Destination: assets/imported
                 // Strategy: Use UUID to ensure uniqueness and flat structure.
-                // Filename: [nanoid]_[OriginalFilename]
-                const uuid = nanoid(10); // Short, URL-safe ID
-                let originalName = finalPath.split('/').pop() || `imported_${Date.now()}.png`;
-                // Remove potential query params if it's a URL
-                originalName = originalName.split('?')[0] ?? originalName; 
+                const uuid = crypto.randomUUID ? crypto.randomUUID().slice(0, 8) : Math.random().toString(36).slice(2, 10);
                 
+                let originalName = 'image.png';
+                if (!isBlob) {
+                     originalName = finalPath.split('/').pop() || `imported_${Date.now()}.png`;
+                     originalName = originalName.split('?')[0] ?? originalName;
+                }
+                
+                // Ensure extension
+                if (!originalName.includes('.')) originalName += '.png';
+
                 const customFilename = `${uuid}_${originalName}`;
-                const destDir = `${projectPath}/assets/imported`;
+                // Ensure destDir doesn't double slash
+                const cleanProjectPath = projectPath.endsWith('/') ? projectPath.slice(0, -1) : projectPath;
+                const destDir = `${cleanProjectPath}/assets/imported`;
                 
+                console.log(`[Animator] Importing to destDir: ${destDir} with name: ${customFilename}`);
+
                 try {
                     // Pass customFilename as 3rd optional argument
                     // @ts-ignore - we know our FS supports it now
                     const result = await fs.importFile(finalPath, destDir, customFilename);
                     
-                  // Debug log (throttled/once per unique path ideally, but for now just log imports)
-
-                    
                     if (result.success && result.path) {
-                        console.log(`[Animator] Imported to: ${result.path}`);
+                        console.log(`[Animator] Import Success. Result Path: ${result.path}`);
+                        
                         // Convert absolute result to relative path from project root
                         const absPath = result.path.replace(/\\/g, '/');
+                        const normPath = absPath.toLowerCase(); // simplified check
                         
-                        // Normalize for case-insensitive check on Windows
-                        const normPath = absPath.toLowerCase();
-                        const normProject = projectPath.toLowerCase();
-
-                        if (normPath.startsWith(normProject)) {
-                            finalPath = absPath.slice(projectPath.length + 1); // +1 for slash
+                        // For Web, internal paths are like /MyWebProject/assets/...
+                        // For Electron, C:/...
+                        
+                        // We want just 'assets/imported/xxx'
+                        if (absPath.startsWith(cleanProjectPath)) {
+                             // cleanProjectPath = /MyWebProject
+                             // absPath = /MyWebProject/assets/imported/...
+                             finalPath = absPath.slice(new RegExp(`^${cleanProjectPath}/?`).exec(absPath)?.[0].length || 0);
                         } else {
-                             finalPath = absPath; // Fallback
+                             finalPath = absPath;
+                             // Try to strip leading slash if valid relative
+                             if (finalPath.startsWith('/')) finalPath = finalPath.slice(1);
                         }
+                        
+                         console.log(`[Animator] Final Relative Path: ${finalPath}`);
+
                     } else {
                         console.error(`[Animator] Failed to import ${finalPath}:`, result.error);
+                        alert(`Failed to import file: ${result.error}`);
+                        // Return empty or original? If failed, do not save blob as it won't persist
+                        return ''; 
                     }
                 } catch (err) {
                     console.error(`[Animator] Error importing file:`, err);
+                    alert(`Error importing file: ${err}`);
+                    return '';
                 }
             } else {
-
-                 // If it IS in the project path, make it relative for consistency
-                if (finalPath.startsWith(projectPath)) {
+                 // It IS in the project path already
+                 console.log(`[Animator] File is already in project: ${finalPath}`);
+                 if (finalPath.startsWith(projectPath)) {
                     finalPath = finalPath.slice(projectPath.length + 1);
-                }
+                 }
             }
+    } else {
+        console.warn('[Animator] No project path found!');
     }
     return finalPath;
 };
@@ -182,6 +207,8 @@ const onFileSelected = async (e: Event) => {
 
     const newFrames: string[] = [];
     const fs = getFileSystem();
+
+    console.log(`[Animator] Processing ${files.length} files for ${animName}`);
 
     for (let i = 0; i < files.length; i++) {
         const file = files[i];
@@ -200,18 +227,22 @@ const onFileSelected = async (e: Event) => {
 
         if (rawPath) {
             const finalPath = await importExternalFile(rawPath, animName);
-            newFrames.push(finalPath);
+            if (finalPath) {
+                newFrames.push(finalPath);
+            }
         }
     }
     
     // Force reactivity
     if (newFrames.length > 0) {
+        console.log(`[Animator] Adding frames to ${animName}:`, newFrames);
         props.entity.animator.animations[animName].frames = [
             ...props.entity.animator.animations[animName].frames,
             ...newFrames
         ];
         version.value++;
         emit('update');
+        console.log('[Animator] Update emitted');
     }
     
     // Reset
@@ -226,6 +257,8 @@ const onDropFrame = async (e: DragEvent, animName: string) => {
     const newFrames: string[] = [];
     const fs = getFileSystem();
     
+    console.log(`[Animator] Drop event on ${animName}`);
+
     // 1. Check for Files (External Drop)
     if (e.dataTransfer?.files && e.dataTransfer.files.length > 0) {
          for (let i = 0; i < e.dataTransfer.files.length; i++) {
@@ -243,7 +276,7 @@ const onDropFrame = async (e: DragEvent, animName: string) => {
 
              if (rawPath && rawPath.match(/\.(png|jpg|jpeg|gif|webp)$/i)) {
                  const finalPath = await importExternalFile(rawPath, animName);
-                 newFrames.push(finalPath);
+                 if (finalPath) newFrames.push(finalPath);
              }
          }
     } 
@@ -251,7 +284,7 @@ const onDropFrame = async (e: DragEvent, animName: string) => {
     else {
         const path = e.dataTransfer?.getData('text/plain');
         if (path && path.match(/\.(png|jpg|jpeg|gif|webp)$/i)) {
-             newFrames.push(path);
+             newFrames.push(path); // Internal assets are usually relative paths
         }
     }
 
@@ -262,6 +295,7 @@ const onDropFrame = async (e: DragEvent, animName: string) => {
          ];
          version.value++;
          emit('update');
+         console.log('[Animator] Drop update emitted');
     }
 };
 

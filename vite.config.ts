@@ -8,6 +8,7 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
+      '@zenfs/core/vfs/constants.js': path.resolve(__dirname, 'node_modules/@zenfs/core/dist/vfs/constants.js'),
     },
   },
   server: {

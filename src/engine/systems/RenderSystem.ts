@@ -121,7 +121,7 @@ export class RenderSystem {
 
                         this.pendingLoads.delete(texturePath);
                     }).catch(e => {
-                        //console.error('[RenderSystem] Failed to load texture:', texturePath, e);
+                        console.error('[RenderSystem] Failed to load texture:', texturePath, e);
                         this.pendingLoads.delete(texturePath);
                         this.failedLoads.add(texturePath);
                     });

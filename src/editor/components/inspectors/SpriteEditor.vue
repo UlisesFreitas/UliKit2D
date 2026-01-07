@@ -21,7 +21,9 @@ const openPicker = () => {
 
 const onSelectAsset = (path: string) => {
     // 1. Mutate
-    props.sprite.texture = path;
+    // Normalize path to forward slashes
+    const normPath = path.replace(/\\/g, '/');
+    props.sprite.texture = normPath;
     
     // 2. Immediate visual update
     thumbnailUrl.value = ''; // Force loading state
@@ -40,7 +42,8 @@ const onDrop = (e: DragEvent) => {
             return;
         }
 
-        props.sprite.texture = path;
+        const normPath = path.replace(/\\/g, '/');
+        props.sprite.texture = normPath;
         thumbnailUrl.value = '';
         updateThumbnail();
         onUpdate();
