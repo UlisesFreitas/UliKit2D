@@ -17,6 +17,7 @@ export class RenderSystem {
 
     constructor(app: Application) {
         this.app = app;
+        this.app.stage.sortableChildren = true;
     }
 
     public update() {
@@ -116,6 +117,9 @@ export class RenderSystem {
         nSlice.x = entity.transform.x;
         nSlice.y = entity.transform.y;
         nSlice.rotation = entity.transform.rotation;
+        if (nSlice.zIndex !== (entity.transform.zIndex || 0)) {
+            nSlice.zIndex = entity.transform.zIndex || 0;
+        }
         // NineSlice usually IGNORES scale if width/height are set, BUT we can simply Apply Scale to the container? No, NineSliceSprite extends Container?
         // Actually, NineSlice width/height IS the size. 
         // If we want Transform.Scale to affect it:
@@ -190,6 +194,9 @@ export class RenderSystem {
         sprite.x = entity.transform.x;
         sprite.y = entity.transform.y;
         sprite.rotation = entity.transform.rotation;
+        if (sprite.zIndex !== (entity.transform.zIndex || 0)) {
+            sprite.zIndex = entity.transform.zIndex || 0;
+        }
         sprite.scale.set(entity.transform.scale.x, entity.transform.scale.y);
 
         // Sync Visibility
@@ -265,6 +272,9 @@ export class RenderSystem {
         textFn.x = entity.transform.x;
         textFn.y = entity.transform.y;
         textFn.rotation = entity.transform.rotation;
+        if (textFn.zIndex !== (entity.transform.zIndex || 0)) {
+            textFn.zIndex = entity.transform.zIndex || 0;
+        }
         textFn.scale.set(entity.transform.scale.x, entity.transform.scale.y);
         
         textFn.visible = entity.visible !== false;
@@ -333,6 +343,9 @@ export class RenderSystem {
         bText.x = entity.transform.x;
         bText.y = entity.transform.y;
         bText.rotation = entity.transform.rotation;
+        if (bText.zIndex !== (entity.transform.zIndex || 0)) {
+            bText.zIndex = entity.transform.zIndex || 0;
+        }
         bText.scale.set(entity.transform.scale.x, entity.transform.scale.y);
 
         bText.visible = entity.visible !== false;

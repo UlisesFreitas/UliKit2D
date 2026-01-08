@@ -62,7 +62,7 @@ const createEntity = (type: 'Empty' | 'Sprite' | 'Camera' | 'Text' | 'BitmapText
     let data: any = {
         id,
         name: type === 'Empty' ? 'New Entity' : `New ${type}`,
-        transform: { x: 0, y: 0, rotation: 0, scale: { x: 1, y: 1 } }
+        transform: { x: 0, y: 0, rotation: 0, scale: { x: 1, y: 1 }, zIndex: 0 }
     };
 
     if (type === 'Sprite') {

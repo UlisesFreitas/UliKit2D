@@ -38,7 +38,15 @@ const movement = Input.getAxis('Horizontal'); // -1 to 1
 - `SceneManager.loadScene(name)` needs to be safe for runtime (clearing ECS, resetting systems).
 - Needs a build step to bundle scene JSONs so they are accessible in the final build (not just `file://` access).
 
-## 5. Prefab System (Optional but Recommended)
+## 5. Advanced Layer Manager (Future)
+**Current Status:** Basic Z-Index support exists (manual number implementation).
+**Requirement:** Named Layers (e.g., "Background", "Actors", "UI") to organize z-sorting more intuitively.
+**Proposed Workflow:**
+- A "Layer Manager" panel to create and reorder named layers.
+- Entities assign to a "Layer" by name drop-down instead of raw number.
+- Internally maps Layer Order + Local Z to final zIndex.
+
+## 6. Prefab System (Optional but Recommended)
 **Current Status:** "Copy/Paste" exists, but no true template/prefab system.
 **Requirement:** Reuse entity definitions.
 

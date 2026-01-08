@@ -1,7 +1,7 @@
 <script setup lang="ts">
 
 const props = defineProps<{
-    transform: { x: number; y: number; rotation: number; scale: { x: number; y: number } };
+    transform: { x: number; y: number; rotation: number; scale: { x: number; y: number }; zIndex?: number };
     revision?: number;
 }>();
 
@@ -57,6 +57,23 @@ const update = (key: string, val: number) => {
                             transform.rotation = val * (Math.PI / 180);
                             update('rotation', transform.rotation);
                         }"
+                    />
+                </div>
+             </div>
+         </div>
+
+        <!-- Z-Index -->
+         <div class="flex items-center">
+             <div class="w-16 text-xs text-text-secondary">Layer</div>
+             <div class="flex-1">
+                 <div class="flex items-center bg-bg-input border border-border rounded overflow-hidden group">
+                    <div class="px-2 text-xs font-bold text-yellow-500 cursor-ew-resize border-r border-border hover:bg-bg-hover">#</div>
+                    <input 
+                        type="number" 
+                        class="w-full bg-transparent text-xs p-1 px-2 outline-none text-text-primary"
+                        v-model.number="transform.zIndex"
+                        @input="update('zIndex', transform.zIndex || 0)"
+                        placeholder="0"
                     />
                 </div>
              </div>
