@@ -58,7 +58,7 @@ export class SceneManager {
         this._activeSceneName = 'Untitled Scene';
         createEntity('Main Camera'); // Should add Camera component logic here later if not auto-added
         // We might want to ensure Main Camera has the camera component
-        const cam = world.add({ 
+        world.add({ 
             name: 'Main Camera',
             transform: { x: 0, y: 0, rotation: 0, scale: { x: 1, y: 1 } },
             camera: { zoom: 1, isPrimary: true, backgroundColor: '#333333' }

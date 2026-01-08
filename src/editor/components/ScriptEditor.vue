@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue';
 import type { Entity } from '../../engine/ecs/ECS';
-import { projectState } from '../managers/ProjectManager';
+
 import AssetPickerModal from './modals/AssetPickerModal.vue';
 import { getFileSystem } from '../../api/FileSystem';
 

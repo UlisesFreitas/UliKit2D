@@ -1,7 +1,7 @@
 import { Application, Sprite, Texture, Text, BitmapText, FederatedPointerEvent, NineSliceSprite } from 'pixi.js';
 import { world } from '../ecs/ECS';
 import { resourceManager } from '../resources/ResourceManager';
-import { eventBus } from '../core/EventBus';
+
 
 export class RenderSystem {
     private app: Application;

@@ -413,8 +413,8 @@ export class GizmoManager {
                // To keep it simple: We will just change dimensions and assume center scaling for now (NineSlice handles anchors).
                
                // Account for current scale to convert screen pixel delta to local unit delta
-               const currentScaleX = this.selectedEntity.transform.scale.x;
-               const currentScaleY = this.selectedEntity.transform.scale.y;
+                const currentScaleX = this.selectedEntity!.transform!.scale.x;
+                const currentScaleY = this.selectedEntity!.transform!.scale.y;
 
                // Avoid div by zero
                const sX = Math.abs(currentScaleX) > 0.01 ? currentScaleX : 1;

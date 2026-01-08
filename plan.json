@@ -107,7 +107,11 @@
         "Implement AudioSource Component & System",
         "Implement Text/Label Component & System",
         "Implement Sprite Animator Component",
-        "Implement Tilemap Component & Editor"
+        "Implement Tilemap Component & Editor",
+        "Implement Input Manager System",
+        "Implement Physics Shapes (CircleCollider)",
+        "Implement Z-Index / Layer Sorting",
+        "Implement Runtime Scene Switching"
       ]
     },
     {

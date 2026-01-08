@@ -12,6 +12,7 @@ dist-ssr
 *.local
 
 TestProject
+TestProject2
 BrowserTestProject
 ct-js-reference
 zscreenshots    

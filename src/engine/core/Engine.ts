@@ -4,6 +4,7 @@ import { AudioSystem } from '../audio/AudioSystem';
 import { AnimationSystem } from '../systems/AnimationSystem';
 import { RenderSystem } from '../systems/RenderSystem';
 import { EditorDebugSystem } from '../systems/EditorDebugSystem';
+import { Input } from '../input/InputManager';
 import { Application } from 'pixi.js';
 
 export class Engine {
@@ -41,6 +42,7 @@ export class Engine {
             preference: 'webgpu',
         });
         container.appendChild(this.app.canvas);
+        Input.initialize(this.app.canvas);
     }
 
     public start() {
@@ -57,11 +59,13 @@ export class Engine {
 
     public startSimulation() {
         this.isSimulationRunning = true;
+        Input.reset();
         this.audioSystem.start();
     }
 
     public stopSimulation() {
         this.isSimulationRunning = false;
+        Input.reset();
         this.audioSystem.stopAll();
     }
 
@@ -77,6 +81,7 @@ export class Engine {
 
         if (this.isSimulationRunning) {
             this.physicsSystem.update(deltaTime);
+            Input.update(); // Update input state (clears frame-based flags)
             this.scriptSystem.update(deltaTime);
             this.animationSystem.update(deltaTime / 1000); // Pass seconds
         }

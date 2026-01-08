@@ -78,7 +78,7 @@ export class ResourceManager {
      * Preload assets.
      * Stub for now to maintain compatibility with RenderSystem.
      */
-    public async preload(assets: string[]): Promise<void> {
+    public async preload(_assets: string[]): Promise<void> {
         // Optional: Implement preloading logic if needed
         // For now, just resolve immediately
         return Promise.resolve();

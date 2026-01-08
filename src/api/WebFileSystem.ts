@@ -344,7 +344,8 @@ export class WebFileSystem implements IFileSystem {
                 let params: BlobPropertyBag = {};
                 if (ext === 'png') params.type = 'image/png';
                 else if (ext === 'jpg' || ext === 'jpeg') params.type = 'image/jpeg';
-                else if (ext === 'js' || ext === 'json') params.type = 'text/plain'; // Scripts
+                else if (ext === 'js' || ext === 'mjs') params.type = 'application/javascript';
+                else if (ext === 'json') params.type = 'application/json';
 
                 const blob = new Blob([bufferContent], params);
                 return URL.createObjectURL(blob);

@@ -1,4 +1,4 @@
-import { BitmapFont, Texture, type BitmapFontData, Assets } from 'pixi.js';
+import { BitmapFont, type BitmapFontData, Assets } from 'pixi.js';
 import { ResourceLoader } from './ResourceLoader';
 import { PixiImageManager } from './PixiImageManager';
 import { ResourceCache } from './ResourceCache';
@@ -63,6 +63,7 @@ export class PixiBitmapFontManager {
             
             // Register manually in PixiJS v8 Cache
             // Key format typically used by Pixi is `${name}-bitmap`
+            console.log('Registering font to Assets cache', Assets);
             Assets.cache.set(`${uniqueName}-bitmap`, font);
             
             // Cache mapping
