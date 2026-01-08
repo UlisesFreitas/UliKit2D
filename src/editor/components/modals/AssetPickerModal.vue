@@ -2,6 +2,7 @@
 import { ref, computed, watch } from 'vue';
 import { useAssetStore } from '../../../stores/useAssetStore';
 import { getFileSystem } from '../../../api/FileSystem';
+import { projectState } from '../../managers/ProjectManager';
 
 const props = defineProps<{
     isOpen: boolean;
@@ -64,6 +65,69 @@ const selectAsset = (asset: any) => {
     props.onClose();
 };
 
+const importAssets = async () => {
+    console.log('[AssetPicker] Import blocked? Checking project state...');
+    if (!projectState.currentProjectPath) {
+        console.error('[AssetPicker] No project path found!');
+        alert("No project open. Please open a project first.");
+        return;
+    }
+
+    const fs = getFileSystem();
+    const destDir = `${projectState.currentProjectPath}/assets`;
+    console.log('[AssetPicker] Importing to:', destDir);
+    
+    // We assume 'assets' exists. If not, writeFile/importFile usually handles it or we fail gracefully.
+
+    if (fs.isElectron) {
+        console.log('[AssetPicker] Running in Electron mode');
+        const result = await (window as any).electronAPI.showOpenDialog({
+            properties: ['openFile', 'multiSelections'],
+            filters: [
+                { name: 'Images', extensions: ['png', 'jpg', 'jpeg', 'webp', 'svg', 'gif'] },
+                { name: 'Scripts', extensions: ['js', 'ts'] },
+                { name: 'All Files', extensions: ['*'] }
+            ]
+        });
+
+        if (!result.canceled && result.filePaths.length > 0) {
+            for (const filePath of result.filePaths) {
+                // ElectronFileSystem's importFile handles copying
+                await fs.importFile(filePath, destDir);
+            }
+            // Watcher should trigger update automatically
+        }
+    } else {
+        console.log('[AssetPicker] Running in Web mode');
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.multiple = true;
+        input.accept = '.png,.jpg,.jpeg,.webp,.svg,.gif,.js,.ts';
+        
+        input.onchange = async (e: any) => {
+            const files = e.target.files;
+            console.log('[AssetPicker] Files selected:', files);
+            if (files && files.length > 0) {
+                for (let i = 0; i < files.length; i++) {
+                    const file = files[i];
+                    // On Web, destDir is effectively 'MyWebProject/assets'
+                    // writeFile expects relative path from root? 
+                    // FileSystem.ts: Path: Absolute path or relative path from project root
+                    // WebFileSystem.writeFile implementation: `/${this.currentProject}/${path}`
+                    // So we should pass 'assets/filename.png'
+                    
+                    const fileName = file.name;
+                    const relativePath = `assets/${fileName}`;
+                    console.log('[AssetPicker] Writing to relative path:', relativePath);
+                    await fs.writeFile(relativePath, file);
+                }
+                // Watcher should trigger
+            }
+        };
+        input.click();
+    }
+};
+
 </script>
 
 <template>
@@ -83,6 +147,13 @@ const selectAsset = (asset: any) => {
                   placeholder="Search assets..." 
                   autofocus
               />
+              <button 
+                  @click="importAssets" 
+                  class="px-3 py-1 bg-primary text-white text-xs rounded hover:bg-primary-hover flex items-center gap-1"
+                  title="Import external files to assets folder"
+              >
+                  <span>📥</span> Import
+              </button>
           </div>
 
           <!-- Grid -->

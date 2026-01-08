@@ -18,6 +18,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   showItemInFolder: (path: string) => ipcRenderer.invoke('shell:showItemInFolder', path),
 
   // Generic File I/O
+  showOpenDialog: (options: any) => ipcRenderer.invoke('dialog:showOpenDialog', options),
   openFile: (filters: any[]) => ipcRenderer.invoke('dialog:openFile', filters),
   saveFile: (filters: any[]) => ipcRenderer.invoke('dialog:saveFile', filters),
   readFile: (path: string) => ipcRenderer.invoke('fs:readFile', path),

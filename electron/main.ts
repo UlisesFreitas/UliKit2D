@@ -3,6 +3,8 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import chokidar, { FSWatcher } from 'chokidar';
 
+import config from '../ukit.config.json';
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
@@ -27,7 +29,9 @@ const createWindow = () => {
     const isDev = process.argv.includes('--dev');
 
     if (isDev) {
-        mainWindow.loadURL('http://localhost:5175');
+        const host = config.server?.host || 'localhost';
+        const port = config.server?.port || 9222;
+        mainWindow.loadURL(`http://${host}:${port}`);
     } else {
         mainWindow.loadFile(path.join(__dirname, '../index.html'));
     }
@@ -186,6 +190,10 @@ ipcMain.handle('dialog:openFile', async (_event, filters: any[]) => {
         filters: filters || []
     });
     return result.canceled ? null : result.filePaths[0];
+});
+
+ipcMain.handle('dialog:showOpenDialog', async (_event, options: any) => {
+    return await dialog.showOpenDialog(mainWindow!, options);
 });
 
 ipcMain.handle('dialog:saveFile', async (_event, filters: any[]) => {

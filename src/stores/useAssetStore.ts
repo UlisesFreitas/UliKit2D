@@ -27,6 +27,29 @@ export const useAssetStore = defineStore('assets', () => {
                 currentPath.value = ''; // Reset navigation
                 
                 await fs.watchProject(newPath as any, (event: FileChangeEvent) => {
+                    // Notify Resource Manager of Content Changes
+                    if (event.event === 'change' && event.path) {
+                        // Normalize path to ensure it matches what RenderSystem uses (usually relative)
+                        const normPath = event.path.replace(/\\/g, '/');
+                        // If path is absolute (starts with project path), make it relative
+                        // But wait, event.path from watcher might vary.
+                        // Ideally ResourceManager handles path normalization/matching.
+                        // For now, pass as is, let ResourceManager decide or verify.
+                        // Actually, better to strip project path here if possible.
+                        const projPath = (typeof projectState.currentProjectPath === 'string') 
+                            ? projectState.currentProjectPath.replace(/\\/g, '/') 
+                            : '';
+                        let relPath = normPath;
+                        if (projPath && normPath.startsWith(projPath)) {
+                             relPath = normPath.slice(projPath.length + 1);
+                        }
+                        
+                        // We use the Engine's ResourceManager singleton
+                        import('../engine/resources/ResourceManager').then(({ resourceManager }) => {
+                             resourceManager.notifyAssetChanged(relPath);
+                        });
+                    }
+
                     // Handle bulk updates (initial or manual re-scan)
                     if ((event.event === 'initial' || event.event === 'change') && event.files) {
                         console.log('AssetStore: Received bulk update', event.files.length, 'files');

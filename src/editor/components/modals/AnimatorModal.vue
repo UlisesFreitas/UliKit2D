@@ -156,7 +156,6 @@ const importExternalFile = async (rawPath: string, _animName: string): Promise<s
                         
                         // Convert absolute result to relative path from project root
                         const absPath = result.path.replace(/\\/g, '/');
-                        const normPath = absPath.toLowerCase(); // simplified check
                         
                         // For Web, internal paths are like /MyWebProject/assets/...
                         // For Electron, C:/...

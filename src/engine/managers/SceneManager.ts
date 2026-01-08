@@ -31,6 +31,8 @@ export class SceneManager {
                  boxCollider: entity.boxCollider ? { ...entity.boxCollider } : undefined,
                  audioSource: entity.audioSource ? { ...entity.audioSource } : undefined,
                  label: entity.label ? { ...entity.label } : undefined,
+                 bitmapText: entity.bitmapText ? { ...entity.bitmapText } : undefined,
+                 nineSliceSprite: entity.nineSliceSprite ? { ...entity.nineSliceSprite } : undefined,
                  animator: entity.animator ? JSON.parse(JSON.stringify(entity.animator)) : undefined,
                  script: entity.script ? (Array.isArray(entity.script) ? entity.script.map(s => ({...s})) : []) : undefined
             };

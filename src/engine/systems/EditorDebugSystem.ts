@@ -28,8 +28,9 @@ export class EditorDebugSystem {
             // Condition: No Sprite AND No Label
             const hasVisibleSprite = entity.sprite && entity.sprite.texture && entity.sprite.texture.trim() !== '';
             const hasVisibleLabel = entity.label && entity.label.text && entity.label.text.trim() !== '';
-            
-            if (!hasVisibleSprite && !hasVisibleLabel) {
+            const hasVisibleBitmapText = entity.bitmapText && entity.bitmapText.text && entity.bitmapText.text.trim() !== '';
+            const hasVisibleNineSlice = entity.nineSliceSprite && entity.nineSliceSprite.texture && entity.nineSliceSprite.texture.trim() !== '';
+            if (!hasVisibleSprite && !hasVisibleLabel && !hasVisibleBitmapText && !hasVisibleNineSlice) {
                 let graphics = this.debugGraphics.get(id);
                 if (!graphics) {
                     graphics = new Graphics();

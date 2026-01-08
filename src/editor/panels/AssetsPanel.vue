@@ -33,8 +33,9 @@
             @dragstart="onDragStart($event, file)"
             @dblclick="onDoubleClick(file)"
         >
-            <div class="icon text-3xl mb-1">
-                {{ file.type === 'directory' ? '📁' : file.name.endsWith('.png') ? '🖼️' : '📄' }}
+            <div class="icon text-3xl mb-1 w-full h-10 flex items-center justify-center overflow-hidden">
+                <img v-if="thumbnails[file.path]" :src="thumbnails[file.path]" class="w-full h-full object-contain" />
+                <span v-else>{{ file.type === 'directory' ? '📁' : isImage(file.name) ? '🖼️' : '📄' }}</span>
             </div>
             <div class="name leading-tight">{{ file.name }}</div>
         </div>
@@ -48,16 +49,39 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted } from 'vue';
+import { onMounted, ref, watch } from 'vue';
 import { useAssetStore } from '../../stores/useAssetStore';
 import { projectState } from '../managers/ProjectManager';
 import { getFileSystem } from '../../api/FileSystem';
 
 const assetStore = useAssetStore();
+const thumbnails = ref<Record<string, string>>({});
 
 onMounted(() => {
     assetStore.initWatcher();
+    loadThumbnails();
 });
+
+const isImage = (filename: string) => {
+    return /\.(png|jpg|jpeg|webp|bmp|gif)$/i.test(filename);
+};
+
+const loadThumbnails = async () => {
+    const fs = getFileSystem();
+    for (const file of assetStore.visibleFiles) {
+        if (file.type === 'file' && isImage(file.name)) {
+            // Check if we already have it to avoid flicker/re-fetch (though FS might cache)
+            if (!thumbnails.value[file.path]) {
+                const url = await fs.getAssetURL(file.path);
+                thumbnails.value[file.path] = url;
+            }
+        }
+    }
+};
+
+watch(() => assetStore.visibleFiles, () => {
+    loadThumbnails();
+}, { deep: true });
 
 const onDragStart = (e: DragEvent, file: any) => {
     if (e.dataTransfer) {

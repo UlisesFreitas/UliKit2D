@@ -1,314 +1,374 @@
-import { Application, Sprite, Texture, Assets, Text } from 'pixi.js';
+import { Application, Sprite, Texture, Text, BitmapText, FederatedPointerEvent, NineSliceSprite } from 'pixi.js';
 import { world } from '../ecs/ECS';
-import { getFileSystem } from '../../api/FileSystem';
+import { resourceManager } from '../resources/ResourceManager';
+import { eventBus } from '../core/EventBus';
 
 export class RenderSystem {
     private app: Application;
     private spriteCache: Map<string, Sprite> = new Map();
     private textCache: Map<string, Text> = new Map();
-    private textureCache: Map<string, Texture> = new Map();
-    private pendingLoads: Set<string> = new Set();
-    private failedLoads: Set<string> = new Set();
-    private resolvedPathCache: Map<string, string> = new Map();
-    private pendingPaths: Set<string> = new Set();
+    private bitmapTextCache: Map<string, BitmapText> = new Map();
+    private nineSliceCache: Map<string, NineSliceSprite> = new Map();
+
+    // Track which entities need texture updates (due to invalidation)
+    private pendingUpdates: Set<string> = new Set(); 
     
     public onEntityClicked: ((id: string) => void) | null = null;
 
     constructor(app: Application) {
         this.app = app;
-        
-        // Cleanup when entity is destroyed
-        world.onEntityRemoved.subscribe((entity) => {
-            if (entity.id && this.spriteCache.has(entity.id)) {
-                const sprite = this.spriteCache.get(entity.id)!;
-                this.app.stage.removeChild(sprite);
-                sprite.destroy();
-                this.spriteCache.delete(entity.id);
-            }
-            if (entity.id && this.textCache.has(entity.id)) {
-                 const text = this.textCache.get(entity.id)!;
-                 this.app.stage.removeChild(text);
-                 text.destroy();
-                 this.textCache.delete(entity.id);
-            }
-        });
     }
 
     public update() {
-        const entities = world.with('transform', 'sprite');
+        const entities = world.with('transform');
+        const activeIds = new Set<string>();
 
-        // Preload Animators
-        const animators = world.with('animator');
-        for (const entity of animators) {
-             if (entity.animator && entity.animator.animations) {
-                 for (const animName in entity.animator.animations) {
-                     const anim = entity.animator.animations[animName];
-                     if (anim && anim.frames) {
-                         for (const framePath of anim.frames) {
-                             if (!this.resolvedPathCache.has(framePath) && !this.pendingLoads.has(framePath) && !this.textureCache.has(framePath)) {
-                                 // Trigger load in background
-                                 this.resolveAndLoad(framePath);
-                             }
-                         }
-                     }
-                 }
-             }
-        }
+        // ... (Animators)
 
-        // Add/Update Sprites
         for (const entity of entities) {
-            let sprite = this.spriteCache.get(entity.id!);
-
-            if (!sprite) {
-                const rawPath = entity.sprite.texture;
-                if (!rawPath) continue;
-
-                const fs = getFileSystem();
-                const cacheKey = rawPath;
-                
-                // If we don't have a resolved URL yet, start resolving
-                if (!this.resolvedPathCache.has(cacheKey)) {
-                    if (rawPath.startsWith('blob:') || rawPath.startsWith('data:')) {
-                        // Direct usage
-                        this.resolvedPathCache.set(cacheKey, rawPath);
-                    } else if (!this.pendingPaths.has(cacheKey)) {
-                        this.pendingPaths.add(cacheKey);
-                        fs.getAssetURL(rawPath).then((url: string) => {
-                            this.resolvedPathCache.set(cacheKey, url);
-                            this.pendingPaths.delete(cacheKey);
-                        });
-                    }
-                    if (!this.resolvedPathCache.has(cacheKey)) continue; // Skip until resolved
-                }
-
-                const texturePath = this.resolvedPathCache.get(cacheKey)!;
-
-                // Check cache
-                if (this.textureCache.has(texturePath)) {
-                    const texture = this.textureCache.get(texturePath)!;
-                    sprite = new Sprite(texture);
-                    sprite.anchor.set(0.5);
-                    (sprite as any)._texturePath = texturePath;
-                    
-                    // Enable interaction
-                    sprite.eventMode = 'static';
-                    sprite.cursor = 'pointer';
-                    sprite.on('pointerdown', (e) => {
-                        e.stopPropagation();
-                        if (this.onEntityClicked && entity.id) {
-                            this.onEntityClicked(entity.id);
-                        }
-                    });
-
-                    this.app.stage.addChild(sprite);
-                    this.spriteCache.set(entity.id!, sprite);
-                } else if (!this.pendingLoads.has(texturePath) && !this.failedLoads.has(texturePath)) {
-                    // Start loading
-                    this.pendingLoads.add(texturePath);
-                    //console.log('[RenderSystem] Loading texture:', texturePath);
-                    
-                    this.loadTexture(texturePath).then((texture) => {
-                        //console.log('[RenderSystem] Loaded texture:', texturePath);
-                        if (!texture) throw new Error('Texture loaded as null');
-                        
-                        this.textureCache.set(texturePath, texture);
-                        
-                        // Update ECS with texture dimensions
-                        if (entity.sprite) {
-                            entity.sprite.width = texture.width;
-                            entity.sprite.height = texture.height;
-                        }
-
-                        this.pendingLoads.delete(texturePath);
-                    }).catch(e => {
-                        console.error('[RenderSystem] Failed to load texture:', texturePath, e);
-                        this.pendingLoads.delete(texturePath);
-                        this.failedLoads.add(texturePath);
-                    });
-                }
-                
-                if (!sprite) continue;
+            if (entity.bitmapText) {
+                this.updateBitmapText(entity);
+                this.removeLabel(entity.id!);
+                this.removeSprite(entity.id!);
+                this.removeNineSlice(entity.id!);
+            } else if (entity.label) {
+                this.updateLabel(entity);
+                this.removeBitmapText(entity.id!);
+                this.removeSprite(entity.id!);
+                this.removeNineSlice(entity.id!);
+            } else if (entity.nineSliceSprite) {
+                this.updateNineSlice(entity);
+                this.removeBitmapText(entity.id!);
+                this.removeLabel(entity.id!);
+                this.removeSprite(entity.id!);
+            } else if (entity.sprite) {
+                this.updateSprite(entity);
+                this.removeBitmapText(entity.id!);
+                this.removeLabel(entity.id!);
+                this.removeNineSlice(entity.id!);
+            } else {
+                 // Cleanup
+                 this.removeBitmapText(entity.id!);
+                 this.removeLabel(entity.id!);
+                 this.removeSprite(entity.id!);
+                 this.removeNineSlice(entity.id!);
             }
-
-            // Sync Transform
-            if (!sprite) continue; // Double check
-
-            sprite.x = entity.transform.x;
-            sprite.y = entity.transform.y;
-            sprite.rotation = entity.transform.rotation;
-            sprite.scale.set(entity.transform.scale.x, entity.transform.scale.y);
-
-            // Sync Visibility
-            sprite.visible = entity.visible !== false;
-
-            // Check for Texture Change
-            const rawPath = entity.sprite.texture;
-            if (rawPath) {
-                const fs = getFileSystem();
-                const cacheKey = rawPath;
-
-                if (!this.resolvedPathCache.has(cacheKey)) {
-                    if (rawPath.startsWith('blob:') || rawPath.startsWith('data:')) {
-                         this.resolvedPathCache.set(cacheKey, rawPath);
-                    } else if (!this.pendingPaths.has(cacheKey)) {
-                        this.pendingPaths.add(cacheKey);
-                        fs.getAssetURL(rawPath).then((url: string) => {
-                            this.resolvedPathCache.set(cacheKey, url);
-                            this.pendingPaths.delete(cacheKey);
-                        });
-                    }
-                } else {
-                    const texturePath = this.resolvedPathCache.get(cacheKey)!;
-
-                    if ((sprite as any)._texturePath !== texturePath) {
-                        // Texture changed!
-                        //console.log(`[RenderSystemDebug] Texture mismatch for entity ${entity.id}. Current: ${(sprite as any)._texturePath}, New: ${texturePath}`);
-                        
-                        if (this.textureCache.has(texturePath)) {
-                            // console.log(`[RenderSystemDebug] Applying cached texture: ${texturePath}`);
-                            sprite.texture = this.textureCache.get(texturePath)!;
-                            (sprite as any)._texturePath = texturePath;
-                        } else if (!this.pendingLoads.has(texturePath) && !this.failedLoads.has(texturePath)) {
-                            // console.log(`[RenderSystemDebug] Texture not cached, triggering load: ${texturePath}`);
-                            this.pendingLoads.add(texturePath);
-                            
-                            this.loadTexture(texturePath).then((texture) => {
-                                if (!texture) return;
-                                this.textureCache.set(texturePath, texture);
-                                if (this.spriteCache.get(entity.id!) === sprite) {
-                                    // console.log(`[RenderSystemDebug] Late apply texture: ${texturePath}`);
-                                    sprite!.texture = texture;
-                                    (sprite as any)._texturePath = texturePath;
-                                    if (entity.sprite) {
-                                        entity.sprite.width = texture.width;
-                                        entity.sprite.height = texture.height;
-                                    }
-                                }
-                                this.pendingLoads.delete(texturePath);
-                            }).catch(() => {
-                                 this.pendingLoads.delete(texturePath);
-                                 this.failedLoads.add(texturePath);
-                            });
-                        } else {
-                            //console.log(`[RenderSystemDebug] Texture pending or failed: ${texturePath}`);
-                        }
-                    }
-                }
-            }
+            activeIds.add(entity.id!);
         }
         
-        // Add/Update Text Labels
-        const labelEntities = world.with('transform', 'label');
-        for (const entity of labelEntities) {
-            let textFn = this.textCache.get(entity.id!);
+        // Cleanup Removed Entities (Zombies)
+        this.cleanupZombies(activeIds);
+    }
 
-            if (!textFn) {
-                 // Create new Text
-                 textFn = new Text({
-                     text: entity.label.text,
-                     style: {
-                         fontSize: entity.label.fontSize,
-                         fontFamily: entity.label.fontFamily,
-                         fill: entity.label.color,
-                         align: entity.label.align
-                     }
-                 });
-                 textFn.anchor.set(0.5);
-                 
-                 // Interaction
-                 textFn.eventMode = 'static';
-                 textFn.cursor = 'pointer';
-                 textFn.on('pointerdown', (e) => {
-                        e.stopPropagation();
-                        if (this.onEntityClicked && entity.id) {
-                            this.onEntityClicked(entity.id);
-                        }
-                 });
+    private cleanupZombies(activeIds: Set<string>) {
+        for (const id of this.spriteCache.keys()) {
+            if (!activeIds.has(id)) this.removeSprite(id);
+        }
+        for (const id of this.textCache.keys()) {
+            if (!activeIds.has(id)) this.removeLabel(id);
+        }
+        for (const id of this.bitmapTextCache.keys()) {
+            if (!activeIds.has(id)) this.removeBitmapText(id);
+        }
+        for (const id of this.nineSliceCache.keys()) {
+            if (!activeIds.has(id)) this.removeNineSlice(id);
+        }
 
-                 this.app.stage.addChild(textFn);
-                 this.textCache.set(entity.id!, textFn);
+    }
+
+
+
+    // ... (updateSprite, updateLabel, updateBitmapText)
+
+    private updateNineSlice(entity: any) {
+        let nSlice = this.nineSliceCache.get(entity.id!);
+        const texturePath = entity.nineSliceSprite.texture;
+
+        if (!nSlice) {
+            if (!texturePath) return;
+
+             // Create with placeholder, will update texture later
+             nSlice = new NineSliceSprite({
+                 texture: Texture.EMPTY,
+                 leftWidth: entity.nineSliceSprite.left,
+                 topHeight: entity.nineSliceSprite.top,
+                 rightWidth: entity.nineSliceSprite.right,
+                 bottomHeight: entity.nineSliceSprite.bottom,
+             });
+             nSlice.anchor.set(0.5);
+
+             // Interaction
+             nSlice.eventMode = 'static';
+             nSlice.cursor = 'pointer';
+             nSlice.on('pointerdown', (e: FederatedPointerEvent) => {
+                 e.stopPropagation();
+                 if (this.onEntityClicked && entity.id) {
+                     this.onEntityClicked(entity.id);
+                 }
+             });
+
+             this.app.stage.addChild(nSlice);
+             this.nineSliceCache.set(entity.id!, nSlice);
+             (nSlice as any)._currentPath = '';
+        }
+
+        // Sync Transform
+        nSlice.x = entity.transform.x;
+        nSlice.y = entity.transform.y;
+        nSlice.rotation = entity.transform.rotation;
+        // NineSlice usually IGNORES scale if width/height are set, BUT we can simply Apply Scale to the container? No, NineSliceSprite extends Container?
+        // Actually, NineSlice width/height IS the size. 
+        // If we want Transform.Scale to affect it:
+        // Option A: Use scale as multiplier for width/height.
+        // Option B: Set width/height strictly, and let Scale be 1.
+        // Standard in Game Engines: NineSlice uses Width/Height property for sizing, Transform Scale applies on top.
+        nSlice.scale.set(entity.transform.scale.x, entity.transform.scale.y); 
+
+        // Sync Dimensions & Slices
+        if (nSlice.width !== entity.nineSliceSprite.width) nSlice.width = entity.nineSliceSprite.width;
+        if (nSlice.height !== entity.nineSliceSprite.height) nSlice.height = entity.nineSliceSprite.height;
+        
+        if (nSlice.leftWidth !== entity.nineSliceSprite.left) nSlice.leftWidth = entity.nineSliceSprite.left;
+        if (nSlice.rightWidth !== entity.nineSliceSprite.right) nSlice.rightWidth = entity.nineSliceSprite.right;
+        if (nSlice.topHeight !== entity.nineSliceSprite.top) nSlice.topHeight = entity.nineSliceSprite.top;
+        if (nSlice.bottomHeight !== entity.nineSliceSprite.bottom) nSlice.bottomHeight = entity.nineSliceSprite.bottom;
+
+        nSlice.visible = entity.visible !== false;
+
+        // Sync Texture
+         if (texturePath) {
+            if ((nSlice as any)._currentPath !== texturePath || this.pendingUpdates.has(entity.id!)) {
+                (nSlice as any)._currentPath = texturePath;
+                this.pendingUpdates.delete(entity.id!); 
+
+                resourceManager.loadTexture(texturePath).then((texture) => {
+                    if (texture && nSlice && (nSlice as any)._currentPath === texturePath) {
+                        nSlice.texture = texture;
+                    }
+                });
             }
-
-            // Sync Properties
-            if (textFn.text !== entity.label.text) textFn.text = entity.label.text;
-            
-            // Sync Style
-            if (textFn.style.fontSize !== entity.label.fontSize) textFn.style.fontSize = entity.label.fontSize;
-            if (textFn.style.fontFamily !== entity.label.fontFamily) textFn.style.fontFamily = entity.label.fontFamily;
-            if (textFn.style.fill !== entity.label.color) textFn.style.fill = entity.label.color;
-            if (textFn.style.align !== entity.label.align) textFn.style.align = entity.label.align;
-
-            // Sync Transform
-            textFn.x = entity.transform.x;
-            textFn.y = entity.transform.y;
-            textFn.rotation = entity.transform.rotation;
-            textFn.scale.set(entity.transform.scale.x, entity.transform.scale.y);
-            
-            textFn.visible = entity.visible !== false;
         }
     }
 
-    private async loadTexture(url: string): Promise<Texture | null> {
-        // console.log('[RenderSystem] loadTexture called for:', url);
-        try {
-            if (url.startsWith('blob:') || url.startsWith('data:')) {
-                // Use HTML Image for 100% robust blob loading
-                const img = new Image();
-                img.src = url;
-                await img.decode(); // Wait for decode
-                const tex = Texture.from(img);
-                // console.log(`[RenderSystemDebug] Loaded blob texture via Image: ${tex.width}x${tex.height}`);
-                return tex;
-            }
-            return await Assets.load(url);
-        } catch (e) {
-            //console.error('[RenderSystem] loadTexture Error:', e);
-            return null;
+    private removeNineSlice(id: string) {
+        if (this.nineSliceCache.has(id)) {
+            const ns = this.nineSliceCache.get(id)!;
+            this.app.stage.removeChild(ns);
+            ns.destroy();
+            this.nineSliceCache.delete(id);
         }
     }
 
-    private resolveAndLoad(rawPath: string) {
-        if (this.resolvedPathCache.has(rawPath)) {
-            const resolved = this.resolvedPathCache.get(rawPath)!;
-            if (!this.textureCache.has(resolved) && !this.pendingLoads.has(resolved)) {
-                 this.pendingLoads.add(resolved);
-                 this.loadTexture(resolved).then(tex => {
-                     if (tex) this.textureCache.set(resolved, tex);
-                     this.pendingLoads.delete(resolved);
-                 });
-            }
-            return;
-        }
+    private updateSprite(entity: any) {
+        let sprite = this.spriteCache.get(entity.id!);
+        const texturePath = entity.sprite.texture;
 
-        if (this.pendingPaths.has(rawPath)) return;
-        
-        if (rawPath.startsWith('blob:') || rawPath.startsWith('data:')) {
-             this.resolvedPathCache.set(rawPath, rawPath);
-             // Trigger load immediately
-             if (!this.textureCache.has(rawPath) && !this.pendingLoads.has(rawPath)) {
-                  this.pendingLoads.add(rawPath);
-                  this.loadTexture(rawPath).then(tex => {
-                      if (tex) this.textureCache.set(rawPath, tex);
-                      this.pendingLoads.delete(rawPath);
-                  });
-             }
-             return;
-        }
+        // Creation
+        if (!sprite) {
+            if (!texturePath) return; // Don't create if no texture
 
-        this.pendingPaths.add(rawPath);
-        
-        const fs = getFileSystem();
-        fs.getAssetURL(rawPath).then(async (url: string) => {
-            this.resolvedPathCache.set(rawPath, url);
-            this.pendingPaths.delete(rawPath);
+            // Create placeholder or waiting sprite
+            sprite = new Sprite(Texture.EMPTY); 
+            sprite.anchor.set(0.5);
             
-            // Trigger load immediately
-            if (!this.textureCache.has(url) && !this.pendingLoads.has(url)) {
-                 this.pendingLoads.add(url);
-                 const tex = await this.loadTexture(url);
-                 if (tex) this.textureCache.set(url, tex);
-                 this.pendingLoads.delete(url);
+            // Enable interaction
+            sprite.eventMode = 'static';
+            sprite.cursor = 'pointer';
+            sprite.on('pointerdown', (e: FederatedPointerEvent) => {
+                e.stopPropagation();
+                if (this.onEntityClicked && entity.id) {
+                    this.onEntityClicked(entity.id);
+                }
+            });
+
+            this.app.stage.addChild(sprite);
+            this.spriteCache.set(entity.id!, sprite);
+            (sprite as any)._currentPath = ''; // Init tracker
+        }
+
+        // Sync Transform
+        sprite.x = entity.transform.x;
+        sprite.y = entity.transform.y;
+        sprite.rotation = entity.transform.rotation;
+        sprite.scale.set(entity.transform.scale.x, entity.transform.scale.y);
+
+        // Sync Visibility
+        sprite.visible = entity.visible !== false;
+
+        // Sync Texture
+        if (texturePath) {
+            // If path changed OR explicitly marked for update
+            if ((sprite as any)._currentPath !== texturePath || this.pendingUpdates.has(entity.id!)) {
+                (sprite as any)._currentPath = texturePath;
+                this.pendingUpdates.delete(entity.id!); // Clear flag
+
+                resourceManager.loadTexture(texturePath).then((texture) => {
+                    if (texture && sprite) {
+                        // Verify race condition: did path change while loading?
+                        if ((sprite as any)._currentPath === texturePath) {
+                            sprite.texture = texture;
+                            // Update ECS dimensions if needed
+                            if (entity.sprite) {
+                                entity.sprite.width = texture.width;
+                                entity.sprite.height = texture.height;
+                            }
+                        }
+                    }
+                });
             }
-        });
+        } else {
+             sprite.texture = Texture.EMPTY;
+             (sprite as any)._currentPath = '';
+        }
+    }
+
+    private updateLabel(entity: any) {
+        let textFn = this.textCache.get(entity.id!);
+
+        if (!textFn) {
+             // Create new Text
+             textFn = new Text({
+                 text: entity.label.text,
+                 style: {
+                     fontSize: entity.label.fontSize,
+                     fontFamily: entity.label.fontFamily,
+                     fill: entity.label.color,
+                     align: entity.label.align
+                 }
+             });
+             textFn.anchor.set(0.5);
+             
+             // Interaction
+             textFn.eventMode = 'static';
+             textFn.cursor = 'pointer';
+             textFn.on('pointerdown', (e: FederatedPointerEvent) => {
+                    e.stopPropagation();
+                    if (this.onEntityClicked && entity.id) {
+                        this.onEntityClicked(entity.id);
+                    }
+             });
+
+             this.app.stage.addChild(textFn);
+             this.textCache.set(entity.id!, textFn);
+        }
+
+        // Sync Properties
+        if (textFn.text !== entity.label.text) textFn.text = entity.label.text;
+        
+        // Sync Style
+        if (textFn.style.fontSize !== entity.label.fontSize) textFn.style.fontSize = entity.label.fontSize;
+        if (textFn.style.fontFamily !== entity.label.fontFamily) textFn.style.fontFamily = entity.label.fontFamily;
+        if (textFn.style.fill !== entity.label.color) textFn.style.fill = entity.label.color;
+        if (textFn.style.align !== entity.label.align) textFn.style.align = entity.label.align;
+
+        // Sync Transform
+        textFn.x = entity.transform.x;
+        textFn.y = entity.transform.y;
+        textFn.rotation = entity.transform.rotation;
+        textFn.scale.set(entity.transform.scale.x, entity.transform.scale.y);
+        
+        textFn.visible = entity.visible !== false;
+
+        // Sync dimensions back to ECS for Gizmos
+        if (entity.label) {
+            entity.label.width = textFn.width;
+            entity.label.height = textFn.height;
+        }
+    }
+
+    private updateBitmapText(entity: any) {
+        let bText = this.bitmapTextCache.get(entity.id!);
+
+        if (!bText) {
+            bText = new BitmapText({
+                text: entity.bitmapText.text,
+                style: {
+                    fontFamily: 'Arial', // Fallback until loaded
+                    fontSize: entity.bitmapText.fontSize,
+                    align: entity.bitmapText.align
+                }
+            });
+            bText.anchor.set(0.5);
+            bText.tint = entity.bitmapText.tint;
+            
+            // Interaction
+            bText.eventMode = 'static';
+            bText.cursor = 'pointer';
+            bText.on('pointerdown', (e: FederatedPointerEvent) => {
+                e.stopPropagation();
+                if (this.onEntityClicked && entity.id) {
+                    this.onEntityClicked(entity.id);
+                }
+            });
+
+            this.app.stage.addChild(bText);
+            this.bitmapTextCache.set(entity.id!, bText);
+            (bText as any)._loadedFontPath = ''; 
+        }
+
+        // Load Font if needed
+        const fontPath = entity.bitmapText.fontName;
+        const fontTexture = entity.bitmapText.fontTexture;
+        
+        // Check if font OR texture override changed
+        const loadedKey = (bText as any)._loadedFontPath;
+        const requestedKey = fontTexture ? `${fontPath}|${fontTexture}` : fontPath;
+
+        if (fontPath && loadedKey !== requestedKey) {
+            (bText as any)._loadedFontPath = requestedKey; // Mark as requested
+            resourceManager.loadBitmapFont(fontPath, fontTexture).then(fontFace => {
+                if (fontFace && bText && (bText as any)._loadedFontPath === requestedKey) {
+                    bText.style.fontFamily = fontFace;
+                }
+            });
+        }
+
+        // Sync Properties
+        if (bText.text !== entity.bitmapText.text) bText.text = entity.bitmapText.text;
+        if (bText.style.fontSize !== entity.bitmapText.fontSize) bText.style.fontSize = entity.bitmapText.fontSize;
+        if (bText.style.align !== entity.bitmapText.align) bText.style.align = entity.bitmapText.align;
+        if (bText.tint !== entity.bitmapText.tint) bText.tint = entity.bitmapText.tint;
+
+        // Sync Transform
+        bText.x = entity.transform.x;
+        bText.y = entity.transform.y;
+        bText.rotation = entity.transform.rotation;
+        bText.scale.set(entity.transform.scale.x, entity.transform.scale.y);
+
+        bText.visible = entity.visible !== false;
+
+        // Sync dimensions back to ECS for Gizmos
+        if (entity.bitmapText) {
+            entity.bitmapText.width = bText.width;
+            entity.bitmapText.height = bText.height;
+        }
+    }
+
+    private removeSprite(id: string) {
+        if (this.spriteCache.has(id)) {
+            const sprite = this.spriteCache.get(id)!;
+            this.app.stage.removeChild(sprite);
+            sprite.destroy();
+            this.spriteCache.delete(id);
+        }
+    }
+
+    private removeLabel(id: string) {
+        if (this.textCache.has(id)) {
+            const text = this.textCache.get(id)!;
+            this.app.stage.removeChild(text);
+            text.destroy();
+            this.textCache.delete(id);
+        }
+    }
+
+    private removeBitmapText(id: string) {
+        if (this.bitmapTextCache.has(id)) {
+            const bText = this.bitmapTextCache.get(id)!;
+            this.app.stage.removeChild(bText);
+            bText.destroy();
+            this.bitmapTextCache.delete(id);
+        }
     }
 }
+

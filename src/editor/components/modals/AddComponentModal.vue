@@ -21,7 +21,9 @@ const CORE_COMPONENTS = [
     { type: 'boxCollider', name: 'Box Collider 2D', icon: '📦', description: 'Box shape collision' },
     { type: 'animator', name: 'Sprite Animator', icon: '🎬', description: 'Frame-based animation' },
     { type: 'audioSource', name: 'Audio Source', icon: '🔊', description: 'Plays sound clips' },
-    { type: 'label', name: 'Text Label', icon: '📝', description: 'Displays text' }
+    { type: 'label', name: 'Text Label', icon: '📝', description: 'Displays text' },
+    { type: 'bitmapText', name: 'Bitmap Text', icon: '🔤', description: 'High-performance styled text' },
+    { type: 'nineSliceSprite', name: 'Nine Slice Sprite', icon: '🍱', description: 'Scalable UI panel/frame' }
 ];
 
 const loadScripts = async () => {

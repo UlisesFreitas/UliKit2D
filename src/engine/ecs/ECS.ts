@@ -48,6 +48,27 @@ export type Entity = {
       fontFamily: string;
       color: string;
       align: 'left' | 'center' | 'right';
+      width?: number; // Runtime width for gizmos
+      height?: number; // Runtime height for gizmos
+  };
+  bitmapText?: {
+      text: string;
+      fontName: string;
+      fontTexture?: string; // Explicit texture override
+      fontSize: number;
+      tint: number;
+      align: 'left' | 'center' | 'right';
+      width?: number; // Runtime width for gizmos
+      height?: number; // Runtime height for gizmos
+  };
+  nineSliceSprite?: {
+      texture: string;
+      width: number;
+      height: number;
+      left: number; // Left slice width
+      right: number; // Right slice width
+      top: number; // Top slice height
+      bottom: number; // Bottom slice height
   };
   animator?: {
       currentAnim: string;
@@ -60,6 +81,7 @@ export type Entity = {
           speed?: number;
       }>;
   };
+
   // Runtime only
   physicsBody?: any; // Matter.js body declaration
 };

@@ -90,9 +90,23 @@ export class GizmoManager {
         if (this.selectedEntity.boxCollider) {
             w = this.selectedEntity.boxCollider.width * this.selectedEntity.transform.scale.x;
             h = this.selectedEntity.boxCollider.height * this.selectedEntity.transform.scale.y;
+        } else if (this.selectedEntity.nineSliceSprite) {
+            // NineSlice uses explicit width/height, but Transform.Scale applies ON TOP of it in my RenderSystem logic
+            // nSlice.scale.set(transform.scale.x, ...)
+            // So visual size = nineSlice.width * scale.x
+            w = this.selectedEntity.nineSliceSprite.width * this.selectedEntity.transform.scale.x;
+            h = this.selectedEntity.nineSliceSprite.height * this.selectedEntity.transform.scale.y;
         } else if (this.selectedEntity.sprite && this.selectedEntity.sprite.width) {
             w = this.selectedEntity.sprite.width * this.selectedEntity.transform.scale.x;
             h = (this.selectedEntity.sprite.height || 100) * this.selectedEntity.transform.scale.y;
+        } else if (this.selectedEntity.bitmapText && this.selectedEntity.bitmapText.width) {
+            // New: Sync with BitmapText size
+            w = this.selectedEntity.bitmapText.width * this.selectedEntity.transform.scale.x;
+            h = (this.selectedEntity.bitmapText.height || 32) * this.selectedEntity.transform.scale.y;
+        } else if (this.selectedEntity.label && this.selectedEntity.label.width) {
+             // New: Sync with Label size
+             w = this.selectedEntity.label.width * this.selectedEntity.transform.scale.x;
+             h = (this.selectedEntity.label.height || 24) * this.selectedEntity.transform.scale.y;
         } else {
              // Fallback for entities with no size data (apply scale)
              w = 100 * this.selectedEntity.transform.scale.x;
@@ -332,21 +346,33 @@ export class GizmoManager {
                 const currentRot = this.entityStart.rotation + deltaRotation;
                 const snappedRot = Math.round(currentRot / snapRad) * snapRad;
                 this.selectedEntity.transform!.rotation = snappedRot;
+                this.selectedEntity!.transform!.rotation = snappedRot;
            } else {
-                this.selectedEntity.transform!.rotation = this.entityStart.rotation + deltaRotation;
+                this.selectedEntity!.transform!.rotation = this.entityStart.rotation + deltaRotation;
            }
            
        } else if (this.dragHandle) {
            // Scaling
            // We need base width/height to know ratio
-           const bounds = this.getBounds(); // current bounds? No, uses current scale.
            // Use initial sprite size?
            let baseW = 100;
            let baseH = 100;
-           if (this.selectedEntity.sprite && this.selectedEntity.sprite.width) {
-               baseW = this.selectedEntity.sprite.width;
-               baseH = this.selectedEntity.sprite.height || 100;
-           }
+            if (this.selectedEntity!.boxCollider) {
+                 baseW = this.selectedEntity!.boxCollider.width;
+                 baseH = this.selectedEntity!.boxCollider.height;
+            } else if (this.selectedEntity!.sprite && this.selectedEntity!.sprite.width) {
+                 baseW = this.selectedEntity!.sprite.width;
+                 baseH = this.selectedEntity!.sprite.height || 100;
+            } else if (this.selectedEntity!.nineSliceSprite && this.selectedEntity!.nineSliceSprite.width) {
+                 baseW = this.selectedEntity!.nineSliceSprite.width;
+                 baseH = this.selectedEntity!.nineSliceSprite.height || 100;
+            } else if (this.selectedEntity!.bitmapText && this.selectedEntity!.bitmapText.width) {
+                 baseW = this.selectedEntity!.bitmapText.width;
+                 baseH = this.selectedEntity!.bitmapText.height || 32;
+            } else if (this.selectedEntity!.label && this.selectedEntity!.label.width) {
+                 baseW = this.selectedEntity!.label.width;
+                 baseH = this.selectedEntity!.label.height || 24;
+            }
            // Use collider as fallback
            
            // Project mouse onto axes? 
@@ -375,35 +401,71 @@ export class GizmoManager {
            if (this.dragHandle.includes('s')) my = 1;
            if (this.dragHandle.includes('n')) my = -1;
            
-           // New Scale = StartScale + (Delta / BaseSize) * Multiplier * 2 (since w is full width, center to edge is half)
-           // Actually, dragging edge by D increases width by D? 
-           // If scaling from center, dragging corner out by 10px adds 20px to width (10 on each side).
-           
-           let newScaleX = this.entityStart.scaleX + (localDx / (baseW/2)) * mx * 0.5; 
-           let newScaleY = this.entityStart.scaleY + (localDy / (baseH/2)) * my * 0.5;
-           
-           if (e.ctrlKey) {
-               // Proportional Scale Logic
-               const ratioX = newScaleX / this.entityStart.scaleX;
-               const ratioY = newScaleY / this.entityStart.scaleY;
+           // SPECIAL HANDLING FOR NINE SLICE: RESIZE DIMENSIONS NOT SCALE
+           if (this.selectedEntity.nineSliceSprite) {
+               // We want to change WIDTH/HEIGHT, not Scale.
+               // Current Size = BaseW * ScaleX
+               // New Size = Current Size + (LocalDelta * mx * 0.5? No, edges move fully)
+               // If dragging 'east' (right edge), we add delta to width.
+               // But Gizmo calculates center-based resizing usually?
+               // Our Gizmo logic above: center stays put? 
+               // Currently Logic: "newScaleX = ..." this implies scaling from center if we don't move position.
+               // To keep it simple: We will just change dimensions and assume center scaling for now (NineSlice handles anchors).
                
-               // Use the larger scale factor to drive both
-               // Handle potential division by zero if startScale is 0 (unlikely but safe)
-               const startX = Math.abs(this.entityStart.scaleX) > 0.001 ? this.entityStart.scaleX : 1;
-               const startY = Math.abs(this.entityStart.scaleY) > 0.001 ? this.entityStart.scaleY : 1;
+               // Account for current scale to convert screen pixel delta to local unit delta
+               const currentScaleX = this.selectedEntity.transform.scale.x;
+               const currentScaleY = this.selectedEntity.transform.scale.y;
 
-               // Determine dominant ratio change
-               const deltaRatioX = Math.abs(ratioX - 1);
-               const deltaRatioY = Math.abs(ratioY - 1);
+               // Avoid div by zero
+               const sX = Math.abs(currentScaleX) > 0.01 ? currentScaleX : 1;
+               const sY = Math.abs(currentScaleY) > 0.01 ? currentScaleY : 1;
+
+               // The Gizmo handle moves by localDx.
+               // Since handles are at edges (width/2), moving handle by 10px means width increases by 20px (if symmetric).
+               const deltaW = (localDx * mx * 2) / sX; 
+               const deltaH = (localDy * my * 2) / sY;
+
+               const startW = this.selectedEntity.nineSliceSprite.width;
+               const startH = this.selectedEntity.nineSliceSprite.height;
+
+               // Update ECS Data directly
+               const ns = this.selectedEntity.nineSliceSprite;
+               if (mx !== 0) ns.width = Math.max(startW + deltaW, ns.left + ns.right); // Clamp to margins
+               if (my !== 0) ns.height = Math.max(startH + deltaH, ns.top + ns.bottom);
+
+               // Do NOT touch transform.scale
+           } else {
+               // NORMAL SCALING LOGIC
+               // New Scale = StartScale + (Delta / BaseSize) * Multiplier * 2 (since w is full width, center to edge is half)
+               // Actually, dragging edge by D increases width by D? 
+               // If scaling from center, dragging corner out by 10px adds 20px to width (10 on each side).
                
-               const factor = deltaRatioX > deltaRatioY ? ratioX : ratioY;
+               let newScaleX = this.entityStart.scaleX + (localDx / (baseW/2)) * mx * 0.5; 
+               let newScaleY = this.entityStart.scaleY + (localDy / (baseH/2)) * my * 0.5;
                
-               newScaleX = startX * factor;
-               newScaleY = startY * factor;
+               if (e.ctrlKey) {
+                   // Proportional Scale Logic
+                   const ratioX = newScaleX / this.entityStart.scaleX;
+                   const ratioY = newScaleY / this.entityStart.scaleY;
+                   
+                   // Use the larger scale factor to drive both
+                   // Handle potential division by zero if startScale is 0 (unlikely but safe)
+                   const startX = Math.abs(this.entityStart.scaleX) > 0.001 ? this.entityStart.scaleX : 1;
+                   const startY = Math.abs(this.entityStart.scaleY) > 0.001 ? this.entityStart.scaleY : 1;
+
+                   // Determine dominant ratio change
+                   const deltaRatioX = Math.abs(ratioX - 1);
+                   const deltaRatioY = Math.abs(ratioY - 1);
+                   
+                   const factor = deltaRatioX > deltaRatioY ? ratioX : ratioY;
+                   
+                   newScaleX = startX * factor;
+                   newScaleY = startY * factor;
+               }
+
+               this.selectedEntity.transform!.scale.x = newScaleX;
+               this.selectedEntity.transform!.scale.y = newScaleY;
            }
-
-           this.selectedEntity.transform!.scale.x = newScaleX;
-           this.selectedEntity.transform!.scale.y = newScaleY;
        }
 
        eventBus.emit('entity-updated', this.selectedEntity.id);

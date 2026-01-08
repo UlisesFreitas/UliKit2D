@@ -15,7 +15,15 @@ import AudioSourceEditor from '../components/inspectors/AudioSourceEditor.vue';
 import LabelEditor from '../components/inspectors/LabelEditor.vue';
 import AnimatorEditor from '../components/inspectors/AnimatorEditor.vue';
 import ScriptInspector from '../components/inspectors/ScriptInspector.vue';
+import BitmapTextEditor from '../components/inspectors/BitmapTextEditor.vue';
+// ... imports
+import NineSliceEditor from '../components/inspectors/NineSliceEditor.vue';
+
 import AddComponentModal from '../components/modals/AddComponentModal.vue';
+
+// ...
+
+
 
 const editorStore = useEditorStore();
 const revision = ref(0);
@@ -203,6 +211,11 @@ const handleAddComponent = async (payload: { type: string, data: any }) => {
              data = { text: 'New Text', fontSize: 24, fontFamily: 'Arial', color: '#ffffff', align: 'center' };
         } else if (payload.type === 'animator' && Object.keys(data).length === 0) {
              data = { currentAnim: '', isPlaying: false, speed: 1, elapsedTime: 0, animations: {} };
+        } else if (payload.type === 'bitmapText' && Object.keys(data).length === 0) {
+             data = { text: 'Bitmap Text', fontSize: 32, fontName: '', tint: 0xffffff, align: 'left' };
+        } else if (payload.type === 'nineSliceSprite' && Object.keys(data).length === 0) {
+             data = { texture: '', width: 100, height: 100, left: 10, right: 10, top: 10, bottom: 10 };
+
         }
 
         world.addComponent(rawEntity, payload.type as any, data);
@@ -300,10 +313,10 @@ const toggleCollapse = (key: string) => {
                     
                     <SpriteEditor 
                         v-else-if="item.key === 'sprite'" 
-                        :sprite="item.data" 
+                        :sprite="item.data"
+                        :entity="selectedEntity"
                         @update="onComponentUpdate" 
-                    />
-                    
+                    />        
                     <CameraEditor 
                         v-else-if="item.key === 'camera'" 
                         :camera="item.data" 
@@ -337,6 +350,18 @@ const toggleCollapse = (key: string) => {
                     <AnimatorEditor 
                         v-else-if="item.key === 'animator'" 
                         :entity="(selectedEntity as any)" 
+                        @update="onComponentUpdate" 
+                    />
+
+                    <BitmapTextEditor 
+                        v-else-if="item.key === 'bitmapText'" 
+                        :entity="(selectedEntity as any)" 
+                        @update="onComponentUpdate" 
+                    />
+
+                    <NineSliceEditor 
+                        v-else-if="item.key === 'nineSliceSprite'" 
+                        :nineSlice="item.data" 
                         @update="onComponentUpdate" 
                     />
 

@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import { ref, watch, onMounted } from 'vue';
-import { getFileSystem } from '../../../api/FileSystem';
 import AssetPickerModal from '../modals/AssetPickerModal.vue';
 
 const props = defineProps<{
-    sprite: { texture: string; tint?: number };
+    sprite: any;
+    entity?: any;
 }>();
 
 const emit = defineEmits(['update']);
@@ -19,10 +19,25 @@ const openPicker = () => {
     isPickerOpen.value = true;
 };
 
+const thumbnailUrl = ref('');
+
+const stopAnimation = () => {
+    if (props.entity && props.entity.animator) {
+        if (props.entity.animator.isPlaying || props.entity.animator.currentAnim) {
+            console.log('[SpriteEditor] Stopping active animation to set manual sprite');
+            props.entity.animator.isPlaying = false;
+            props.entity.animator.currentAnim = ''; // Clear current anim so System doesn't override
+        }
+    }
+}
+
 const onSelectAsset = (path: string) => {
     // 1. Mutate
     // Normalize path to forward slashes
     const normPath = path.replace(/\\/g, '/');
+    
+    stopAnimation();
+    
     props.sprite.texture = normPath;
     
     // 2. Immediate visual update
@@ -43,6 +58,10 @@ const onDrop = (e: DragEvent) => {
         }
 
         const normPath = path.replace(/\\/g, '/');
+        console.log(`[SpriteEditor] Drop texture: '${normPath}'`);
+        
+        stopAnimation();
+
         props.sprite.texture = normPath;
         thumbnailUrl.value = '';
         updateThumbnail();
@@ -50,7 +69,7 @@ const onDrop = (e: DragEvent) => {
     }
 };
 
-const thumbnailUrl = ref('');
+
 
 const updateThumbnail = async () => {
     const rawPath = props.sprite.texture;
@@ -59,14 +78,9 @@ const updateThumbnail = async () => {
         return;
     }
 
-    if (rawPath.startsWith('blob:') || rawPath.startsWith('data:')) {
-        thumbnailUrl.value = rawPath;
-        return;
-    }
-
     try {
-        const fs = getFileSystem();
-        thumbnailUrl.value = await fs.getAssetURL(rawPath);
+        const { resourceManager } = await import('../../../engine/resources/ResourceManager');
+        thumbnailUrl.value = await resourceManager.getUrl(rawPath);
     } catch (e) {
         console.error('[SpriteEditor] Failed to resolve thumbnail:', e);
         thumbnailUrl.value = rawPath;
@@ -76,11 +90,22 @@ const updateThumbnail = async () => {
 // Watch for Entity Switching (Identity change)
 watch(() => props.sprite, () => {
     updateThumbnail();
+}, { deep: true });
+
+onMounted(async () => {
+    updateThumbnail();
+    
+    // Listen for live updates
+    const { eventBus } = await import('../../../engine/core/EventBus');
+    eventBus.on('asset-changed', (path: string) => {
+        // If our texture changed, refresh
+        if (props.sprite.texture === path || props.sprite.texture?.endsWith(path)) {
+             console.log('[SpriteEditor] Asset changed, refreshing thumbnail:', path);
+             updateThumbnail();
+        }
+    });
 });
 
-onMounted(() => {
-    updateThumbnail();
-});
 
 </script>
 

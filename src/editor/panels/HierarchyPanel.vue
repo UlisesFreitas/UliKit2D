@@ -56,7 +56,8 @@ const select = (id: string | undefined) => {
 };
 
 // Deprecated in favor of Create Asset Menu for direct usage, but kept for logic reference
-const createEntity = (type: 'Empty' | 'Sprite' | 'Camera' | 'Text' | 'Animator' = 'Empty') => {
+const createEntity = (type: 'Empty' | 'Sprite' | 'Camera' | 'Text' | 'BitmapText' | 'Animator' | 'NineSliceSprite' = 'Empty') => {
+    
     const id = crypto.randomUUID();
     let data: any = {
         id,
@@ -85,6 +86,22 @@ const createEntity = (type: 'Empty' | 'Sprite' | 'Camera' | 'Text' | 'Animator' 
             elapsedTime: 0,
             animations: {}
         };
+    } else if (type === 'BitmapText') {
+        data.bitmapText = {
+            text: 'Bitmap Text',
+            fontName: '',
+            fontSize: 32,
+            tint: 0xffffff,
+            align: 'left'
+        };
+    } else if (type === 'NineSliceSprite') {
+        data.nineSliceSprite = {
+            texture: '',
+            width: 100,
+            height: 100,
+            left: 10, right: 10, top: 10, bottom: 10
+        };
+
     }
 
     world.add(data);
@@ -137,7 +154,7 @@ const showCreateMenu = (e: MouseEvent) => {
     }, 0);
 };
 
-const createAsset = (type: 'Empty' | 'Sprite' | 'Camera' | 'Text' | 'Animator') => {
+const createAsset = (type: 'Empty' | 'Sprite' | 'Camera' | 'Text' | 'BitmapText' | 'Animator' | 'NineSliceSprite') => {
     createEntity(type);
     createMenuState.value.visible = false;
 };
@@ -216,8 +233,11 @@ const duplicateEntity = () => {
                     <span class="mr-1.5 opacity-70">
                         <span v-if="entity.camera">📷</span>
                         <span v-else-if="entity.sprite">🖼️</span>
+                        <span v-else-if="entity.nineSliceSprite">🍱</span>
                         <span v-else-if="entity.animator">🎬</span>
                         <span v-else-if="entity.label">📝</span>
+                        <span v-else-if="entity.bitmapText">🔤</span>
+
                         <span v-else>📦</span>
                     </span>
                     <span class="truncate">{{ entity.name || 'Unnamed Entity' }}</span>
@@ -247,6 +267,9 @@ const duplicateEntity = () => {
         <button @click="createAsset('Camera')" class="w-full text-left px-3 py-1.5 hover:bg-bg-hover text-xs flex items-center"><span class="mr-2">📷</span> Camera</button>
         <button @click="createAsset('Animator')" class="w-full text-left px-3 py-1.5 hover:bg-bg-hover text-xs flex items-center"><span class="mr-2">🎬</span> Animator</button>
         <button @click="createAsset('Text')" class="w-full text-left px-3 py-1.5 hover:bg-bg-hover text-xs flex items-center"><span class="mr-2">📝</span> Text Label</button>
+        <button @click="createAsset('BitmapText')" class="w-full text-left px-3 py-1.5 hover:bg-bg-hover text-xs flex items-center"><span class="mr-2">🔤</span> Bitmap Text</button>
+        <button @click="createAsset('NineSliceSprite')" class="w-full text-left px-3 py-1.5 hover:bg-bg-hover text-xs flex items-center"><span class="mr-2">🍱</span> Nine Slice Sprite</button>
+
         <button @click="createAsset('Empty')" class="w-full text-left px-3 py-1.5 hover:bg-bg-hover text-xs flex items-center"><span class="mr-2">📦</span> Empty Entity</button>
     </div>
   </div>

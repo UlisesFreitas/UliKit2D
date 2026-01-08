@@ -19,7 +19,7 @@ const update = (key: string, val: number) => {
     <div class="flex flex-col space-y-2 select-none px-2 py-1">
         <!-- Position -->
         <div class="flex items-center">
-             <div class="w-20 text-xs font-bold text-text-secondary">Position</div>
+             <div class="w-16 text-xs text-text-secondary">Position</div>
              <div class="flex-1 grid grid-cols-2 gap-1">
                 <div class="flex items-center bg-bg-input border border-border rounded overflow-hidden group">
                     <div class="px-2 text-xs font-bold text-red-500 cursor-ew-resize border-r border-border hover:bg-bg-hover">X</div>
@@ -44,7 +44,7 @@ const update = (key: string, val: number) => {
 
         <!-- Rotation -->
          <div class="flex items-center">
-             <div class="w-20 text-xs font-bold text-text-secondary">Rotation</div>
+             <div class="w-16 text-xs text-text-secondary">Rotation</div>
              <div class="flex-1">
                  <div class="flex items-center bg-bg-input border border-border rounded overflow-hidden group">
                     <div class="px-2 text-xs font-bold text-blue-400 cursor-ew-resize border-r border-border hover:bg-bg-hover">Z</div>
@@ -64,7 +64,7 @@ const update = (key: string, val: number) => {
 
         <!-- Scale -->
         <div class="flex items-center">
-            <div class="w-20 text-xs font-bold text-text-secondary">Scale</div>
+            <div class="w-16 text-xs text-text-secondary">Scale</div>
             <div class="flex-1 grid grid-cols-2 gap-1">
                 <div class="flex items-center bg-bg-input border border-border rounded overflow-hidden group">
                     <div class="px-2 text-xs font-bold text-text-secondary border-r border-border hover:bg-bg-hover">X</div>
