@@ -27,6 +27,9 @@ export type Entity = {
       width: number;
       height: number;
   };
+  circleCollider?: {
+      radius: number;
+  };
   script?: {
       path: string;
       parameters?: Record<string, any>;

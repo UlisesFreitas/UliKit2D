@@ -56,7 +56,7 @@ const select = (id: string | undefined) => {
 };
 
 // Deprecated in favor of Create Asset Menu for direct usage, but kept for logic reference
-const createEntity = (type: 'Empty' | 'Sprite' | 'Camera' | 'Text' | 'BitmapText' | 'Animator' | 'NineSliceSprite' = 'Empty') => {
+const createEntity = (type: 'Empty' | 'Sprite' | 'Camera' | 'Text' | 'BitmapText' | 'Animator' | 'NineSliceSprite' | 'CircleObject' | 'BoxObject' = 'Empty') => {
     
     const id = crypto.randomUUID();
     let data: any = {
@@ -101,7 +101,14 @@ const createEntity = (type: 'Empty' | 'Sprite' | 'Camera' | 'Text' | 'BitmapText
             height: 100,
             left: 10, right: 10, top: 10, bottom: 10
         };
-
+    } else if (type === 'CircleObject') {
+        data.name = 'Circle Physics';
+        data.rigidBody = { mass: 1, isStatic: false, friction: 0.5, restitution: 0.5 };
+        data.circleCollider = { radius: 25 };
+    } else if (type === 'BoxObject') {
+        data.name = 'Box Physics';
+        data.rigidBody = { mass: 1, isStatic: false, friction: 0.5, restitution: 0.5 };
+        data.boxCollider = { width: 50, height: 50 };
     }
 
     world.add(data);
@@ -154,7 +161,7 @@ const showCreateMenu = (e: MouseEvent) => {
     }, 0);
 };
 
-const createAsset = (type: 'Empty' | 'Sprite' | 'Camera' | 'Text' | 'BitmapText' | 'Animator' | 'NineSliceSprite') => {
+const createAsset = (type: 'Empty' | 'Sprite' | 'Camera' | 'Text' | 'BitmapText' | 'Animator' | 'NineSliceSprite' | 'CircleObject' | 'BoxObject') => {
     createEntity(type);
     createMenuState.value.visible = false;
 };
@@ -269,8 +276,12 @@ const duplicateEntity = () => {
         <button @click="createAsset('Text')" class="w-full text-left px-3 py-1.5 hover:bg-bg-hover text-xs flex items-center"><span class="mr-2">📝</span> Text Label</button>
         <button @click="createAsset('BitmapText')" class="w-full text-left px-3 py-1.5 hover:bg-bg-hover text-xs flex items-center"><span class="mr-2">🔤</span> Bitmap Text</button>
         <button @click="createAsset('NineSliceSprite')" class="w-full text-left px-3 py-1.5 hover:bg-bg-hover text-xs flex items-center"><span class="mr-2">🍱</span> Nine Slice Sprite</button>
+        <div class="h-[1px] bg-border my-1"></div>
+        <button @click="createAsset('CircleObject')" class="w-full text-left px-3 py-1.5 hover:bg-bg-hover text-xs flex items-center"><span class="mr-2">⚪</span> Circle Physics Object</button>
+        <button @click="createAsset('BoxObject')" class="w-full text-left px-3 py-1.5 hover:bg-bg-hover text-xs flex items-center"><span class="mr-2">📦</span> Box Physics Object</button>
+        <div class="h-[1px] bg-border my-1"></div>
 
-        <button @click="createAsset('Empty')" class="w-full text-left px-3 py-1.5 hover:bg-bg-hover text-xs flex items-center"><span class="mr-2">📦</span> Empty Entity</button>
+        <button @click="createAsset('Empty')" class="w-full text-left px-3 py-1.5 hover:bg-bg-hover text-xs flex items-center"><span class="mr-2">🧊</span> Empty Entity</button>
     </div>
   </div>
 </template>

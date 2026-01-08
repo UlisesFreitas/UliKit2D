@@ -19,6 +19,7 @@ const CORE_COMPONENTS = [
     { type: 'camera', name: 'Camera', icon: '📷', description: 'Renders the scene' },
     { type: 'rigidBody', name: 'RigidBody 2D', icon: '🧱', description: 'Physics body' },
     { type: 'boxCollider', name: 'Box Collider 2D', icon: '📦', description: 'Box shape collision' },
+    { type: 'circleCollider', name: 'Circle Collider 2D', icon: '⚪', description: 'Circle shape collision' },
     { type: 'animator', name: 'Sprite Animator', icon: '🎬', description: 'Frame-based animation' },
     { type: 'audioSource', name: 'Audio Source', icon: '🔊', description: 'Plays sound clips' },
     { type: 'label', name: 'Text Label', icon: '📝', description: 'Displays text' },

@@ -27,24 +27,38 @@ export class PhysicsSystem {
     }
 
     private syncBodies() {
-        // 1. Initialize bodies for new entities
-        const entitiesWithBody = world.with('transform', 'rigidBody', 'boxCollider');
+        // 1. Initialize bodies for new entities (Box or Circle)
+        const entitiesWithBody = world.with('transform', 'rigidBody');
         
         for (const entity of entitiesWithBody) {
             if (!entity.physicsBody) {
                 const { x, y, rotation } = entity.transform;
-                const { width, height } = entity.boxCollider;
                 const { isStatic, friction, restitution } = entity.rigidBody;
+                
+                let body: Matter.Body | null = null;
 
-                const body = Matter.Bodies.rectangle(x, y, width, height, {
-                    isStatic,
-                    angle: rotation,
-                    friction,
-                    restitution
-                });
+                if (entity.boxCollider) {
+                    const { width, height } = entity.boxCollider;
+                    body = Matter.Bodies.rectangle(x, y, width, height, {
+                        isStatic,
+                        angle: rotation,
+                        friction,
+                        restitution
+                    });
+                } else if (entity.circleCollider) {
+                     const { radius } = entity.circleCollider;
+                     body = Matter.Bodies.circle(x, y, radius, {
+                        isStatic,
+                        angle: rotation,
+                        friction,
+                        restitution
+                    });
+                }
 
-                entity.physicsBody = body;
-                Matter.World.add(this.engine.world, body);
+                if (body) {
+                    entity.physicsBody = body;
+                    Matter.World.add(this.engine.world, body);
+                }
             } else {
                 // 2. Sync Physics -> ECS (for dynamic bodies)
                 if (!entity.rigidBody.isStatic) {
@@ -53,7 +67,6 @@ export class PhysicsSystem {
                    entity.transform.rotation = entity.physicsBody.angle;
                 } else {
                     // 3. Sync ECS -> Physics (for static bodies moved in editor)
-                    // Note: In a real engine, we might want a flag to know if transform transformed
                     Matter.Body.setPosition(entity.physicsBody, { x: entity.transform.x, y: entity.transform.y });
                     Matter.Body.setAngle(entity.physicsBody, entity.transform.rotation);
                 }

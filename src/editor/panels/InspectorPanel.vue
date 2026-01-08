@@ -16,12 +16,11 @@ import LabelEditor from '../components/inspectors/LabelEditor.vue';
 import AnimatorEditor from '../components/inspectors/AnimatorEditor.vue';
 import ScriptInspector from '../components/inspectors/ScriptInspector.vue';
 import BitmapTextEditor from '../components/inspectors/BitmapTextEditor.vue';
-// ... imports
+import CircleColliderEditor from '../components/inspectors/CircleColliderEditor.vue';
 import NineSliceEditor from '../components/inspectors/NineSliceEditor.vue';
 
 import AddComponentModal from '../components/modals/AddComponentModal.vue';
 
-// ...
 
 
 
@@ -205,6 +204,8 @@ const handleAddComponent = async (payload: { type: string, data: any }) => {
                 // If has sprite, try to match size? (Ideally read image, but this is async/complex here)
                 // For now stick to safe default
             }
+        } else if (payload.type === 'circleCollider' && Object.keys(data).length === 0) {
+             data = { radius: 50 };
         } else if (payload.type === 'audioSource' && Object.keys(data).length === 0) {
              data = { clip: '', volume: 1.0, loop: false, playOnAwake: true };
         } else if (payload.type === 'label' && Object.keys(data).length === 0) {
@@ -332,6 +333,12 @@ const toggleCollapse = (key: string) => {
                     <BoxColliderEditor 
                         v-else-if="item.key === 'boxCollider'" 
                         :collider="item.data" 
+                        @update="onComponentUpdate" 
+                    />
+
+                    <CircleColliderEditor 
+                        v-else-if="item.key === 'circleCollider'" 
+                        :circleCollider="item.data" 
                         @update="onComponentUpdate" 
                     />
 

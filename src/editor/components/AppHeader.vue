@@ -26,7 +26,7 @@ const onOpenProject = () => ProjectManager.openProject();
 const onSaveProject = () => ProjectManager.saveProject();
 const onExit = () => window.close(); // Simple mock
 
-const createAsset = (type: 'Empty' | 'Sprite' | 'Camera' | 'Text' | 'Animator' | 'BitmapText' | 'NineSliceSprite') => {
+const createAsset = (type: 'Empty' | 'Sprite' | 'Camera' | 'Text' | 'Animator' | 'BitmapText' | 'NineSliceSprite' | 'CircleObject' | 'BoxObject') => {
     const id = crypto.randomUUID();
     let data: any = {
         id,
@@ -71,7 +71,14 @@ const createAsset = (type: 'Empty' | 'Sprite' | 'Camera' | 'Text' | 'Animator' |
             height: 100,
             left: 10, right: 10, top: 10, bottom: 10
         };
-
+    } else if (type === 'CircleObject') {
+        data.name = 'Circle Physics';
+        data.rigidBody = { mass: 1, isStatic: false, friction: 0.5, restitution: 0.5 };
+        data.circleCollider = { radius: 25 };
+    } else if (type === 'BoxObject') {
+        data.name = 'Box Physics';
+        data.rigidBody = { mass: 1, isStatic: false, friction: 0.5, restitution: 0.5 };
+        data.boxCollider = { width: 50, height: 50 };
     }
 
     world.add(data);
@@ -172,9 +179,16 @@ const createAsset = (type: 'Empty' | 'Sprite' | 'Camera' | 'Text' | 'Animator' |
                                         <MenubarItem class="menu-item" @select="createAsset('NineSliceSprite')">
                                             <span class="mr-2">🍱</span> Nine Slice Sprite
                                         </MenubarItem>
-
+                                        <MenubarSeparator class="menu-separator" />
+                                        <MenubarItem class="menu-item" @select="createAsset('CircleObject')">
+                                            <span class="mr-2">⚪</span> Circle Physics Object
+                                        </MenubarItem>
+                                        <MenubarItem class="menu-item" @select="createAsset('BoxObject')">
+                                            <span class="mr-2">📦</span> Box Physics Object
+                                        </MenubarItem>
+                                        <MenubarSeparator class="menu-separator" />
                                         <MenubarItem class="menu-item" @select="createAsset('Empty')">
-                                             <span class="mr-2">📦</span> Empty Entity
+                                             <span class="mr-2">🧊</span> Empty Entity
                                         </MenubarItem>
                                     </MenubarSubContent>
                                 </MenubarPortal>

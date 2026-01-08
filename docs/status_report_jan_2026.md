@@ -43,8 +43,9 @@ The project is split into two main domains in `src/`:
 
 ## 4. Recent Changelog (Jan 2026)
 
-### Jan 8: Visual Polish & NineSlice
+### Jan 8: Visual Polish & Physics Shapes
 *   **NineSliceSprite**: Implemented component and inspector usage.
+*   **Physics**: Added support for **CircleColliders** and **BoxColliders** with full editor integration (Creation, Inspection, Simulation).
 *   **Asset Picker**: Added ability to import files directly via the picker.
 *   **Asset Panel**: Added thumbnail support for better visual navigation.
 
