@@ -48,6 +48,18 @@ export class ResourceManager {
         return this.bitmapFontManager.loadBitmapFont(path, texturePathOverride);
     }
 
+    public async loadJSON(path: string): Promise<any | null> {
+        try {
+            const url = await this.loader.loadUrl(path);
+            const response = await fetch(url);
+            if (!response.ok) throw new Error(`Failed to fetch JSON: ${response.statusText}`);
+            return await response.json();
+        } catch (e) {
+            console.error('ResourceManager: JSON Load Error', e);
+            return null;
+        }
+    }
+
     // --- Utilities & Cache Access ---
 
     public getTexture(key: string): Texture | undefined {

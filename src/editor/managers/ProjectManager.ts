@@ -9,18 +9,23 @@ export const projectState = reactive({
 
 export class ProjectManager {
     
-    static async createProject() {
-        console.log('ProjectManager: Creating new project...');
+    static async createProject(customPath?: string) {
+        console.log('ProjectManager: Creating new project...', customPath ? `(Path: ${customPath})` : '(Interactive)');
         const fs = getFileSystem();
-        const pathOrHandle = await fs.selectFolder();
+        
+        // Use provided path or ask user
+        const pathOrHandle = customPath || await fs.selectFolder();
         
         if (pathOrHandle) {
             const result = await fs.createProject(pathOrHandle as any);
             if (result.success) {
                  projectState.currentProjectPath = pathOrHandle;
+                 console.log(`[ProjectManager] Set currentProjectPath to: ${projectState.currentProjectPath}`);
                  
                  if (typeof pathOrHandle === 'string') {
-                    projectState.projectName = pathOrHandle.split(/[/\\]/).pop() || 'New Project';
+                    // Extract name from path
+                    // Handle both / and \ 
+                    projectState.projectName = pathOrHandle.replace(/[\\/]$/, '').split(/[/\\]/).pop() || 'New Project';
                  } else {
                     projectState.projectName = (pathOrHandle as FileSystemDirectoryHandle).name;
                  }
@@ -35,6 +40,12 @@ export class ProjectManager {
                 alert('Failed to create project: ' + result.error);
             }
         }
+    }
+
+    static closeProject() {
+        projectState.currentProjectPath = null;
+        projectState.projectName = 'Untitled';
+        console.log('[ProjectManager] Project closed');
     }
 
     static async openProject() {
@@ -60,6 +71,33 @@ export class ProjectManager {
 
     static async saveProject() {
         console.log('ProjectManager: Saving project...');
-        projectState.isDirty = false;
+        
+        // Dynamic import to avoid circular dep if needed, though Manager -> Manager is usually fine if mindful
+        const { SceneManager } = await import('../../engine/managers/SceneManager');
+        const json = SceneManager.saveScene();
+        const fs = getFileSystem();
+        
+        if (projectState.currentProjectPath) {
+            // Ensure assets/scenes exists
+             const scenesDir = 'assets/scenes';
+             // We can't easily check dir existence with current API without erroring, but writeFile usually handles it if parent exists.
+             // For now assuming assets/ exists.
+             
+             const filename = `${SceneManager.activeSceneName.replace(/\s+/g, '_')}.json`;
+             const fullPath = `${scenesDir}/${filename}`;
+             
+             const success = await fs.writeFile(fullPath, json);
+             if (success) {
+                 console.log(`[ProjectManager] Saved scene to ${fullPath}`);
+                 projectState.isDirty = false;
+                 // Notify usage
+                 alert(`Scene saved to ${fullPath}`);
+             } else {
+                 console.error('[ProjectManager] Save failed');
+                 alert('Save failed: Unknown error');
+             }
+        } else {
+            console.warn('[ProjectManager] No project open, cannot save.');
+        }
     }
 }

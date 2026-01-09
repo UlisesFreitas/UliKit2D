@@ -3,6 +3,8 @@ import { world } from '../ecs/ECS';
 import { projectState } from '../../editor/managers/ProjectManager';
 import { getFileSystem, type FileChangeEvent } from '../../api/FileSystem';
 
+import { SceneManager } from '../managers/SceneManager';
+
 export class ScriptSystem {
     private scriptCache: Map<string, any> = new Map();
     private resolvedPathCache: Map<string, string> = new Map();
@@ -11,6 +13,12 @@ export class ScriptSystem {
 
     constructor() {
         const fs = getFileSystem();
+        
+        // Expose SceneManager to global scope for scripts
+        if (!(window as any).SceneManager) {
+            (window as any).SceneManager = SceneManager;
+            console.log('[ScriptSystem] Exposed SceneManager to window');
+        }
         
         // Listen for file changes (Hot Reload)
         // Note: ProjectManager or useAssetStore normally starts the watch.

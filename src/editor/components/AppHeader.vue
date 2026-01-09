@@ -21,7 +21,11 @@ import { world } from '../../engine/ecs/ECS';
 const editorStore = useEditorStore();
 
 // Menu Actions
-const onNewProject = () => ProjectManager.createProject();
+const onNewProject = () => {
+    if (confirm('Are you sure you want to close the current project and return to the dashboard? Unsaved changes may be lost.')) {
+        ProjectManager.closeProject();
+    }
+};
 const onOpenProject = () => ProjectManager.openProject();
 const onSaveProject = () => ProjectManager.saveProject();
 const onExit = () => window.close(); // Simple mock

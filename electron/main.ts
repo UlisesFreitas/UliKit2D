@@ -20,7 +20,8 @@ const createWindow = () => {
         webPreferences: {
             nodeIntegration: false,
             contextIsolation: true,
-            preload: path.join(__dirname, 'preload.js')
+            preload: path.join(__dirname, 'preload.js'),
+            webSecurity: false
         },
         show: false,
         backgroundColor: '#1a1a1a',
@@ -130,6 +131,11 @@ ipcMain.handle('project:create', async (_event, folderPath: string) => {
         const importedPath = path.join(assetsPath, 'imported');
         console.log(`[Main] Creating imported at: ${importedPath}`);
         await fs.mkdir(importedPath, { recursive: true });
+
+        // Ensure scenes folder exists
+        const scenesPath = path.join(assetsPath, 'scenes');
+        console.log(`[Main] Creating scenes at: ${scenesPath}`);
+        await fs.mkdir(scenesPath, { recursive: true });
         
         const projectConfig = {
             name: path.basename(folderPath),
@@ -159,20 +165,21 @@ ipcMain.handle('project:create', async (_event, folderPath: string) => {
         }
 
         try {
+            console.log(`[Main] Looking for default assets at: ${sourceAssetsPath}`);
             const files = await fs.readdir(sourceAssetsPath);
+            console.log(`[Main] Found ${files.length} assets.`);
             for (const file of files) {
                 const src = path.join(sourceAssetsPath, file);
                 const dest = path.join(assetsPath, file);
-                // Simple file copy
-                // Ensure it's a file
+                
                 const stat = await fs.stat(src);
                 if (stat.isFile()) {
                     await fs.copyFile(src, dest);
+                    console.log(`[Main] Copied ${file} to ${dest}`);
                 }
             }
         } catch (err) {
             console.error('Failed to copy default assets:', err);
-             // Non-fatal, just log
         }
         // -------------------------------
         
@@ -227,10 +234,24 @@ ipcMain.handle('fs:readdir', async (_event, dirPath: string) => {
     }
 });
 
-ipcMain.handle('fs:writeFile', async (_event, filePath: string, content: string) => {
+    ipcMain.handle('fs:writeFile', async (_event, filePath: string, content: string) => {
     const fs = await import('fs/promises');
     try {
+        // Ensure directory exists
+        const dir = path.dirname(filePath);
+        await fs.mkdir(dir, { recursive: true });
+        
         await fs.writeFile(filePath, content, 'utf-8');
+        return true;
+    } catch (e: any) {
+        throw new Error(e.message);
+    }
+});
+
+ipcMain.handle('fs:deleteFile', async (_event, filePath: string) => {
+    const fs = await import('fs/promises');
+    try {
+        await fs.unlink(filePath);
         return true;
     } catch (e: any) {
         throw new Error(e.message);

@@ -14,6 +14,7 @@ import { getActivePinia } from 'pinia';
 import 'dockview-core/dist/styles/dockview.css';
 
 import ScenePanel from '../panels/ScenePanel.vue';
+import ScenesPanel from '../panels/ScenesPanel.vue'; // New Panel
 import InspectorPanel from '../panels/InspectorPanel.vue'; 
 import ConsolePanel from '../panels/ConsolePanel.vue';
 import AssetsPanel from '../panels/AssetsPanel.vue';
@@ -96,6 +97,7 @@ onMounted(() => {
         createComponent: (options: any) => {
             switch (options.name) {
                 case 'scene': return new VuePanelRenderer(ScenePanel);
+                case 'scenes': return new VuePanelRenderer(ScenesPanel); // Register 'scenes'
                 case 'inspector': return new VuePanelRenderer(InspectorPanel);
                 case 'console': return new VuePanelRenderer(ConsolePanel);
                 case 'assets': return new VuePanelRenderer(AssetsPanel);
@@ -111,15 +113,16 @@ onMounted(() => {
     
     // Restore Layout or Default
     const savedLayout = layoutStore.loadLayout();
-    if (savedLayout) {
-        api.fromJSON(savedLayout);
+    // FORCE DEFAULT for testing new panel config (User Request)
+    if (false && savedLayout) {
+        api!.fromJSON(savedLayout);
     } else {
         // --- Default Layout Construction (Explicit JSON Strategy v15) ---
         // We use a hardcoded JSON schema derived from a successful layout dump,
         // but with corrected 'size' weights to enforce 25% | 50% | 25%.
         // Total Width base: 1460 (365 + 730 + 365)
         
-        api.fromJSON({
+        api!.fromJSON({
             grid: {
                 root: {
                     type: 'branch',
@@ -127,8 +130,9 @@ onMounted(() => {
                         {
                             type: 'branch',
                             data: [
-                                { type: 'leaf', data: { views: ['hierarchy'], id: 'group-hierarchy' }, size: 600 },
-                                { type: 'leaf', data: { views: ['assets'], id: 'group-assets' }, size: 300 }
+                                { type: 'leaf', data: { views: ['scenes'], id: 'group-scenes' }, size: 200 },
+                                { type: 'leaf', data: { views: ['hierarchy'], id: 'group-hierarchy' }, size: 500 },
+                                { type: 'leaf', data: { views: ['assets'], id: 'group-assets' }, size: 200 }
                             ],
                             size: 365
                         },
@@ -155,6 +159,7 @@ onMounted(() => {
             panels: {
                 'hierarchy': { id: 'hierarchy', title: 'Hierarchy', component: 'hierarchy', contentComponent: 'hierarchy' },
                 'assets': { id: 'assets', title: 'Assets', component: 'assets', contentComponent: 'assets' },
+                'scenes': { id: 'scenes', title: 'Scenes', component: 'scenes', contentComponent: 'scenes' },
                 'scene': { id: 'scene', title: 'Scene View', component: 'scene', contentComponent: 'scene' },
                 'console': { id: 'console', title: 'Console', component: 'console', contentComponent: 'console' },
                 'inspector': { id: 'inspector', title: 'Inspector', component: 'inspector', contentComponent: 'inspector' }

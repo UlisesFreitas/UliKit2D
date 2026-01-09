@@ -23,6 +23,7 @@ export interface IFileSystem {
     // Generic File I/O
     readFile(path: string): Promise<string>;
     writeFile(path: string, content: string | Blob | Uint8Array): Promise<boolean>;
+    deleteFile(path: string): Promise<boolean>;
     readdir(path: string): Promise<FileEntry[]>;
     
     // Asset Management

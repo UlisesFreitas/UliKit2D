@@ -21,8 +21,9 @@ export class ResourceLoader {
      * Loads a PIXI Texture from a resolved URL
      */
     public async loadTexture(url: string): Promise<Texture> {
-        if (url.startsWith('blob:') || url.startsWith('data:')) {
-            // Robust loading for Blobs
+        if (url.startsWith('blob:') || url.startsWith('data:') || url.startsWith('file:')) {
+            // Robust loading for Blobs and Local Files (Electron) via Image tag
+            // bypassing fetch restrictions
             const img = new Image();
             img.src = url;
             await img.decode();

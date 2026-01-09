@@ -11,7 +11,34 @@ export class ElectronFileSystem implements IFileSystem {
     }
 
     async createProject(path: string): Promise<{ success: boolean; error?: string }> {
-        return await this.electronAPI.createProject(path);
+        try {
+            // 1. Create Directories via IPC
+           const result = await this.electronAPI.createProject(path); // This creates the root, assets, imported, and scenes
+           if (!result.success) return result;
+           
+           // Resolve project path for usage (Ensure normalized)
+           const projectRoot = path.replace(/\\/g, '/');
+
+           // Ensure assets/scenes directory exists (Redundant if main.ts does it, but safe)
+           await this.electronAPI.writeFile(`${projectRoot}/assets/scenes/.gitkeep`, '');
+           
+           // 2. Copy Default Assets
+           // Handled by Main Process (ipcMain.handle('project:create'))
+           // We do NOT need to do it here. 
+           
+           // Resolve project path for usage
+           // const projectRoot = path; // Already declared at the top of try block
+
+           
+           // 3. Create project.json (Redundant if main.ts does it, but this ensures params are correct for our logic)
+           // Actually main.ts creates a basic one. 
+           // Let's overwrite it to be sure we control the format if needed, or skip.
+           // Main.ts version is fine.
+            
+           return { success: true };
+        } catch (e: any) {
+            return { success: false, error: e.message };
+        }
     }
 
     async getAssetURL(relPath: string): Promise<string> {
@@ -20,15 +47,12 @@ export class ElectronFileSystem implements IFileSystem {
         
         // 2. Handle Absolute Paths (Windows Drive Letter)
         if (/^[a-zA-Z]:\//.test(texturePath)) {
-            // Already absolute, wrap in /@fs/ and encode
-            return encodeURI('/@fs/' + texturePath);
+            // Use file:// protocol for Electron (requires webSecurity: false)
+            return encodeURI('file:///' + texturePath);
         }
         
         // 3. Handle Already Prefixed Paths
-        if (texturePath.startsWith('/@fs/')) {
-            // Ensure encoded but avoid double encoding if already encoded? 
-            // Better to assume raw and encode. decodeURI first safely?
-            // For now, let's assume we receive raw paths mostly.
+        if (texturePath.startsWith('file://')) {
             return encodeURI(texturePath);
         }
 
@@ -38,8 +62,8 @@ export class ElectronFileSystem implements IFileSystem {
             // Remove leading slash if present in relative path
             const cleanRelPath = texturePath.startsWith('/') ? texturePath.slice(1) : texturePath;
             
-            // Construct full path: /@fs/ + ProjectRoot + / + RelativePath
-            return encodeURI(`/@fs/${projectRoot}/${cleanRelPath}`);
+            // Construct full path: file:/// + ProjectRoot + / + RelativePath
+            return encodeURI(`file:///${projectRoot}/${cleanRelPath}`);
         }
 
         // Fallback
@@ -60,20 +84,46 @@ export class ElectronFileSystem implements IFileSystem {
         };
     }
 
+    private resolvePath(p: string): string {
+        if (!projectState.currentProjectPath) return p;
+        // If already absolute (Windows), return it
+        if (/^[a-zA-Z]:\\/.test(p) || /^[a-zA-Z]:\//.test(p)) return p;
+        
+        // If it starts with /@fs/, it's a special internal URL, but for FS ops we likely need real path.
+        // But usually we get simple 'assets/scenes/foo.json' here.
+        
+        // Simple join using forward slashes for consistency if needed, but Electron runs on Node.
+        // Using string concatenation to avoid importing 'path' (browser compatible file).
+        // But this is ElectronFileSystem, it has Node access via IPC, but here we are in Renderer.
+        // We can't import 'path' in Renderer easily without polyfill.
+        // Let's assume passed paths are standardized or use simple logic.
+        
+        const cleanProject = (projectState.currentProjectPath as string).replace(/\\/g, '/');
+        const cleanPath = p.replace(/\\/g, '/');
+        
+        const result = `${cleanProject}/${cleanPath}`;
+        // console.log(`[ElectronFileSystem] resolvePath: '${p}' -> '${result}'`); // Reduced spam
+        return result;
+    }
+
     async readFile(path: string): Promise<string> {
-        return await this.electronAPI.readFile(path);
+        return await this.electronAPI.readFile(this.resolvePath(path));
     }
 
     async writeFile(path: string, content: string | Blob | Uint8Array): Promise<boolean> {
         if (content instanceof Blob) {
             const text = await content.text();
-            return await this.electronAPI.writeFile(path, text);
+            return await this.electronAPI.writeFile(this.resolvePath(path), text);
         }
-        return await this.electronAPI.writeFile(path, content as string);
+        return await this.electronAPI.writeFile(this.resolvePath(path), content as string);
+    }
+
+    async deleteFile(path: string): Promise<boolean> {
+        return await this.electronAPI.deleteFile(this.resolvePath(path));
     }
 
     async readdir(path: string): Promise<FileEntry[]> {
-        return await this.electronAPI.readdir(path);
+        return await this.electronAPI.readdir(this.resolvePath(path));
     }
 
     // Asset Management

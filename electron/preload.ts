@@ -22,5 +22,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
   openFile: (filters: any[]) => ipcRenderer.invoke('dialog:openFile', filters),
   saveFile: (filters: any[]) => ipcRenderer.invoke('dialog:saveFile', filters),
   readFile: (path: string) => ipcRenderer.invoke('fs:readFile', path),
-  writeFile: (path: string, content: string) => ipcRenderer.invoke('fs:writeFile', path, content)
+  writeFile: (path: string, content: string) => ipcRenderer.invoke('fs:writeFile', path, content),
+  deleteFile: (path: string) => ipcRenderer.invoke('fs:deleteFile', path)
 });

@@ -5,6 +5,7 @@ export class SceneManager {
     private static _isDirty: boolean = false;
 
     static get activeSceneName() { return this._activeSceneName; }
+    static set activeSceneName(v: string) { this._activeSceneName = v; }
     static get isDirty() { return this._isDirty; }
 
     static setDirty(dirty: boolean) { this._isDirty = dirty; }
@@ -53,21 +54,39 @@ export class SceneManager {
         this._isDirty = false;
     }
 
+    static async loadSceneFromFile(path: string) {
+        // Dynamic import to avoid circular dependency if possible, or just use registered global
+        // But better to use the ResourceManager singleton
+        const { resourceManager } = await import('../resources/ResourceManager');
+        
+        const data = await resourceManager.loadJSON(path);
+        if (data && Array.isArray(data)) {
+            world.clear();
+            // Extract Name from filename if possible, for now use path
+            this._activeSceneName = path.split(/[/\\]/).pop() || 'Loaded Scene';
+            
+            for (const entity of data) {
+                 world.add(entity);
+            }
+            this._isDirty = false;
+            console.log(`Scene loaded from ${path}`);
+            return true;
+        } else {
+            console.error('SceneManager: Failed to load scene or invalid format', path);
+            return false;
+        }
+    }
+
     static createDefaultScene() {
         world.clear();
         this._activeSceneName = 'Untitled Scene';
-        createEntity('Main Camera'); // Should add Camera component logic here later if not auto-added
-        // We might want to ensure Main Camera has the camera component
-        world.add({ 
-            name: 'Main Camera',
-            transform: { x: 0, y: 0, rotation: 0, scale: { x: 1, y: 1 } },
-            camera: { zoom: 1, isPrimary: true, backgroundColor: '#333333' }
-        });
         
-        const player = createEntity('Player');
-        player.transform = { x: 100, y: 100, rotation: 0, scale: { x: 1, y: 1 } };
-        player.sprite = { texture: '' }; // ready for sprite
+        // createEntity adds it to the world automatically
+        const camera = createEntity('Main Camera');
+        camera.transform = { x: 0, y: 0, rotation: 0, scale: { x: 1, y: 1 } };
+        camera.camera = { zoom: 1, isPrimary: true, backgroundColor: '#333333' };
         
+        // Just a camera for now
         this._isDirty = false;
     }
 }

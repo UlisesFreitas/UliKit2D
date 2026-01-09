@@ -1,0 +1,14 @@
+[
+  {
+    "id": "scene-b-entity",
+    "name": "Scene B Object",
+    "transform": { "x": 300, "y": 300, "rotation": 0, "scale": { "x": 2, "y": 2 } },
+    "label": {
+      "text": "THIS IS SCENE B",
+      "fontSize": 48,
+      "fontFamily": "Arial",
+      "color": "#00ff00",
+      "align": "center"
+    }
+  }
+]

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { onMounted } from 'vue';
 import DockLayout from './editor/layouts/DockLayout.vue';
-import WelcomeScreen from './editor/components/WelcomeScreen.vue';
+import ProjectWizard from './editor/components/ProjectWizard.vue';
 import AppHeader from './editor/components/AppHeader.vue';
 import { projectState } from './editor/managers/ProjectManager';
 
@@ -17,7 +17,7 @@ onMounted(() => {
     </div>
     
     <div class="editor-content">
-      <WelcomeScreen v-if="!projectState.currentProjectPath" />
+      <ProjectWizard v-if="!projectState.currentProjectPath" />
       <DockLayout v-else />
     </div>
   </div>

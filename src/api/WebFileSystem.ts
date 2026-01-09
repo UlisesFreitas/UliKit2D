@@ -39,8 +39,37 @@ export class WebFileSystem implements IFileSystem {
 
     async selectFolder(): Promise<string | null> {
          await this.ensureInit();
-         // ZenFS is a global root, so "MyWebProject" is just a folder at '/'
-         return "MyWebProject"; 
+
+         // 1. Get existing projects to check for duplicates
+         let existingProjects: string[] = [];
+         try {
+             const dirents = await fs.promises.readdir('/', { withFileTypes: true });
+             existingProjects = dirents
+                .filter(d => d.isDirectory())
+                .map(d => d.name);
+         } catch (e) {
+             console.warn('Failed to list existing projects', e);
+         }
+
+         // 2. Prompt loop
+         let name: string | null = null;
+         console.log('[WebFileSystem] Entering prompt loop for project name...');
+         while (true) {
+             console.log('[WebFileSystem] Requesting prompt...');
+             name = prompt('Enter New Project Name:', 'MyWebProject');
+             console.log(`[WebFileSystem] Prompt returned: ${name}`);
+             
+             if (!name) return null; // User cancelled
+             
+             if (existingProjects.includes(name)) {
+                 if (confirm(`Project "${name}" already exists. Overwrite? (All data in it will be lost)`)) {
+                     return name;
+                 }
+                 // If not confirmed, loop again
+             } else {
+                 return name;
+             }
+         }
     }
 
     async createProject(path: string): Promise<{ success: boolean; error?: string }> {
@@ -60,6 +89,7 @@ export class WebFileSystem implements IFileSystem {
 
             await fs.promises.mkdir(projectPath, { recursive: true });
             await fs.promises.mkdir(`${projectPath}/assets`, { recursive: true });
+            await fs.promises.mkdir(`${projectPath}/assets/scenes`, { recursive: true });
             await fs.promises.mkdir(`${projectPath}/assets/imported`, { recursive: true });
 
             // 2. Load Default Assets
@@ -187,6 +217,26 @@ export class WebFileSystem implements IFileSystem {
             return true;
         } catch (e) {
             console.error('[WebFileSystem] write failed', e);
+            return false;
+        }
+    }
+
+    async deleteFile(path: string): Promise<boolean> {
+        await this.ensureInit();
+        if (!this.currentProject) return false;
+        
+        try {
+            const fullPath = `/${this.currentProject}/${path}`;
+            await fs.promises.unlink(fullPath);
+             // Trigger Watcher Manually
+             if (this.watcherCallback) {
+                this._scanRecursive('').then(files => {
+                    if (this.watcherCallback) this.watcherCallback({ event: 'unlink', path, files });
+                });
+            }
+            return true;
+        } catch (e) {
+            console.error('[WebFileSystem] delete failed', e);
             return false;
         }
     }
