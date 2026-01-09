@@ -26,8 +26,12 @@ const update = (key: string, val: number) => {
                     <input 
                         type="number" 
                         class="w-full bg-transparent text-xs p-1 px-2 outline-none text-text-primary"
-                        v-model.number="transform.x"
-                        @input="update('x', transform.x)"
+                        :value="transform.x"
+                        @input="(e) => {
+                            const val = parseFloat((e.target as HTMLInputElement).value);
+                            transform.x = val;
+                            update('x', val);
+                        }"
                     />
                 </div>
                 <div class="flex items-center bg-bg-input border border-border rounded overflow-hidden group">
@@ -35,8 +39,12 @@ const update = (key: string, val: number) => {
                     <input 
                         type="number" 
                         class="w-full bg-transparent text-xs p-1 px-2 outline-none text-text-primary"
-                        v-model.number="transform.y"
-                        @input="update('y', transform.y)"
+                        :value="transform.y"
+                        @input="(e) => {
+                            const val = parseFloat((e.target as HTMLInputElement).value);
+                            transform.y = val;
+                            update('y', val);
+                        }"
                     />
                 </div>
             </div>
@@ -71,8 +79,12 @@ const update = (key: string, val: number) => {
                     <input 
                         type="number" 
                         class="w-full bg-transparent text-xs p-1 px-2 outline-none text-text-primary"
-                        v-model.number="transform.zIndex"
-                        @input="update('zIndex', transform.zIndex || 0)"
+                        :value="transform.zIndex || 0"
+                        @input="(e) => {
+                            const val = parseFloat((e.target as HTMLInputElement).value);
+                            transform.zIndex = val;
+                            update('zIndex', val);
+                        }"
                         placeholder="0"
                     />
                 </div>
@@ -89,8 +101,12 @@ const update = (key: string, val: number) => {
                         type="number" 
                         step="0.1"
                         class="w-full bg-transparent text-xs p-1 px-2 outline-none text-text-primary"
-                        v-model.number="transform.scale.x"
-                        @input="update('scale.x', transform.scale.x)"
+                        :value="transform.scale.x"
+                        @input="(e) => {
+                            const val = parseFloat((e.target as HTMLInputElement).value);
+                            transform.scale.x = val;
+                            update('scale.x', val);
+                        }"
                     />
                 </div>
                 <div class="flex items-center bg-bg-input border border-border rounded overflow-hidden group">
@@ -99,8 +115,12 @@ const update = (key: string, val: number) => {
                         type="number" 
                         step="0.1"
                         class="w-full bg-transparent text-xs p-1 px-2 outline-none text-text-primary"
-                        v-model.number="transform.scale.y"
-                        @input="update('scale.y', transform.scale.y)"
+                        :value="transform.scale.y"
+                        @input="(e) => {
+                            const val = parseFloat((e.target as HTMLInputElement).value);
+                            transform.scale.y = val;
+                            update('scale.y', val);
+                        }"
                     />
                 </div>
             </div>

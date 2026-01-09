@@ -32,6 +32,12 @@ export class PixiBitmapFontManager {
             // 3. Resolve Texture
             let texturePath = texturePathOverride;
             if (!texturePath) {
+                // If path is a Blob URL, we cannot resolve relative paths automatically
+                if (path.startsWith('blob:')) {
+                    console.warn('[PixiBitmapFontManager] Cannot resolve relative texture from Blob URL. Please provide texture path override.');
+                    throw new Error('Texture path override required for Blob URL fonts');
+                }
+
                 // Determine texture path from XML "pages"
                 const firstPageFile = data.pages[0]?.file;
                  if (!firstPageFile && !texturePathOverride) {

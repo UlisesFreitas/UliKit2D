@@ -3,6 +3,7 @@ import { computed, ref } from 'vue';
 import { type Entity } from '../../../engine/ecs/ECS';
 import { eventBus } from '../../../engine/core/EventBus';
 import { getFileSystem } from '../../../api/FileSystem';
+import AssetPickerModal from '../modals/AssetPickerModal.vue';
 
 const props = defineProps<{
     entity: Entity;
@@ -72,44 +73,49 @@ const emitUpdate = () => {
     eventBus.emit('component-updated', props.entity.id);
 };
 
-const fileInputRef = ref<HTMLInputElement | null>(null);
 const activeFileMode = ref<'fnt' | 'img'>('fnt');
+const showAssetPicker = ref(false);
 
 const triggerFileSelect = (mode: 'fnt' | 'img') => {
     activeFileMode.value = mode;
-    if (fileInputRef.value) {
-        // Reset to allow re-selecting same file
-        fileInputRef.value.value = '';
-        fileInputRef.value.click();
-    }
+    showAssetPicker.value = true;
 };
 
-const handleFileSelect = (e: Event) => {
-    const input = e.target as HTMLInputElement;
-    if (input.files && input.files.length > 0) {
-        const file = input.files[0];
-        if (!file) return;
-
-        const fs = getFileSystem();
-        let path = fs.getPathForFile(file) || file.name;
-        
-        // Normalize
-         if (path.startsWith('file:///')) {
-            path = decodeURI(path.slice(8));
-        }
-
-        if (activeFileMode.value === 'fnt') {
-            fontName.value = path;
-        } else {
-            fontTexture.value = path;
-        }
+const handleAssetSelect = (path: string) => {
+    // Normalize path just in case
+    let finalPath = path;
+    if (finalPath.startsWith('file:///')) {
+        finalPath = decodeURI(finalPath.slice(8));
     }
+
+    if (activeFileMode.value === 'fnt') {
+        fontName.value = finalPath;
+    } else {
+        fontTexture.value = finalPath;
+    }
+    showAssetPicker.value = false;
 };
 
-// Drag & Drop for Font File
 const onDropFont = async (e: DragEvent) => {
+    // 1. Try Files (Desktop Drag/Drop)
+    if (e.dataTransfer && e.dataTransfer.files.length > 0) {
+        const file = e.dataTransfer.files[0];
+        if (!file) return; // Strict null check
+
+        if (file.name.toLowerCase().endsWith('.fnt') || file.name.toLowerCase().endsWith('.xml')) {
+            const fs = getFileSystem();
+            let path = fs.getPathForFile(file) || file.name;
+             if (path.startsWith('file:///')) {
+                path = decodeURI(path.slice(8));
+            }
+            fontName.value = path;
+            return;
+        }
+    }
+
+    // 2. Try Text (AssetsPanel Drag)
     const data = e.dataTransfer?.getData('text/plain');
-    if (data && data.toLowerCase().endsWith('.fnt')) {
+    if (data && (data.toLowerCase().endsWith('.fnt') || data.toLowerCase().endsWith('.xml'))) {
         let finalPath = data;
         if (finalPath.startsWith('file:///')) {
             finalPath = decodeURI(finalPath.slice(8));
@@ -119,6 +125,23 @@ const onDropFont = async (e: DragEvent) => {
 };
 
 const onDropTexture = async (e: DragEvent) => {
+    // 1. Try Files (Desktop Drag/Drop)
+    if (e.dataTransfer && e.dataTransfer.files.length > 0) {
+        const file = e.dataTransfer.files[0];
+        if (!file) return; // Strict null check
+
+        if (file.name.toLowerCase().endsWith('.png') || file.name.toLowerCase().endsWith('.jpg')) {
+            const fs = getFileSystem();
+            let path = fs.getPathForFile(file) || file.name;
+             if (path.startsWith('file:///')) {
+                path = decodeURI(path.slice(8));
+            }
+            fontTexture.value = path;
+            return;
+        }
+    }
+
+    // 2. Try Text (AssetsPanel Drag)
     const data = e.dataTransfer?.getData('text/plain');
     if (data && (data.toLowerCase().endsWith('.png') || data.toLowerCase().endsWith('.jpg'))) {
         let finalPath = data;
@@ -163,7 +186,7 @@ const onDropTexture = async (e: DragEvent) => {
                 <button 
                     @click="triggerFileSelect('fnt')"
                     class="bg-bg-input hover:bg-bg-hover border border-border rounded px-2 py-1 text-xs"
-                    title="Select Font"
+                    title="Select from Assets"
                 >
                     📂
                 </button>
@@ -189,19 +212,19 @@ const onDropTexture = async (e: DragEvent) => {
                 <button 
                     @click="triggerFileSelect('img')"
                     class="bg-bg-input hover:bg-bg-hover border border-border rounded px-2 py-1 text-xs"
-                    title="Select Texture"
+                    title="Select from Assets"
                 >
                     📂
                 </button>
             </div>
         </div>
 
-        <input 
-            type="file" 
-            ref="fileInputRef" 
-            class="hidden" 
-            @change="handleFileSelect"
-            accept=".fnt,.xml,.png,.jpg,.jpeg"
+        <!-- Asset Picker Modal -->
+        <AssetPickerModal 
+            :isOpen="showAssetPicker"
+            :type="activeFileMode === 'fnt' ? 'font' : 'image'"
+            :onSelect="handleAssetSelect"
+            :onClose="() => showAssetPicker = false"
         />
 
         <!-- Size & Color -->
@@ -240,7 +263,7 @@ const onDropTexture = async (e: DragEvent) => {
                     ⬅
                 </button>
                 <button 
-                     class="px-2 py-1 hover:bg-bg-hover transition-colors border-l border-r border-border"
+                    class="px-2 py-1 hover:bg-bg-hover transition-colors border-l border-r border-border"
                     :class="align === 'center' ? 'bg-accent-color text-white' : 'text-text-secondary'"
                     @click="align = 'center'"
                     title="Center"
@@ -248,7 +271,7 @@ const onDropTexture = async (e: DragEvent) => {
                     ⬇
                 </button>
                 <button 
-                     class="px-2 py-1 hover:bg-bg-hover transition-colors"
+                    class="px-2 py-1 hover:bg-bg-hover transition-colors"
                     :class="align === 'right' ? 'bg-accent-color text-white' : 'text-text-secondary'"
                     @click="align = 'right'"
                     title="Right"

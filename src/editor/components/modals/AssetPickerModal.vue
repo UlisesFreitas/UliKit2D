@@ -6,7 +6,7 @@ import { projectState } from '../../managers/ProjectManager';
 
 const props = defineProps<{
     isOpen: boolean;
-    type: 'image' | 'script' | 'all';
+    type: 'image' | 'script' | 'font' | 'all';
     onSelect: (path: string) => void;
     onClose: () => void;
 }>();
@@ -25,6 +25,9 @@ const filteredAssets = computed(() => {
     } else if (props.type === 'script') {
         const scriptExts = ['.js', '.ts'];
         result = result.filter(f => scriptExts.some(ext => f.name.toLowerCase().endsWith(ext)));
+    } else if (props.type === 'font') {
+        const fontExts = ['.fnt', '.xml'];
+        result = result.filter(f => fontExts.some(ext => f.name.toLowerCase().endsWith(ext)));
     }
 
     // 2. Filter by Search
