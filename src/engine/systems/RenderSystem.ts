@@ -1,10 +1,17 @@
-import { Application, Sprite, Texture, Text, BitmapText, FederatedPointerEvent, NineSliceSprite } from 'pixi.js';
+import { Application, Sprite, Texture, Text, BitmapText, FederatedPointerEvent, NineSliceSprite, Container, Graphics } from 'pixi.js';
 import { world } from '../ecs/ECS';
 import { resourceManager } from '../resources/ResourceManager';
+import { SceneManager } from '../managers/SceneManager';
 
 
 export class RenderSystem {
     private app: Application;
+    
+    // Layers
+    private layerContainers: Map<string, Container> = new Map();
+    private layerBackgrounds: Map<string, Graphics> = new Map(); // For Base Layer color
+
+    // ECS Cache
     private spriteCache: Map<string, Sprite> = new Map();
     private textCache: Map<string, Text> = new Map();
     private bitmapTextCache: Map<string, BitmapText> = new Map();
@@ -19,8 +26,76 @@ export class RenderSystem {
         this.app = app;
         this.app.stage.sortableChildren = true;
     }
+    
+    private updateLayers() {
+        const layers = SceneManager.layers; // Access global state from Manager
+        
+        // 1. Sync Containers
+        // Create missing containers
+        for (const layer of layers) {
+            let container = this.layerContainers.get(layer.id);
+            if (!container) {
+                container = new Container();
+                container.label = layer.name;
+                // Add to stage
+                this.app.stage.addChild(container);
+                this.layerContainers.set(layer.id, container);
+                
+                // Add Background if needed
+                if (layer.color) {
+                     const bg = new Graphics();
+                     bg.beginFill(layer.color);
+                     // Huge rectangle to cover screen? Or Viewport?
+                     // For now, let's make it cover the "World" area or a large safe area.
+                     // A better approach is usually setting the Application background color if it's the base layer.
+                     // But GDevelop treats it as a layer.
+                     // Let's draw a large rect centered:
+                     bg.drawRect(-10000, -10000, 20000, 20000); 
+                     bg.endFill();
+                     container.addChildAt(bg, 0); // Always at bottom
+                     this.layerBackgrounds.set(layer.id, bg);
+                }
+            }
+            
+            // Sync Properties
+            container.visible = layer.visible;
+            container.zIndex = layers.indexOf(layer); // Pixi sortableChildren handles this
+            
+            // Update Background Color if changed
+             if (layer.id === 'Base Layer' && layer.color) { // Assuming only base layer has bg color for now based on GDevelop
+                 const bg = this.layerBackgrounds.get(layer.id);
+                 if (bg) {
+                     bg.clear();
+                     bg.beginFill(layer.color);
+                     bg.drawRect(-10000, -10000, 20000, 20000);
+                     bg.endFill();
+                     
+                     // Also sync Camera background?
+                     // Usually the "Scene Background" is the base layer color.
+                 }
+             }
+        }
+        
+        // Remove dead layers
+        for (const [id, container] of this.layerContainers) {
+            if (!layers.find(l => l.id === id)) {
+                this.app.stage.removeChild(container);
+                container.destroy({ children: true }); // Destroy children (sprites) too? 
+                // Careful! If we move entities before destroying layer, it's fine.
+                // But RenderSystem might invoke removeSprite() later. 
+                // Let's just remove container from stage. SpriteCache still holds references.
+                this.layerContainers.delete(id);
+                this.layerBackgrounds.delete(id);
+            }
+        }
+        
+        // Sort Stage (Layers)
+        this.app.stage.sortChildren();
+    }
 
     public update() {
+        this.updateLayers(); // Sync Layers first
+
         const entities = world.with('transform');
         const activeIds = new Set<string>();
 
@@ -108,9 +183,20 @@ export class RenderSystem {
                  }
              });
 
-             this.app.stage.addChild(nSlice);
+             // Layer Parenting
+             const layerId = entity.layer || 'Base Layer';
+             const parent = this.layerContainers.get(layerId) || this.app.stage; // Fallback
+             parent.addChild(nSlice);
+             
              this.nineSliceCache.set(entity.id!, nSlice);
              (nSlice as any)._currentPath = '';
+        } else {
+             // Handle Layer Change
+             const layerId = entity.layer || 'Base Layer';
+             const desiredParent = this.layerContainers.get(layerId) || this.app.stage;
+             if (nSlice.parent !== desiredParent) {
+                 desiredParent.addChild(nSlice); // Moves it
+             }
         }
 
         // Sync Transform
@@ -157,7 +243,7 @@ export class RenderSystem {
     private removeNineSlice(id: string) {
         if (this.nineSliceCache.has(id)) {
             const ns = this.nineSliceCache.get(id)!;
-            this.app.stage.removeChild(ns);
+            if (ns.parent) ns.parent.removeChild(ns);
             ns.destroy();
             this.nineSliceCache.delete(id);
         }
@@ -185,9 +271,20 @@ export class RenderSystem {
                 }
             });
 
-            this.app.stage.addChild(sprite);
+            // Layer Parenting
+            const layerId = entity.layer || 'Base Layer';
+            const parent = this.layerContainers.get(layerId) || this.app.stage;
+            parent.addChild(sprite);
+            
             this.spriteCache.set(entity.id!, sprite);
             (sprite as any)._currentPath = ''; // Init tracker
+        } else {
+            // Check Layer Change
+            const layerId = entity.layer || 'Base Layer';
+            const parent = this.layerContainers.get(layerId);
+            if (parent && sprite.parent !== parent) {
+                parent.addChild(sprite);
+            }
         }
 
         // Sync Transform
@@ -255,8 +352,15 @@ export class RenderSystem {
                     }
              });
 
-             this.app.stage.addChild(textFn);
+             const layerId = entity.layer || 'Base Layer';
+             const parent = this.layerContainers.get(layerId) || this.app.stage;
+             parent.addChild(textFn);
+             
              this.textCache.set(entity.id!, textFn);
+        } else {
+             const layerId = entity.layer || 'Base Layer';
+             const parent = this.layerContainers.get(layerId);
+             if (parent && textFn.parent !== parent) parent.addChild(textFn);
         }
 
         // Sync Properties
@@ -311,9 +415,16 @@ export class RenderSystem {
                 }
             });
 
-            this.app.stage.addChild(bText);
+            const layerId = entity.layer || 'Base Layer';
+            const parent = this.layerContainers.get(layerId) || this.app.stage;
+            parent.addChild(bText);
+            
             this.bitmapTextCache.set(entity.id!, bText);
             (bText as any)._loadedFontPath = ''; 
+        } else {
+             const layerId = entity.layer || 'Base Layer';
+             const parent = this.layerContainers.get(layerId);
+             if (parent && bText.parent !== parent) parent.addChild(bText);
         }
 
         // Load Font if needed
@@ -360,7 +471,7 @@ export class RenderSystem {
     private removeSprite(id: string) {
         if (this.spriteCache.has(id)) {
             const sprite = this.spriteCache.get(id)!;
-            this.app.stage.removeChild(sprite);
+            if (sprite.parent) sprite.parent.removeChild(sprite);
             sprite.destroy();
             this.spriteCache.delete(id);
         }
@@ -369,7 +480,7 @@ export class RenderSystem {
     private removeLabel(id: string) {
         if (this.textCache.has(id)) {
             const text = this.textCache.get(id)!;
-            this.app.stage.removeChild(text);
+            if (text.parent) text.parent.removeChild(text);
             text.destroy();
             this.textCache.delete(id);
         }
@@ -378,7 +489,7 @@ export class RenderSystem {
     private removeBitmapText(id: string) {
         if (this.bitmapTextCache.has(id)) {
             const bText = this.bitmapTextCache.get(id)!;
-            this.app.stage.removeChild(bText);
+            if (bText.parent) bText.parent.removeChild(bText);
             bText.destroy();
             this.bitmapTextCache.delete(id);
         }

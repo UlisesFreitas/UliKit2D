@@ -15,6 +15,7 @@ import 'dockview-core/dist/styles/dockview.css';
 
 import ScenePanel from '../panels/ScenePanel.vue';
 import ScenesPanel from '../panels/ScenesPanel.vue'; // New Panel
+import LayersPanel from '../panels/LayersPanel.vue'; 
 import InspectorPanel from '../panels/InspectorPanel.vue'; 
 import ConsolePanel from '../panels/ConsolePanel.vue';
 import AssetsPanel from '../panels/AssetsPanel.vue';
@@ -98,6 +99,7 @@ onMounted(() => {
             switch (options.name) {
                 case 'scene': return new VuePanelRenderer(ScenePanel);
                 case 'scenes': return new VuePanelRenderer(ScenesPanel); // Register 'scenes'
+                case 'layers': return new VuePanelRenderer(LayersPanel);
                 case 'inspector': return new VuePanelRenderer(InspectorPanel);
                 case 'console': return new VuePanelRenderer(ConsolePanel);
                 case 'assets': return new VuePanelRenderer(AssetsPanel);
@@ -145,8 +147,11 @@ onMounted(() => {
                             size: 730
                         },
                         {
-                            type: 'leaf',
-                            data: { views: ['inspector'], id: 'group-inspector' },
+                            type: 'branch',
+                            data: [
+                                { type: 'leaf', data: { views: ['inspector'], id: 'group-inspector' }, size: 500 },
+                                { type: 'leaf', data: { views: ['layers'], id: 'group-layers' }, size: 300 }
+                            ],
                             size: 365
                         }
                     ],
@@ -162,7 +167,8 @@ onMounted(() => {
                 'scenes': { id: 'scenes', title: 'Scenes', component: 'scenes', contentComponent: 'scenes' },
                 'scene': { id: 'scene', title: 'Scene View', component: 'scene', contentComponent: 'scene' },
                 'console': { id: 'console', title: 'Console', component: 'console', contentComponent: 'console' },
-                'inspector': { id: 'inspector', title: 'Inspector', component: 'inspector', contentComponent: 'inspector' }
+                'inspector': { id: 'inspector', title: 'Inspector', component: 'inspector', contentComponent: 'inspector' },
+                'layers': { id: 'layers', title: 'Layers', component: 'layers', contentComponent: 'layers' }
             },
             activeGroup: 'group-scene'
         } as any);

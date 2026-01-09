@@ -4,6 +4,7 @@ import { World } from 'miniplex';
 export type Entity = {
   id?: string;
   name?: string; // For Hierarchy
+  layer?: string; // Layer ID
   visible?: boolean; // Visibility Flag
   transform?: {
       x: number;
@@ -96,6 +97,7 @@ export function createEntity(name: string = 'Entity') {
     return world.add({
         id: crypto.randomUUID(),
         name,
+        layer: 'Base Layer',
         transform: { x: 0, y: 0, rotation: 0, scale: { x: 1, y: 1 } }
     });
 }

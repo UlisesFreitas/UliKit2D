@@ -8,9 +8,8 @@ export class GridSystem {
     constructor(app: Application) {
         this.app = app;
         this.container = new Container();
-        // Typically grid should be behind everything? 
-        // Or we can rely on zIndex.
-        this.container.zIndex = -1000; 
+        // Grid should be an overlay to be visible above the Base Layer background
+        this.container.zIndex = 1000; 
         
         this.app.stage.addChild(this.container);
         

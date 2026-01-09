@@ -28,7 +28,23 @@ export class WebFileSystem implements IFileSystem {
                 console.log('[WebFileSystem] ZenFS already configured (HMR re-init detected)');
                 this.initialized = true;
             } else {
-                console.error('[WebFileSystem] Added ZenFS configuration error:', e);
+                console.error('[WebFileSystem] ZenFS config error. Attempting reset...', e);
+                // Attempt to wipe and retry
+                try {
+                     const DBDeleteRequest = window.indexedDB.deleteDatabase('UliKit2D_FS');
+                     DBDeleteRequest.onsuccess = async () => {
+                        console.log('[WebFileSystem] IDB Reset success. Retrying init...');
+                        await configure({
+                            mounts: {
+                                '/': { backend: IndexedDB, name: 'UliKit2D_FS' }
+                            }
+                        });
+                        this.initialized = true;
+                        console.log('[WebFileSystem] ZenFS re-initialized after reset');
+                     };
+                } catch (retryErr) {
+                     console.error('[WebFileSystem] Failed to reset FS:', retryErr);
+                }
             }
         }
     }

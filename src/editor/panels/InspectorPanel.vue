@@ -4,6 +4,7 @@ import { useEditorStore } from '../../stores/useEditorStore';
 import { world } from '../../engine/ecs/ECS';
 import { eventBus } from '../../engine/core/EventBus';
 import { projectState } from '../managers/ProjectManager';
+import { SceneManager } from '../../engine/managers/SceneManager';
 import { getFileSystem } from '../../api/FileSystem';
 
 import TransformEditor from '../components/inspectors/TransformEditor.vue';
@@ -272,6 +273,20 @@ const toggleCollapse = (key: string) => {
                     ID: {{ selectedEntity.id }}
                 </div>
             </div>
+        </div>
+
+        <!-- Layer Selector -->
+        <div class="mb-4 flex items-center space-x-2 bg-bg-panel p-1 rounded border border-bg-border">
+            <label class="text-xs text-text-secondary uppercase font-bold w-12">Layer</label>
+            <select 
+                v-model="selectedEntity.layer" 
+                @change="onComponentUpdate"
+                class="flex-1 bg-bg-input text-text-primary text-xs p-1 rounded border-none focus:ring-1 focus:ring-accent-color outline-none"
+            >
+                <option v-for="layer in SceneManager.layers" :key="layer.id" :value="layer.id">
+                    {{ layer.name }}
+                </option>
+            </select>
         </div>
 
         <!-- Component List -->
