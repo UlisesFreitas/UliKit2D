@@ -30,11 +30,23 @@ export class ProjectManager {
                     projectState.projectName = (pathOrHandle as FileSystemDirectoryHandle).name;
                  }
                  
-                 // Watch Project
+                  // Watch Project
                  await fs.watchProject(pathOrHandle as any, (_event: FileChangeEvent) => {
                     // This will be handled by AssetStore usually
                  });
                  console.log('Project Created:', projectState.projectName);
+
+                 // LOAD THE INITIAL SCENE
+                 // Dynamic import to avoid circular dependency issues if any
+                 const { SceneManager } = await import('../../engine/managers/SceneManager');
+                 try {
+                    await SceneManager.loadSceneFromFile('assets/scenes/NewScene.json');
+                 } catch (e) {
+                     console.warn('[ProjectManager] Failed to load initial scene file. Using fallback default scene.', e);
+                     SceneManager.createDefaultScene();
+                     // Manually set name so it looks like the file
+                     (SceneManager as any)._activeSceneName = 'NewScene'; 
+                 }
             } else {
                 console.error('Failed to create project:', result.error);
                 alert('Failed to create project: ' + result.error);

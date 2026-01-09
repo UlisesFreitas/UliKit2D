@@ -63,7 +63,8 @@ export class SceneManager {
         if (data && Array.isArray(data)) {
             world.clear();
             // Extract Name from filename if possible, for now use path
-            this._activeSceneName = path.split(/[/\\]/).pop() || 'Loaded Scene';
+            const filename = path.split(/[/\\]/).pop() || 'Loaded Scene';
+            this._activeSceneName = filename.replace('.json', '');
             
             for (const entity of data) {
                  world.add(entity);

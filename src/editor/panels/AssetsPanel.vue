@@ -23,7 +23,7 @@
     </div>
 
     <!-- File Grid -->
-    <div class="file-grid flex-1 overflow-y-auto p-2 align-content-start">
+    <div class="file-grid flex-1 overflow-y-auto p-2 align-content-start" @click.self="closeContextMenu">
         <div 
             v-for="file in assetStore.visibleFiles" 
             :key="file.path" 
@@ -32,6 +32,7 @@
             draggable="true"
             @dragstart="onDragStart($event, file)"
             @dblclick="onDoubleClick(file)"
+            @contextmenu="showContextMenu($event, file)"
         >
             <div class="icon text-3xl mb-1 w-full h-10 flex items-center justify-center overflow-hidden">
                 <img v-if="thumbnails[file.path]" :src="thumbnails[file.path]" class="w-full h-full object-contain" />
@@ -44,6 +45,21 @@
         <div v-if="assetStore.visibleFiles.length === 0" class="w-full text-center text-text-secondary mt-10">
             Empty Folder
         </div>
+
+        <!-- Custom Context Menu -->
+        <div v-if="menuState.visible" 
+             class="fixed bg-bg-panel border border-border shadow-lg rounded z-[9999] py-1 min-w-[140px]"
+             :style="{ top: menuState.y + 'px', left: menuState.x + 'px' }">
+             <div class="px-3 py-1 text-[10px] font-bold text-text-secondary truncate max-w-[200px]">{{ menuState.file?.name }}</div>
+             <div class="h-[1px] bg-border my-1"></div>
+            <button 
+                v-if="menuState.file?.path !== 'assets'"
+                @click="deleteAsset" 
+                class="w-full text-left px-3 py-1.5 hover:bg-red-900 hover:text-white text-xs text-red-400"
+            >
+                Delete
+            </button>
+        </div>
     </div>
   </div>
 </template>
@@ -53,14 +69,78 @@ import { onMounted, ref, watch } from 'vue';
 import { useAssetStore } from '../../stores/useAssetStore';
 import { projectState } from '../managers/ProjectManager';
 import { getFileSystem } from '../../api/FileSystem';
+import { useUIStore } from '../../stores/useUIStore';
 
 const assetStore = useAssetStore();
+const ui = useUIStore();
 const thumbnails = ref<Record<string, string>>({});
+
+// Context Menu State
+const menuState = ref({
+    visible: false,
+    x: 0,
+    y: 0,
+    file: null as any
+});
 
 onMounted(() => {
     assetStore.initWatcher();
     loadThumbnails();
+    
+    // Global click listener to close context menu
+    window.addEventListener('click', closeContextMenu);
 });
+
+// Clean up listener
+import { onUnmounted } from 'vue';
+onUnmounted(() => {
+    window.removeEventListener('click', closeContextMenu);
+});
+
+const closeContextMenu = () => {
+    menuState.value.visible = false;
+};
+
+const showContextMenu = (e: MouseEvent, file: any) => {
+    e.preventDefault(); // Prevent native browser menu
+    menuState.value = {
+        visible: true,
+        x: e.clientX,
+        y: e.clientY,
+        file: file
+    };
+};
+
+const deleteAsset = async () => {
+    const file = menuState.value.file;
+    if (!file) return;
+    
+    // Close menu
+    closeContextMenu();
+
+    // PROTECTED: Do not allow deleting the 'assets' folder
+    if (file.name === 'assets' && file.path === 'assets') {
+        ui.showToast({ title: 'Protected', description: 'The assets folder cannot be deleted.', type: 'warning' });
+        return;
+    }
+
+    if (await ui.confirm({
+        title: 'Delete Asset',
+        message: `Are you sure you want to delete '${file.name}'? This cannot be undone.`,
+        confirmText: 'Delete',
+        isDanger: true
+    })) {
+        const fs = getFileSystem();
+        const success = await fs.deleteFile(file.path);
+        if (!success) {
+            ui.showToast({ title: 'Error', description: 'Failed to delete file', type: 'error' });
+        } else {
+             ui.showToast({ title: 'Deleted', description: `Deleted ${file.name}`, type: 'success' });
+        }
+    }
+};
+
+// ... existing code ...
 
 const isImage = (filename: string) => {
     return /\.(png|jpg|jpeg|webp|bmp|gif)$/i.test(filename);
@@ -148,6 +228,7 @@ const onDrop = async (e: DragEvent) => {
   background-color: var(--bg-base);
   overflow-y: auto;
   color: var(--text-primary);
+  position: relative; /* For context menu context */
 }
 .header {
     padding: 5px 10px;
@@ -173,6 +254,7 @@ const onDrop = async (e: DragEvent) => {
     border: 1px solid transparent;
     border-radius: 4px;
     color: var(--text-primary);
+    user-select: none;
 }
 .file-item:hover {
     background-color: var(--bg-hover);

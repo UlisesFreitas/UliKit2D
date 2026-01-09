@@ -1,12 +1,12 @@
 <script setup lang="ts">
-import { ref, onMounted, nextTick, onUnmounted } from 'vue';
+import { ref, onMounted, nextTick } from 'vue';
 import { getFileSystem } from '../../api/FileSystem';
 import { SceneManager } from '../../engine/managers/SceneManager';
 import { ProjectManager } from '../managers/ProjectManager';
-import { useEditorStore } from '../../stores/useEditorStore';
+import { useUIStore } from '../../stores/useUIStore';
 
 const fs = getFileSystem();
-const editorStore = useEditorStore();
+const ui = useUIStore();
 
 interface SceneFile {
     name: string;
@@ -44,6 +44,7 @@ const loadScenes = async () => {
              console.warn('Scenes directory not found, will be created on save.');
         } else {
             console.error('Failed to list scenes:', e);
+            ui.showToast({ title: 'Error', description: 'Failed to list scenes.', type: 'error' });
         }
     } finally {
         isLoading.value = false;
@@ -51,10 +52,11 @@ const loadScenes = async () => {
 };
 
 const onOpenScene = async (scene: SceneFile) => {
-    if (confirm(`Load scene "${scene.name}"? Unsaved changes will be lost.`)) {
+    if (await ui.confirm({ title: 'Load Scene', message: `Load scene "${scene.name}"? Unsaved changes will be lost.` })) {
         const success = await SceneManager.loadSceneFromFile(scene.path);
         if (success) {
             console.log('Scene loaded:', scene.name);
+            ui.showToast({ title: 'Scene Loaded', description: `Loaded ${scene.name}`, type: 'success' });
         }
     }
 };
@@ -81,7 +83,12 @@ const onDeleteScene = async () => {
     const scene = menuState.value.scene;
     if (!scene) return;
     
-    if (confirm(`Are you sure you want to delete "${scene.name}"? This cannot be undone.`)) {
+    if (await ui.confirm({ 
+        title: 'Delete Scene', 
+        message: `Are you sure you want to delete "${scene.name}"? This cannot be undone.`,
+        confirmText: 'Delete',
+        isDanger: true
+    })) {
         console.log('[ScenesPanel] Context Menu Deleting:', scene.path);
         try {
             const success = await fs.deleteFile(scene.path);
@@ -89,13 +96,21 @@ const onDeleteScene = async () => {
             if (success) {
                 console.log('Scene deleted:', scene.name);
                 scenes.value = scenes.value.filter(s => s.path !== scene.path);
+                ui.showToast({ title: 'Deleted', description: `Scene ${scene.name} deleted.`, type: 'success' });
+                
+                // If we deleted the ACTIVE scene, we must reset the world
+                if (scene.name === SceneManager.activeSceneName) {
+                    SceneManager.createDefaultScene(); // Clears world, adds new Camera
+                    // We effectively switch to "Untitled Scene" state which is unsaved
+                }
+
                 await loadScenes();
             } else {
-                alert('Failed to delete scene (fs returned false).');
+                ui.showToast({ title: 'Error', description: 'Failed to delete scene (fs returned false).', type: 'error' });
             }
         } catch (e: any) {
              console.error('[ScenesPanel] Context Delete error:', e);
-            alert('Error deleting scene: ' + e.message);
+             ui.showToast({ title: 'Error', description: 'Error deleting scene: ' + e.message, type: 'error' });
         }
     }
     menuState.value.visible = false;
@@ -111,9 +126,10 @@ const onDuplicateScene = async () => {
         const newPath = `assets/scenes/${newName}.json`;
         
         await fs.writeFile(newPath, content);
+        ui.showToast({ title: 'Duplicated', description: `Scene duplicated as ${newName}`, type: 'success' });
         await loadScenes();
     } catch (e: any) {
-        alert('Failed to duplicate scene: ' + e.message);
+        ui.showToast({ title: 'Error', description: 'Failed to duplicate scene: ' + e.message, type: 'error' });
     }
     menuState.value.visible = false;
 };
@@ -122,7 +138,12 @@ const onDuplicateScene = async () => {
 const onDeleteSceneDirect = async (scene: SceneFile) => {
     menuState.value.scene = scene; 
     // console.log('[ScenesPanel] Clicked delete for:', scene.path);
-    if (confirm(`Delete "${scene.name}"?`)) {
+    if (await ui.confirm({ 
+        title: 'Delete Scene', 
+        message: `Delete "${scene.name}"?`,
+        confirmText: 'Delete',
+        isDanger: true
+    })) {
         console.log('[ScenesPanel] Deleting scene:', scene.path);
         try {
             const success = await fs.deleteFile(scene.path);
@@ -130,12 +151,18 @@ const onDeleteSceneDirect = async (scene: SceneFile) => {
             if (success) {
                 // Optimistic update
                 scenes.value = scenes.value.filter(s => s.path !== scene.path);
+                ui.showToast({ title: 'Deleted', description: `Scene ${scene.name} deleted.`, type: 'success' });
+
+                if (scene.name === SceneManager.activeSceneName) {
+                    SceneManager.createDefaultScene();
+                }
+
                 await loadScenes();
             }
-            else alert('Failed to delete (fs returned false).');
+            else ui.showToast({ title: 'Error', description: 'Failed to delete (fs returned false).', type: 'error' });
         } catch(e: any) {
             console.error('[ScenesPanel] Delete error:', e);
-            alert('Error: ' + e.message);
+            ui.showToast({ title: 'Error', description: 'Error: ' + e.message, type: 'error' });
         }
     }
 };
@@ -160,7 +187,7 @@ const confirmCreate = async () => {
     // Check for duplicate name
     const exists = scenes.value.some(s => s.name === newSceneName.value);
     if (exists) {
-        if (!confirm(`Scene "${newSceneName.value}" already exists. Overwrite?`)) {
+        if (!await ui.confirm({ title: 'Scene Exists', message: `Scene "${newSceneName.value}" already exists. Overwrite?`, confirmText: 'Overwrite' })) {
             return;
         }
     }
@@ -173,8 +200,9 @@ const confirmCreate = async () => {
         isCreating.value = false;
         // Refresh list
         await loadScenes();
+        ui.showToast({ title: 'Created', description: `Scene ${newSceneName.value} created.`, type: 'success' });
     } catch (e) {
-        alert('Failed to create scene: ' + e);
+        ui.showToast({ title: 'Error', description: 'Failed to create scene: ' + e, type: 'error' });
     } finally {
         isLoading.value = false;
     }

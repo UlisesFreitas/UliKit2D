@@ -3,6 +3,7 @@ import { onMounted } from 'vue';
 import DockLayout from './editor/layouts/DockLayout.vue';
 import ProjectWizard from './editor/components/ProjectWizard.vue';
 import AppHeader from './editor/components/AppHeader.vue';
+import GlobalOverlay from './editor/components/overlays/GlobalOverlay.vue';
 import { projectState } from './editor/managers/ProjectManager';
 
 onMounted(() => {
@@ -20,6 +21,9 @@ onMounted(() => {
       <ProjectWizard v-if="!projectState.currentProjectPath" />
       <DockLayout v-else />
     </div>
+
+    <!-- UI Overlay (Modals & Toasts) -->
+    <GlobalOverlay />
   </div>
 </template>
 

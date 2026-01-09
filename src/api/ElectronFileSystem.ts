@@ -30,10 +30,7 @@ export class ElectronFileSystem implements IFileSystem {
            // const projectRoot = path; // Already declared at the top of try block
 
            
-           // 3. Create project.json (Redundant if main.ts does it, but this ensures params are correct for our logic)
-           // Actually main.ts creates a basic one. 
-           // Let's overwrite it to be sure we control the format if needed, or skip.
-           // Main.ts version is fine.
+           // 3. Create project.json is handled by Main
             
            return { success: true };
         } catch (e: any) {

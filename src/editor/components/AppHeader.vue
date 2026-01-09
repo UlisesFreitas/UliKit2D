@@ -15,14 +15,19 @@ import {
 import { ProjectManager, projectState } from '../managers/ProjectManager';
 import { useEditorStore } from '../../stores/useEditorStore';
 import { ThemeManager } from '../managers/ThemeManager';
+import { useUIStore } from '../../stores/useUIStore';
 
 import { world } from '../../engine/ecs/ECS';
 
 const editorStore = useEditorStore();
+const ui = useUIStore();
 
 // Menu Actions
-const onNewProject = () => {
-    if (confirm('Are you sure you want to close the current project and return to the dashboard? Unsaved changes may be lost.')) {
+const onNewProject = async () => {
+    if (await ui.confirm({ 
+        title: 'New Project', 
+        message: 'Are you sure you want to close the current project and return to the dashboard? Unsaved changes may be lost.'
+    })) {
         ProjectManager.closeProject();
     }
 };

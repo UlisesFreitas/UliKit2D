@@ -3,10 +3,13 @@ import { ref } from 'vue';
 import { ProjectManager } from '../managers/ProjectManager';
 import { getFileSystem } from '../../api/FileSystem';
 
+import { useUIStore } from '../../stores/useUIStore';
+
 const step = ref<'HOME' | 'CREATE'>('HOME');
 const projectName = ref('');
 const projectLocation = ref('');
 const isElectron = (window as any).electronAPI !== undefined;
+const ui = useUIStore();
 
 const selectLocation = async () => {
     const fs = getFileSystem();
@@ -21,12 +24,12 @@ const selectLocation = async () => {
 
 const onCreate = async () => {
     if (!projectName.value) {
-        alert('Please enter a project name');
+        ui.showToast({ title: 'Validation Error', description: 'Please enter a project name', type: 'error' });
         return;
     }
 
     if (isElectron && !projectLocation.value) {
-        alert('Please select a location');
+        ui.showToast({ title: 'Validation Error', description: 'Please select a location', type: 'error' });
         return;
     }
 

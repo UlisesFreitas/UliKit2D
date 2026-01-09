@@ -3,6 +3,7 @@ import { ref, computed, onUnmounted } from 'vue';
 import { type Entity } from '../../../engine/ecs/ECS';
 import { projectState } from '../../managers/ProjectManager';
 import { getFileSystem } from '../../../api/FileSystem';
+import { useUIStore } from '../../../stores/useUIStore';
 
 const props = defineProps<{
     isOpen: boolean;
@@ -10,6 +11,7 @@ const props = defineProps<{
 }>();
 
 const emit = defineEmits(['close', 'update']);
+const ui = useUIStore();
 
 const version = ref(0);
 const fileInput = ref<HTMLInputElement | null>(null);
@@ -53,16 +55,17 @@ const addAnimation = () => {
     emit('update');
 };
 
-const removeAnimation = (name: string) => {
+const removeAnimation = async (name: string) => {
     if (!props.entity.animator || !props.entity.animator.animations) return;
     
-    if (confirm(`Delete '${name}'?`)) {
+    if (await ui.confirm({ title: 'Delete Animation', message: `Delete '${name}'?`, confirmText: 'Delete', isDanger: true })) {
         if (showPreview.value && previewAnimName.value === name) {
             closePreview();
         }
         delete props.entity.animator.animations[name];
         version.value++;
         emit('update');
+        ui.showToast({ title: 'Deleted', description: `Animation '${name}' deleted.`, type: 'success' });
     }
 };
 
@@ -72,7 +75,7 @@ const updateName = (oldName: string, newName: string) => {
     if (!props.entity.animator || !props.entity.animator.animations) return;
 
     if (props.entity.animator.animations[newName]) {
-        alert('Name already exists');
+        ui.showToast({ title: 'Error', description: 'Name already exists', type: 'error' });
         return;
     }
     
@@ -175,13 +178,13 @@ const importExternalFile = async (rawPath: string, _animName: string): Promise<s
 
                     } else {
                         console.error(`[Animator] Failed to import ${finalPath}:`, result.error);
-                        alert(`Failed to import file: ${result.error}`);
+                        ui.showToast({ title: 'Import Failed', description: `Failed to import file: ${result.error}`, type: 'error' });
                         // Return empty or original? If failed, do not save blob as it won't persist
                         return ''; 
                     }
                 } catch (err) {
                     console.error(`[Animator] Error importing file:`, err);
-                    alert(`Error importing file: ${err}`);
+                    ui.showToast({ title: 'Error', description: `Error importing file: ${err}`, type: 'error' });
                     return '';
                 }
             } else {
@@ -350,7 +353,7 @@ const handleWheel = (e: WheelEvent) => {
 const openPreview = (name: string) => {
     const anim = props.entity.animator?.animations?.[name];
     if (!anim || !anim.frames.length) {
-        alert("Add frames to preview!");
+        ui.showToast({ title: 'Preview Error', description: "Add frames to preview!", type: 'warning' });
         return;
     }
     previewAnimName.value = name;

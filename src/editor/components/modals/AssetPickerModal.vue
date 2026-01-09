@@ -72,7 +72,15 @@ const importAssets = async () => {
     console.log('[AssetPicker] Import blocked? Checking project state...');
     if (!projectState.currentProjectPath) {
         console.error('[AssetPicker] No project path found!');
-        alert("No project open. Please open a project first.");
+        // alert("No project open. Please open a project first.");
+        // Use unified Toast
+        const { useUIStore } = await import('../../../stores/useUIStore'); // Lazy import to avoid circ dep if any (though store is safe)
+        const ui = useUIStore();
+        ui.showToast({
+            title: 'Error',
+            description: 'No project open. Please open a project first.',
+            type: 'error'
+        });
         return;
     }
 
