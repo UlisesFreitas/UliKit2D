@@ -11,6 +11,7 @@ export type Entity = {
       y: number;
       rotation: number;
       scale: { x: number, y: number };
+      zIndex?: number; // Sorting order within the layer
   };
   sprite?: {
       texture: string;
@@ -98,6 +99,6 @@ export function createEntity(name: string = 'Entity') {
         id: crypto.randomUUID(),
         name,
         layer: 'Base Layer',
-        transform: { x: 0, y: 0, rotation: 0, scale: { x: 1, y: 1 } }
+        transform: { x: 0, y: 0, rotation: 0, scale: { x: 1, y: 1 }, zIndex: 0 }
     });
 }

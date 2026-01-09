@@ -88,8 +88,8 @@ const update = (key: string, val: number) => {
                         placeholder="0"
                     />
                 </div>
-             </div>
-         </div>
+            </div>
+        </div>
 
         <!-- Scale -->
         <div class="flex items-center">

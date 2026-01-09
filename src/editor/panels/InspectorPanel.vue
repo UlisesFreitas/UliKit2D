@@ -137,6 +137,13 @@ const parseScriptParameters = async (path: string) => {
     }
 };
 
+const changeLayer = (newLayerId: string) => {
+    if (selectedEntity.value) {
+        SceneManager.moveEntityToLayer(selectedEntity.value.id!, newLayerId);
+        onComponentUpdate();
+    }
+};
+
 const onComponentUpdate = () => {
     revision.value++;
     projectState.isDirty = true;
@@ -279,8 +286,8 @@ const toggleCollapse = (key: string) => {
         <div class="mb-4 flex items-center space-x-2 bg-bg-panel p-1 rounded border border-bg-border">
             <label class="text-xs text-text-secondary uppercase font-bold w-12">Layer</label>
             <select 
-                v-model="selectedEntity.layer" 
-                @change="onComponentUpdate"
+                :value="selectedEntity.layer || 'Base Layer'" 
+                @change="(e) => changeLayer((e.target as HTMLSelectElement).value)"
                 class="flex-1 bg-bg-input text-text-primary text-xs p-1 rounded border-none focus:ring-1 focus:ring-accent-color outline-none"
             >
                 <option v-for="layer in SceneManager.layers" :key="layer.id" :value="layer.id">

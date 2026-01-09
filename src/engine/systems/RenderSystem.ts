@@ -37,6 +37,7 @@ export class RenderSystem {
             if (!container) {
                 container = new Container();
                 container.label = layer.name;
+                container.sortableChildren = true; // Enable zIndex sorting within layer
                 // Add to stage
                 this.app.stage.addChild(container);
                 this.layerContainers.set(layer.id, container);

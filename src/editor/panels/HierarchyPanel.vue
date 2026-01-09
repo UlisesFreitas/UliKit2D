@@ -62,6 +62,7 @@ const createEntity = (type: 'Empty' | 'Sprite' | 'Camera' | 'Text' | 'BitmapText
     let data: any = {
         id,
         name: type === 'Empty' ? 'New Entity' : `New ${type}`,
+        layer: 'Base Layer', // Default Layer
         transform: { x: 0, y: 0, rotation: 0, scale: { x: 1, y: 1 }, zIndex: 0 }
     };
 
@@ -112,6 +113,7 @@ const createEntity = (type: 'Empty' | 'Sprite' | 'Camera' | 'Text' | 'BitmapText
     }
 
     world.add(data);
+    SceneManager.registerEntity(id, 'Base Layer');
     // The subscription will update the list automatically
     select(id);
 };
@@ -192,6 +194,7 @@ const duplicateEntity = () => {
             ...JSON.parse(JSON.stringify(components)), // Deep clone data
             name: `${entity.name} (Copy)`
         });
+        SceneManager.registerEntity(newId, entity.layer || 'Base Layer');
         select(newId);
     }
 };
