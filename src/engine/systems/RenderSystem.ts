@@ -27,6 +27,9 @@ export class RenderSystem {
         this.app.stage.sortableChildren = true;
     }
     
+    private tileSpriteCache: Map<string, Map<string, Sprite>> = new Map(); // LayerID -> "x,y" -> Sprite
+    private layerTileContainers: Map<string, Container> = new Map();
+
     private updateLayers() {
         const layers = SceneManager.layers; // Access global state from Manager
         
@@ -46,16 +49,18 @@ export class RenderSystem {
                 if (layer.color) {
                      const bg = new Graphics();
                      bg.beginFill(layer.color);
-                     // Huge rectangle to cover screen? Or Viewport?
-                     // For now, let's make it cover the "World" area or a large safe area.
-                     // A better approach is usually setting the Application background color if it's the base layer.
-                     // But GDevelop treats it as a layer.
-                     // Let's draw a large rect centered:
                      bg.drawRect(-10000, -10000, 20000, 20000); 
                      bg.endFill();
                      container.addChildAt(bg, 0); // Always at bottom
                      this.layerBackgrounds.set(layer.id, bg);
                 }
+
+                // Create Tile Container (Child of Layer Container)
+                const tileContainer = new Container();
+                tileContainer.label = `${layer.name}_Tiles`;
+                tileContainer.zIndex = -1; // Behind entities (Entities default to 0)
+                container.addChild(tileContainer); // Add it
+                this.layerTileContainers.set(layer.id, tileContainer);
             }
             
             // Sync Properties
@@ -63,17 +68,20 @@ export class RenderSystem {
             container.zIndex = layers.indexOf(layer); // Pixi sortableChildren handles this
             
             // Update Background Color if changed
-             if (layer.id === 'Base Layer' && layer.color) { // Assuming only base layer has bg color for now based on GDevelop
+             if (layer.id === 'Base Layer' && layer.color) { 
                  const bg = this.layerBackgrounds.get(layer.id);
                  if (bg) {
                      bg.clear();
                      bg.beginFill(layer.color);
                      bg.drawRect(-10000, -10000, 20000, 20000);
                      bg.endFill();
-                     
-                     // Also sync Camera background?
-                     // Usually the "Scene Background" is the base layer color.
                  }
+             }
+
+             // Update Tiles
+             const tileContainer = this.layerTileContainers.get(layer.id);
+             if (tileContainer) {
+                 this.updateLayerTiles(layer, tileContainer);
              }
         }
         
@@ -81,17 +89,92 @@ export class RenderSystem {
         for (const [id, container] of this.layerContainers) {
             if (!layers.find(l => l.id === id)) {
                 this.app.stage.removeChild(container);
-                container.destroy({ children: true }); // Destroy children (sprites) too? 
-                // Careful! If we move entities before destroying layer, it's fine.
-                // But RenderSystem might invoke removeSprite() later. 
-                // Let's just remove container from stage. SpriteCache still holds references.
+                container.destroy({ children: true });
                 this.layerContainers.delete(id);
                 this.layerBackgrounds.delete(id);
+                this.layerTileContainers.delete(id);
+                this.tileSpriteCache.delete(id);
             }
         }
         
         // Sort Stage (Layers)
         this.app.stage.sortChildren();
+    }
+
+    private updateLayerTiles(layer: any, container: Container) {
+        // If no tileset or data, clear and return
+        if (!layer.tileset || !layer.tileData) return;
+
+        // Ensure cache exists for this layer
+        if (!this.tileSpriteCache.has(layer.id)) {
+            this.tileSpriteCache.set(layer.id, new Map());
+        }
+        const layerCache = this.tileSpriteCache.get(layer.id)!;
+        const activeCoords = new Set<string>();
+
+        // Load Texture (Async)
+        // Note: For now, we assume texture is loaded or will load. 
+        // Real-time batching of texture frame updates is expensive if done every frame without check.
+        // We'll trust resourceManager cache.
+        resourceManager.loadTexture(layer.tileset).then(baseTexture => {
+            if (!baseTexture) return;
+
+            // Iterate Data
+            for (const [coord, tileId] of Object.entries(layer.tileData)) {
+                const [gx, gy] = coord.split(',').map(Number);
+                const tileIndex = Number(tileId);
+
+                activeCoords.add(coord);
+                let sprite = layerCache.get(coord);
+
+                // Calculate Texture Frame
+                // Assuming standard tileset or similar... 
+                // Wait, how do we know tileset layout? (Columns/Rows).
+                // Usually Tileset Metadata is needed. 
+                // For "Clean Slate", let's assume standard grid based on texture width and layer gridSize.
+                
+                const gridSize = layer.gridSize || { x: 32, y: 32 };
+                const cols = Math.floor(baseTexture.width / gridSize.x);
+                
+                const tx = (tileIndex % cols) * gridSize.x;
+                const ty = Math.floor(tileIndex / cols) * gridSize.y;
+
+                if (!sprite) {
+                    // Create Sprite
+                    // We clone the texture with a specific frame
+                     const tileTex = new Texture({
+                         source: baseTexture.source,
+                         frame: { x: tx, y: ty, width: gridSize.x, height: gridSize.y }
+                     });
+                     
+                     sprite = new Sprite(tileTex);
+                     sprite.x = gx * gridSize.x;
+                     sprite.y = gy * gridSize.y;
+                     
+                     container.addChild(sprite);
+                     layerCache.set(coord, sprite);
+                     (sprite as any)._tileId = tileIndex;
+                } else {
+                    // Update if Changed
+                    if ((sprite as any)._tileId !== tileIndex) {
+                        sprite.texture = new Texture({
+                            source: baseTexture.source,
+                            frame: { x: tx, y: ty, width: gridSize.x, height: gridSize.y }
+                        });
+                        (sprite as any)._tileId = tileIndex;
+                    }
+                }
+            }
+
+            // Cleanup removed tiles
+            for (const [coord, sprite] of layerCache.entries()) {
+                if (!activeCoords.has(coord)) {
+                    container.removeChild(sprite);
+                    sprite.destroy();
+                    layerCache.delete(coord);
+                }
+            }
+        });
     }
 
     public update() {

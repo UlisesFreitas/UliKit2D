@@ -68,7 +68,21 @@
 
         <!-- RIGHT: Tools -->
         <div class="flex items-center gap-1 bg-transparent group-hover:opacity-100 transition-opacity" :class="{'opacity-60': selectedLayerId !== layer.id}">
-             
+             <!-- Tilemap Settings Button -->
+            <button 
+                class="p-1 hover:text-accent-color focus:outline-none"
+                @click.stop="openTilemapSettings(layer)"
+                title="Edit Tilemap"
+            >
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                    <line x1="3" y1="9" x2="21" y2="9"></line>
+                    <line x1="3" y1="15" x2="21" y2="15"></line>
+                    <line x1="9" y1="3" x2="9" y2="21"></line>
+                    <line x1="15" y1="3" x2="15" y2="21"></line>
+                </svg>
+            </button>
+
              <!-- Background Color (Base Layer Only) -->
              <div v-if="layer.id === 'Base Layer'" class="mr-2" title="Background Color">
                  <input 
@@ -122,8 +136,13 @@
 import { ref, onMounted, onUnmounted, computed } from 'vue';
 import { SceneManager, type SceneLayer } from '../../engine/managers/SceneManager';
 import { useUIStore } from '../../stores/useUIStore';
+import { useLayoutStore } from '../../stores/useLayoutStore';
+import { useEditorStore } from '../../stores/useEditorStore';
 
 const uiStore = useUIStore();
+const layoutStore = useLayoutStore();
+const editorStore = useEditorStore();
+
 const selectedLayerId = ref<string | null>(null);
 const draggingIndex = ref<number | null>(null);
 
@@ -153,8 +172,16 @@ onUnmounted(() => {
     clearInterval(intervalId);
 });
 
+const openTilemapSettings = (layer: SceneLayer) => {
+    // 1. Select Layer
+    selectLayer(layer.id);
+    // 2. Open Panel
+    layoutStore.openPanel('tilemap-settings', 'Tilemap Settings');
+};
+
 const selectLayer = (id: string) => {
     selectedLayerId.value = id;
+    editorStore.selectLayer(id);
 };
 
 const addLayer = async () => {

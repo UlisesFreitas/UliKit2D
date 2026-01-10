@@ -39,12 +39,46 @@ export const useLayoutStore = defineStore('layout', () => {
         window.location.reload();
     };
 
+    const openPanel = (id: string, title: string = 'Panel') => {
+        if (!dockApi.value) return;
+        
+        const panel = dockApi.value.getPanel(id);
+        if (panel) {
+            panel.focus();
+        } else {
+            // Create Panel (Docked by default for safety)
+             try {
+                 dockApi.value.addPanel({
+                     id: id,
+                     component: id,
+                     title: title,
+                     position: { referencePanel: 'inspector', direction: 'left' }
+                 });
+             } catch(e: any) {
+                 if (e.message && e.message.includes('already exists')) {
+                     // If it exists but getPanel failed (maybe floating?), try to focus it if possible or just ignore.
+                     // Often getPanel finds it but we still tried adding.
+                     // But if getPanel returned null, and addPanel says exists, that's odd.
+                     // Let's rely on dockApi.value.getPanel(id) being correct. 
+                     // If we are here, something is desynced. 
+                     // Just log and ignore.
+                     console.log(`Panel ${id} already exists.`);
+                     const p = dockApi.value.getPanel(id);
+                     if (p) p.focus();
+                 } else {
+                     console.warn(`Failed to open panel ${id}`, e);
+                 }
+             }
+        }
+    };
+
     return {
         layoutState,
         saveLayout,
         loadLayout,
         setApi,
         hasSavedLayout,
-        resetLayout
+        resetLayout,
+        openPanel
     };
 });

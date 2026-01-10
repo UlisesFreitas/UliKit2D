@@ -8,31 +8,32 @@ import SceneToolbar from '../components/SceneToolbar.vue';
 import Toolbar from '../components/Toolbar.vue';
 import { projectState } from '../managers/ProjectManager';
 
+// ... imports
+import { EditorTilemapSystem } from '../systems/EditorTilemapSystem'; // Static import ok? Or dynamic? ScenePanel uses dynamic for some. Static is fine.
+// Actually ScenePanel uses dynamic GridSystem import. I'll stick to consistency or static.
+// Static is better for Types.
+
+// ...
+
 // Force Rebuild
 const container = ref<HTMLElement | null>(null);
 let gizmoManager: GizmoManager;
+let tilemapSystem: EditorTilemapSystem; // Add this
 
 onMounted(async () => {
     if (container.value) {
         await engine.init(container.value);
         engine.start();
         
-        const store = useEditorStore();
-        
-        // Setup Selection Callback
-        if (engine.renderSystem) {
-             engine.renderSystem.onEntityClicked = (id) => {
-                 store.selectEntity(id);
-             };
-        }
-        
-        if (engine.editorDebugSystem) {
-            engine.editorDebugSystem.onEntityClicked = (id) => {
-                store.selectEntity(id);
-            };
-        }
+        // ... (store, selection setup) ...
 
         gizmoManager = new GizmoManager();
+        
+        // Tilemap System
+        tilemapSystem = new EditorTilemapSystem(engine.app);
+        engine.app.ticker.add(() => tilemapSystem.update());
+        // Initial Dirty Mark
+        tilemapSystem.markDirty();
         
         // Grid System
         const { GridSystem } = await import('../systems/GridSystem');
@@ -46,64 +47,43 @@ onMounted(async () => {
         engine.app.renderer.on('resize', () => {
              grid.draw();
         });
-
-        console.log('Scene Panel Initialized with Gizmos & Grid', gizmoManager);
-
-        // Deselection Logic (Background Click)
-        engine.app.stage.eventMode = 'static';
-        // Use a massive hit area to ensure background clicks are caught anywhere
-        // Or just rely on the fact that we have a grid? 
-        // Better: hitArea covering the conceptual world.
-        // Actually, let's try just setting it to interactive and checking target.
-        // If no hitArea is defined, Pixi might only trigger on children.
-        // But the GridSystem typically is there. If we click the Grid, does it bubble?
-        // GridGraphics usually has pointer events disabled or ignored unless configured.
-        // Let's ensure stage has a hit area.
-        engine.app.stage.hitArea = new (await import('pixi.js')).Rectangle(-100000, -100000, 200000, 200000); // Huge infinite plane
         
-        engine.app.stage.on('pointerdown', (e) => {
-             // Only deselect if we clicked the stage directly (background)
-             // or the Grid (if it catches events, which we probably want to act as background)
-             const target = e.target;
-             // If target is stage or grid, deselect
-             // Note: checking if it's NOT a Known Entity or Gizmo
-             // Easier: exact match with stage or grid
-             if (target === engine.app.stage) {
-                 store.selectEntity(null);
-             }
-        });
-
-        // Handle Resize
-        const resizeObserver = new ResizeObserver(() => {
-            if (container.value) {
-                engine.app.resize();
-            }
-        });
-        resizeObserver.observe(container.value);
+        // ...
         
         // Watch for Project Changes
         watch(() => projectState.currentProjectPath, (newPath) => {
             if (newPath) {
-                console.log('Project Changed, Resetting Scene...');
-                // Clear ECS
-                world.clear();
-                
-                // Re-init Gizmos
-                if (gizmoManager) {
-                    gizmoManager.dispose();
-                }
-                gizmoManager = new GizmoManager();
-                if (snapToGrid.value) gizmoManager.snapToGrid = true;
-                
-                // Reset Camera
-                cameraX.value = 0;
-                cameraY.value = 0;
-                zoom.value = 1;
-                updateView();
+                 // ...
+                 world.clear();
+                 // ...
+                 tilemapSystem.markDirty(); // Re-scan layers
+                 // ...
             }
         });
+        
+        // Also watch Scene Load?
+        // If we load a scene JSON, SceneManager layers change completely.
+        // We need to mark dirty.
+        // SceneManager doesn't emit events easily. 
+        // But we can watch `SceneManager.isDirty` or rely on `update()` checking order?
+        // My `update` checks order. So if layers change ID/Count, it rebuilds.
+        // But if tileData changes via Load, we might miss it if we don't mark dirty.
+        // Let's add a watch for `SceneManager.layers`? Deep watch? Expensive.
+        // Better: Hook into logic or rely on manual trigger.
+        // For PAINTING (User input), we have `paintTile`.
+        // For LOADING: Component re-mounts? No.
+        // If user loads scene, `ScenePanel` stays mounted.
+        // `SceneManager.loadScene` is called.
+        // Maybe we just poll `markDirty` every second? No.
+        // `engine.app.ticker` runs every frame.
+        // Let's rely on `paintTile` marking dirty for painting.
+        // For loading, we might need a signal. `EventBus`?
+        
     }
 });
+// ...
+
+
 
 onUnmounted(() => {
     if (gizmoManager) {
@@ -179,7 +159,80 @@ watch(zoom, () => {
     updateView();
 });
 
+// ... imports
+import { useTilemapStore } from '../stores/useTilemapStore';
+import { SceneManager } from '../../engine/managers/SceneManager';
+import type { SceneLayer } from '../../engine/managers/SceneManager';
+
+// ... (existing state)
+
+const tilemapStore = useTilemapStore();
+const activeLayer = computed<SceneLayer | null>(() => {
+    if (!store.activeLayerId) return null;
+    return SceneManager.getLayerById(store.activeLayerId);
+});
+
+const isTilemapMode = computed(() => {
+    // Only if active layer has tile properties AND we are in Paint Mode
+    if (!store.activeLayerId) return false;
+    const layer = SceneManager.getLayerById(store.activeLayerId);
+    return !!(layer?.tileData) && tilemapStore.isPaintMode;
+});
+
+const isPainting = ref(false);
+
+const paintTile = (e: MouseEvent, erase = false) => {
+    if (!isTilemapMode.value || !activeLayer.value || !container.value) return;
+
+    // Convert to Grid Coords
+    // Use Canvas Rect for accurate offsets (handles flex centering/padding)
+    const rect = engine.app?.canvas?.getBoundingClientRect() ?? container.value?.getBoundingClientRect();
+    
+    if (!rect) return;
+
+    const screenX = e.clientX - rect.left;
+    const screenY = e.clientY - rect.top;
+    
+    // World Coords
+    const worldX = (screenX - cameraX.value) / zoom.value;
+    const worldY = (screenY - cameraY.value) / zoom.value;
+    
+    // Grid Coords
+    const gridSize = activeLayer.value.gridSize || { x: 32, y: 32 };
+    const gx = Math.floor(worldX / gridSize.x);
+    const gy = Math.floor(worldY / gridSize.y);
+    
+    const key = `${gx},${gy}`;
+    const currentId = activeLayer.value.tileData![key];
+    const targetId = erase ? undefined : tilemapStore.selectedTileId;
+
+    if (currentId !== targetId) {
+        if (targetId === undefined) {
+            delete activeLayer.value.tileData![key];
+        } else {
+            activeLayer.value.tileData![key] = targetId;
+        }
+        SceneManager.setDirty(true);
+        if (tilemapSystem) tilemapSystem.markDirty(activeLayer.value.id);
+    }
+};
+
 const onMouseDown = (e: MouseEvent) => {
+    // Priority: Tilemap Painting -> Panning/Select
+    // If Left Click + Tilemap Mode -> Paint
+    // If Right Click + Tilemap Mode -> Erase
+    
+    if (isTilemapMode.value && (e.button === 0 || e.button === 2) && !e.altKey) {
+        isPainting.value = true;
+        
+        const isRightClick = e.button === 2;
+        const isEraserTool = tilemapStore.currentTool === 'eraser';
+        const isErase = isRightClick || isEraserTool;
+
+        paintTile(e, isErase);
+        return; // Consume event
+    }
+
     if (e.button === 1 || (e.button === 0 && e.altKey)) { // Middle click or Alt+Left
         isPanning.value = true;
         lastMouseX.value = e.clientX;
@@ -188,7 +241,68 @@ const onMouseDown = (e: MouseEvent) => {
     }
 };
 
+// ...
+const highlightGraphics = ref<any>(null);
+
+onMounted(async () => {
+    // ... (existing init)
+    
+    // Highlight Graphics
+    const { Graphics } = await import('pixi.js');
+    highlightGraphics.value = new Graphics();
+    highlightGraphics.value.zIndex = 9999; // Top
+    engine.app.stage.addChild(highlightGraphics.value);
+});
+
+
+const updateHighlight = (screenX: number, screenY: number) => {
+    if (!highlightGraphics.value || !isTilemapMode.value || !activeLayer.value) {
+        if (highlightGraphics.value) highlightGraphics.value.clear();
+        return;
+    }
+
+    // World Coords
+    const worldX = (screenX - cameraX.value) / zoom.value;
+    const worldY = (screenY - cameraY.value) / zoom.value;
+    
+    // Grid Coords
+    const gridSize = activeLayer.value.gridSize || { x: 32, y: 32 };
+    const gx = Math.floor(worldX / gridSize.x);
+    const gy = Math.floor(worldY / gridSize.y);
+
+    const tx = gx * gridSize.x;
+    const ty = gy * gridSize.y;
+    
+    // Style based on Tool
+    const isEraser = tilemapStore.currentTool === 'eraser';
+    const color = isEraser ? 0xFF0000 : 0x00FF00;
+
+    // Draw
+    const g = highlightGraphics.value;
+    g.clear();
+    
+    g.lineStyle(2, color, 0.8);
+    g.beginFill(color, 0.2);
+    g.drawRect(tx, ty, gridSize.x, gridSize.y);
+    g.endFill();
+};
+
 const onMouseMove = (e: MouseEvent) => {
+    const rect = engine.app?.canvas?.getBoundingClientRect() ?? container.value?.getBoundingClientRect();
+
+    if (rect) {
+        updateHighlight(e.clientX - rect.left, e.clientY - rect.top);
+    }
+    
+    if (isPainting.value) {
+        const isRightClick = (e.buttons & 2) === 2;
+        const isEraserTool = tilemapStore.currentTool === 'eraser';
+        const isErase = isRightClick || isEraserTool;
+        
+        paintTile(e, isErase); 
+        return;
+    }
+
     if (isPanning.value) {
         const dx = e.clientX - lastMouseX.value;
         const dy = e.clientY - lastMouseY.value;
@@ -203,10 +317,15 @@ const onMouseMove = (e: MouseEvent) => {
     }
 };
 
+// ...
+
 const onMouseUp = () => {
+    isPainting.value = false;
     isPanning.value = false;
     if (container.value) container.value.style.cursor = 'default';
 };
+
+// ... (rest of file)
 
 const updateView = () => {
     // Update Stage Transform

@@ -16,11 +16,13 @@ import { ProjectManager, projectState } from '../managers/ProjectManager';
 import { useEditorStore } from '../../stores/useEditorStore';
 import { ThemeManager } from '../managers/ThemeManager';
 import { useUIStore } from '../../stores/useUIStore';
+import { useLayoutStore } from '../../stores/useLayoutStore';
 
 import { world } from '../../engine/ecs/ECS';
 
 const editorStore = useEditorStore();
 const ui = useUIStore();
+const layoutStore = useLayoutStore();
 
 // Menu Actions
 const onNewProject = async () => {
@@ -233,6 +235,10 @@ const createAsset = (type: 'Empty' | 'Sprite' | 'Camera' | 'Text' | 'Animator' |
                     <MenubarTrigger class="menu-trigger">View</MenubarTrigger>
                     <MenubarPortal>
                         <MenubarContent class="menu-content" align="start" :sideOffset="5">
+                            <MenubarItem class="menu-item" @select="layoutStore.openPanel('tilemap-settings', 'Tilemap Settings')">
+                                Tilemap Settings
+                            </MenubarItem>
+                            <MenubarSeparator class="menu-separator" />
                             <MenubarItem class="menu-item">Toggle Sidebar</MenubarItem>
                             <MenubarItem class="menu-item">Toggle Panel</MenubarItem>
                              <MenubarSeparator class="menu-separator" />

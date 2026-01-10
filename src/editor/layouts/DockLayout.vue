@@ -14,12 +14,140 @@ import { getActivePinia } from 'pinia';
 import 'dockview-core/dist/styles/dockview.css';
 
 import ScenePanel from '../panels/ScenePanel.vue';
-import ScenesPanel from '../panels/ScenesPanel.vue'; // New Panel
+import ScenesPanel from '../panels/ScenesPanel.vue'; 
 import LayersPanel from '../panels/LayersPanel.vue'; 
 import InspectorPanel from '../panels/InspectorPanel.vue'; 
 import ConsolePanel from '../panels/ConsolePanel.vue';
 import AssetsPanel from '../panels/AssetsPanel.vue';
 import HierarchyPanel from '../panels/HierarchyPanel.vue';
+import TilemapSettingsPanel from '../panels/TilemapSettingsPanel.vue';
+
+// ... (other imports)
+
+// ...
+
+onMounted(() => {
+    if (!container.value) return;
+
+    api = new DockviewComponent(container.value, {
+        createComponent: (options: any) => {
+            switch (options.name) {
+                case 'scene': return new VuePanelRenderer(ScenePanel);
+                case 'scenes': return new VuePanelRenderer(ScenesPanel); // Register 'scenes'
+                case 'layers': return new VuePanelRenderer(LayersPanel);
+                case 'inspector': return new VuePanelRenderer(InspectorPanel);
+                case 'console': return new VuePanelRenderer(ConsolePanel);
+                case 'assets': return new VuePanelRenderer(AssetsPanel);
+                case 'hierarchy': return new VuePanelRenderer(HierarchyPanel);
+                case 'tilemap-settings': return new VuePanelRenderer(TilemapSettingsPanel);
+                default: 
+                    return new VuePanelRenderer(GenericPanel, { text: `Panel: ${options.id}` });
+            }
+        }
+    });
+    
+        
+    layoutStore.setApi(api);
+    
+    // Restore Layout or Default
+    const savedLayout = layoutStore.loadLayout();
+    // FORCE DEFAULT for testing new panel config (User Request)
+    if (false && savedLayout) {
+        api!.fromJSON(savedLayout);
+    } else {
+        // --- Default Layout Construction (Explicit JSON Strategy v15) ---
+        // We use a hardcoded JSON schema derived from a successful layout dump,
+        // but with corrected 'size' weights to enforce 25% | 50% | 25%.
+        // Total Width base: 1460 (365 + 730 + 365)
+        
+        api!.fromJSON({
+            grid: {
+                root: {
+                    type: 'branch',
+                    data: [
+                        {
+                            type: 'branch',
+                            data: [
+                                { type: 'leaf', data: { views: ['scenes'], id: 'group-scenes' }, size: 200 },
+                                { type: 'leaf', data: { views: ['hierarchy'], id: 'group-hierarchy' }, size: 500 },
+                                { type: 'leaf', data: { views: ['assets'], id: 'group-assets' }, size: 200 }
+                            ],
+                            size: 365
+                        },
+                        {
+                            type: 'branch',
+                            data: [
+                                { type: 'leaf', data: { views: ['scene'], id: 'group-scene' }, size: 600 },
+                                { type: 'leaf', data: { views: ['console'], id: 'group-console' }, size: 200 }
+                            ],
+                            size: 730
+                        },
+                        {
+                            type: 'branch',
+                            data: [
+                                { type: 'leaf', data: { views: ['inspector'], id: 'group-inspector' }, size: 500 },
+                                { type: 'leaf', data: { views: ['layers'], id: 'group-layers' }, size: 300 }
+                            ],
+                            size: 365
+                        }
+                    ],
+                    size: 800
+                },
+                width: 1460,
+                height: 800,
+                orientation: 'HORIZONTAL'
+            },
+            panels: {
+                'hierarchy': { id: 'hierarchy', title: 'Hierarchy', component: 'hierarchy', contentComponent: 'hierarchy' },
+                'assets': { id: 'assets', title: 'Assets', component: 'assets', contentComponent: 'assets' },
+                'scenes': { id: 'scenes', title: 'Scenes', component: 'scenes', contentComponent: 'scenes' },
+                'scene': { id: 'scene', title: 'Scene View', component: 'scene', contentComponent: 'scene' },
+                'console': { id: 'console', title: 'Console', component: 'console', contentComponent: 'console' },
+                'inspector': { id: 'inspector', title: 'Inspector', component: 'inspector', contentComponent: 'inspector' },
+                'layers': { id: 'layers', title: 'Layers', component: 'layers', contentComponent: 'layers' }
+            },
+            activeGroup: 'group-scene'
+        } as any);
+    }
+
+    // Add Tilemap Settings Floating Group
+    if (!api.getPanel('tilemap-settings')) {
+         try {
+             // Create the panel first internally handled by 'addView' or just 'addFloatingGroup' with full descriptor?
+             // Dockview addFloatingGroup takes 'igroup' options.
+             api.addFloatingGroup({
+                 height: 400,
+                 width: 300,
+                 x: 100,
+                 y: 200,
+                 data: {
+                     views: [{
+                         id: 'tilemap-settings',
+                         component: 'tilemap-settings',
+                         title: 'Tilemap Settings'
+                     }]
+                 }
+             } as any);
+         } catch(e) {
+             console.warn('Floating group creation failed', e);
+         }
+    }
+
+    // Auto-save layout on change
+    api.onDidLayoutChange(() => {
+        if (api) {
+            layoutStore.saveLayout(api.toJSON());
+        }
+    });
+
+    observer.value = new ResizeObserver(() => {
+        if (container.value && api) {
+             api.layout(container.value.clientWidth, container.value.clientHeight);
+        }
+    });
+    observer.value.observe(container.value);
+});
+
 import StatusBar from '../components/StatusBar.vue';
 
 import { useLayoutStore } from '../../stores/useLayoutStore';
@@ -91,103 +219,7 @@ const dockTheme = computed(() => {
     return type === 'light' ? 'light' : 'abyss';
 });
 
-onMounted(() => {
-    if (!container.value) return;
 
-    api = new DockviewComponent(container.value, {
-        createComponent: (options: any) => {
-            switch (options.name) {
-                case 'scene': return new VuePanelRenderer(ScenePanel);
-                case 'scenes': return new VuePanelRenderer(ScenesPanel); // Register 'scenes'
-                case 'layers': return new VuePanelRenderer(LayersPanel);
-                case 'inspector': return new VuePanelRenderer(InspectorPanel);
-                case 'console': return new VuePanelRenderer(ConsolePanel);
-                case 'assets': return new VuePanelRenderer(AssetsPanel);
-                case 'hierarchy': return new VuePanelRenderer(HierarchyPanel);
-                default: 
-                    return new VuePanelRenderer(GenericPanel, { text: `Panel: ${options.id}` });
-            }
-        }
-    });
-    
-        
-    layoutStore.setApi(api);
-    
-    // Restore Layout or Default
-    const savedLayout = layoutStore.loadLayout();
-    // FORCE DEFAULT for testing new panel config (User Request)
-    if (false && savedLayout) {
-        api!.fromJSON(savedLayout);
-    } else {
-        // --- Default Layout Construction (Explicit JSON Strategy v15) ---
-        // We use a hardcoded JSON schema derived from a successful layout dump,
-        // but with corrected 'size' weights to enforce 25% | 50% | 25%.
-        // Total Width base: 1460 (365 + 730 + 365)
-        
-        api!.fromJSON({
-            grid: {
-                root: {
-                    type: 'branch',
-                    data: [
-                        {
-                            type: 'branch',
-                            data: [
-                                { type: 'leaf', data: { views: ['scenes'], id: 'group-scenes' }, size: 200 },
-                                { type: 'leaf', data: { views: ['hierarchy'], id: 'group-hierarchy' }, size: 500 },
-                                { type: 'leaf', data: { views: ['assets'], id: 'group-assets' }, size: 200 }
-                            ],
-                            size: 365
-                        },
-                        {
-                            type: 'branch',
-                            data: [
-                                { type: 'leaf', data: { views: ['scene'], id: 'group-scene' }, size: 600 },
-                                { type: 'leaf', data: { views: ['console'], id: 'group-console' }, size: 200 }
-                            ],
-                            size: 730
-                        },
-                        {
-                            type: 'branch',
-                            data: [
-                                { type: 'leaf', data: { views: ['inspector'], id: 'group-inspector' }, size: 500 },
-                                { type: 'leaf', data: { views: ['layers'], id: 'group-layers' }, size: 300 }
-                            ],
-                            size: 365
-                        }
-                    ],
-                    size: 800
-                },
-                width: 1460,
-                height: 800,
-                orientation: 'HORIZONTAL'
-            },
-            panels: {
-                'hierarchy': { id: 'hierarchy', title: 'Hierarchy', component: 'hierarchy', contentComponent: 'hierarchy' },
-                'assets': { id: 'assets', title: 'Assets', component: 'assets', contentComponent: 'assets' },
-                'scenes': { id: 'scenes', title: 'Scenes', component: 'scenes', contentComponent: 'scenes' },
-                'scene': { id: 'scene', title: 'Scene View', component: 'scene', contentComponent: 'scene' },
-                'console': { id: 'console', title: 'Console', component: 'console', contentComponent: 'console' },
-                'inspector': { id: 'inspector', title: 'Inspector', component: 'inspector', contentComponent: 'inspector' },
-                'layers': { id: 'layers', title: 'Layers', component: 'layers', contentComponent: 'layers' }
-            },
-            activeGroup: 'group-scene'
-        } as any);
-    }
-
-    // Auto-save layout on change
-    api.onDidLayoutChange(() => {
-        if (api) {
-            layoutStore.saveLayout(api.toJSON());
-        }
-    });
-
-    observer.value = new ResizeObserver(() => {
-        if (container.value && api) {
-             api.layout(container.value.clientWidth, container.value.clientHeight);
-        }
-    });
-    observer.value.observe(container.value);
-});
 
 onUnmounted(() => {
 });

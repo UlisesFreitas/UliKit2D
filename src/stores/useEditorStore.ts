@@ -144,9 +144,17 @@ export const useEditorStore = defineStore('editor', () => {
         selectEntity(newId);
     };
 
+    // Layer Selection
+    const activeLayerId = ref<string>('Base Layer');
+    const selectLayer = (id: string) => {
+        activeLayerId.value = id;
+    };
+
     return {
         selectedEntityId,
         selectEntity,
+        activeLayerId,
+        selectLayer,
         commandManager,
         executeCommand,
         undo,
