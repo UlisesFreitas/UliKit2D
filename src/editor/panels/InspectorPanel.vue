@@ -63,7 +63,13 @@ const inspectorItems = computed(() => {
 
     // 2. Other Components
     for (const key in ent) {
-        if (['id', 'name', 'visible', 'transform', 'script'].includes(key)) continue;
+        // EXCLUSION LIST DOCUMENTATION:
+        // - id, name, visible: Handled by the Header/Top Bar of the Inspector.
+        // - transform: Handled explicitly above (always first).
+        // - script: Handled explicitly below (special array handling).
+        // - layer: Handled by the Layer Dropdown at the top (redundant as generic).
+        if (['id', 'name', 'visible', 'transform', 'script', 'layer'].includes(key)) continue;
+        
         items.push({ type: 'component', key, data: ent[key] });
     }
 
@@ -266,13 +272,25 @@ const toggleCollapse = (key: string) => {
             <!-- Name Input -->
             <input 
                 v-model="selectedEntity.name" 
-                class="u-input flex-1 font-bold" 
+                class="u-input flex-1 font-bold min-w-0" 
                 placeholder="Entity Name"
                 @input="onComponentUpdate"
             />
+
+            <!-- Layer Selector (Inline) -->
+            <select 
+                :value="selectedEntity.layer || 'Base Layer'" 
+                @change="(e) => changeLayer((e.target as HTMLSelectElement).value)"
+                class="bg-bg-input text-text-primary text-[10px] h-6 px-1 rounded border border-border focus:ring-1 focus:ring-accent-color outline-none max-w-[100px]"
+                title="Layer"
+            >
+                <option v-for="layer in SceneManager.layers" :key="layer.id" :value="layer.id">
+                    {{ layer.name }}
+                </option>
+            </select>
             
             <!-- ID Tooltip -->
-            <div class="relative group cursor-help">
+            <div class="relative group cursor-help ml-1">
                 <div class="w-5 h-5 rounded-full border border-text-secondary flex items-center justify-center text-xs text-text-secondary hover:text-text-primary hover:border-text-primary transition-colors">
                     ?
                 </div>
@@ -280,20 +298,6 @@ const toggleCollapse = (key: string) => {
                     ID: {{ selectedEntity.id }}
                 </div>
             </div>
-        </div>
-
-        <!-- Layer Selector -->
-        <div class="mb-4 flex items-center space-x-2 bg-bg-panel p-1 rounded border border-bg-border">
-            <label class="text-xs text-text-secondary uppercase font-bold w-12">Layer</label>
-            <select 
-                :value="selectedEntity.layer || 'Base Layer'" 
-                @change="(e) => changeLayer((e.target as HTMLSelectElement).value)"
-                class="flex-1 bg-bg-input text-text-primary text-xs p-1 rounded border-none focus:ring-1 focus:ring-accent-color outline-none"
-            >
-                <option v-for="layer in SceneManager.layers" :key="layer.id" :value="layer.id">
-                    {{ layer.name }}
-                </option>
-            </select>
         </div>
 
         <!-- Component List -->
