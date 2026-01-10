@@ -1,6 +1,6 @@
 import type { IFileSystem, FileEntry, FileChangeEvent } from './FileSystem';
 import { fs, configure } from '@zenfs/core';
-import { IndexedDB } from '@zenfs/dom';
+import { WebAccess } from '@zenfs/dom';
 import { useUIStore } from '../stores/useUIStore';
 
 export class WebFileSystem implements IFileSystem {
@@ -16,35 +16,26 @@ export class WebFileSystem implements IFileSystem {
     private async init() {
         if (this.initialized) return;
         try {
+            if (!navigator.storage || !navigator.storage.getDirectory) {
+                throw new Error('OPFS is not supported in this browser');
+            }
+
+            const rootHandle = await navigator.storage.getDirectory();
+            
             await configure({
                 mounts: {
-                    '/': { backend: IndexedDB, name: 'UliKit2D_FS' }
+                    '/': { backend: WebAccess, handle: rootHandle }
                 }
             });
             this.initialized = true;
-            console.log('[WebFileSystem] ZenFS initialized with IndexedDB backend');
+            console.log('[WebFileSystem] ZenFS initialized with WebAccess (OPFS) backend');
         } catch (e: any) {
+             // ... existing error catch ...
             if (e.message && e.message.includes('Mount point is already in use')) {
                 console.log('[WebFileSystem] ZenFS already configured (HMR re-init detected)');
                 this.initialized = true;
             } else {
-                console.error('[WebFileSystem] ZenFS config error. Attempting reset...', e);
-                // Attempt to wipe and retry
-                try {
-                     const DBDeleteRequest = window.indexedDB.deleteDatabase('UliKit2D_FS');
-                     DBDeleteRequest.onsuccess = async () => {
-                        console.log('[WebFileSystem] IDB Reset success. Retrying init...');
-                        await configure({
-                            mounts: {
-                                '/': { backend: IndexedDB, name: 'UliKit2D_FS' }
-                            }
-                        });
-                        this.initialized = true;
-                        console.log('[WebFileSystem] ZenFS re-initialized after reset');
-                     };
-                } catch (retryErr) {
-                     console.error('[WebFileSystem] Failed to reset FS:', retryErr);
-                }
+                console.error('[WebFileSystem] ZenFS config error:', e);
             }
         }
     }
@@ -56,7 +47,7 @@ export class WebFileSystem implements IFileSystem {
     async selectFolder(): Promise<string | null> {
          await this.ensureInit();
 
-         // 1. Get existing projects to check for duplicates
+         // 1. Get existing projects
          let existingProjects: string[] = [];
          try {
              const dirents = await fs.promises.readdir('/', { withFileTypes: true });
@@ -67,34 +58,32 @@ export class WebFileSystem implements IFileSystem {
              console.warn('Failed to list existing projects', e);
          }
 
-         // 2. Prompt loop
+         const projectListStr = existingProjects.length > 0 
+            ? `Available Projects:\n- ${existingProjects.join('\n- ')}` 
+            : 'No projects found.';
+
+         // 2. Prompt loop for Opening
          const ui = useUIStore();
          let name: string | null = null;
-         console.log('[WebFileSystem] Entering prompt loop for project name...');
+         
          while (true) {
-             console.log('[WebFileSystem] Requesting prompt...');
              name = await ui.prompt({ 
-                 title: 'New Project', 
-                 message: 'Enter New Project Name:', 
-                 defaultValue: 'MyWebProject',
+                 title: 'Open Project', 
+                 message: `${projectListStr}\n\nEnter Exact Project Name to Open:`, 
+                 defaultValue: existingProjects[0] || '',
                  placeholder: 'Project Name'
              });
-             console.log(`[WebFileSystem] Prompt returned: ${name}`);
              
              if (!name) return null; // User cancelled
              
              if (existingProjects.includes(name)) {
-                 if (await ui.confirm({ 
-                     title: 'Project Exists', 
-                     message: `Project "${name}" already exists. Overwrite? (All data in it will be lost)`,
-                     confirmText: 'Overwrite',
-                     isDanger: true
-                 })) {
-                     return name;
-                 }
-                 // If not confirmed, loop again
+                 return name; // Found! Open it.
              } else {
-                 return name;
+                 await ui.alert({
+                     title: 'Project Not Found',
+                     message: `Project "${name}" does not exist.`
+                 });
+                 // Loop again
              }
          }
     }
