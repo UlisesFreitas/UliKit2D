@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { ref } from 'vue';
 
 import { 
     MenubarRoot, 
@@ -17,12 +18,16 @@ import { useEditorStore } from '../../stores/useEditorStore';
 import { ThemeManager } from '../managers/ThemeManager';
 import { useUIStore } from '../../stores/useUIStore';
 import { useLayoutStore } from '../../stores/useLayoutStore';
+import GridSettingsModal from './modals/GridSettingsModal.vue';
+import ProjectSettingsModal from './modals/ProjectSettingsModal.vue';
 
 import { world } from '../../engine/ecs/ECS';
 
 const editorStore = useEditorStore();
 const ui = useUIStore();
 const layoutStore = useLayoutStore();
+const showGridSettings = ref(false);
+const showProjectSettings = ref(false);
 
 // Menu Actions
 const onNewProject = async () => {
@@ -99,7 +104,8 @@ const createAsset = (type: 'Empty' | 'Sprite' | 'Camera' | 'Text' | 'Animator' |
 </script>
 
 <template>
-    <div class="app-header h-10 flex items-center justify-between px-4 bg-bg-header border-b border-border select-none text-text-primary">
+    <div class="w-full">
+        <div class="app-header h-10 flex items-center px-4 bg-bg-header border-b border-border select-none text-text-primary">
         
         <!-- Left: Icon + Menubar -->
         <div class="flex items-center">
@@ -124,6 +130,13 @@ const createAsset = (type: 'Empty' | 'Sprite' | 'Camera' | 'Text' | 'Animator' |
                                 </MenubarSubTrigger>
                                 <MenubarPortal>
                                     <MenubarSubContent class="menu-content" :sideOffset="2" :alignOffset="-5">
+                                        <MenubarItem class="menu-item" @select="showProjectSettings = true">
+                                            Project Settings...
+                                        </MenubarItem>
+                                        <MenubarItem class="menu-item" @select="showGridSettings = true">
+                                            Grid Settings
+                                        </MenubarItem>
+                                        <MenubarSeparator class="menu-separator" />
                                         <MenubarSub>
                                             <MenubarSubTrigger class="menu-item w-full justify-between">
                                                 Themes <span class="ml-auto text-xs">▶</span>
@@ -235,12 +248,17 @@ const createAsset = (type: 'Empty' | 'Sprite' | 'Camera' | 'Text' | 'Animator' |
                     <MenubarTrigger class="menu-trigger">View</MenubarTrigger>
                     <MenubarPortal>
                         <MenubarContent class="menu-content" align="start" :sideOffset="5">
-                            <MenubarItem class="menu-item" @select="layoutStore.openPanel('tilemap-settings', 'Tilemap Settings')">
+                             <MenubarItem class="menu-item" @select="layoutStore.togglePanel('scenes', 'Scenes')">Scenes</MenubarItem>
+                             <MenubarItem class="menu-item" @select="layoutStore.togglePanel('hierarchy', 'Hierarchy')">Hierarchy</MenubarItem>
+                             <MenubarItem class="menu-item" @select="layoutStore.togglePanel('assets', 'Assets')">Assets</MenubarItem>
+                             <!-- Scene View Removed (Permanent) -->
+                             <MenubarItem class="menu-item" @select="layoutStore.togglePanel('console', 'Console')">Console</MenubarItem>
+                             <MenubarItem class="menu-item" @select="layoutStore.togglePanel('inspector', 'Inspector')">Inspector</MenubarItem>
+                             <MenubarItem class="menu-item" @select="layoutStore.togglePanel('layers', 'Layers')">Layers</MenubarItem>
+                             <MenubarSeparator class="menu-separator" />
+                             <MenubarItem class="menu-item" @select="layoutStore.openPanel('tilemap-settings', 'Tilemap Settings')">
                                 Tilemap Settings
                             </MenubarItem>
-                            <MenubarSeparator class="menu-separator" />
-                            <MenubarItem class="menu-item">Toggle Sidebar</MenubarItem>
-                            <MenubarItem class="menu-item">Toggle Panel</MenubarItem>
                              <MenubarSeparator class="menu-separator" />
                              <MenubarItem class="menu-item" @select="editorStore.zoomIn">Zoom In</MenubarItem>
                              <MenubarItem class="menu-item" @select="editorStore.zoomOut">Zoom Out</MenubarItem>
@@ -261,12 +279,86 @@ const createAsset = (type: 'Empty' | 'Sprite' | 'Camera' | 'Text' | 'Animator' |
                 </MenubarMenu>
             </MenubarRoot>
         </div>
+        
+        <div class="flex-1"></div>
 
-        <!-- Right: Project Info -->
-        <div class="flex items-center text-xs text-gray-500">
-            <span class="mr-4">{{ projectState.projectName }}</span>
-            <span>v0.0.1</span>
+        <!-- Right: Icons & Project Info -->
+        <div class="flex items-center gap-4">
+            <!-- Panel Toggles -->
+            <div class="flex items-center gap-1 border-r border-border pr-3 mr-1">
+                <!-- Scenes -->
+                <button 
+                    class="p-1 rounded transition-colors"
+                    :class="layoutStore.isPanelOpen('scenes') ? 'text-accent-color bg-bg-selection' : 'text-text-disabled hover:text-text-primary'"
+                    @click="layoutStore.togglePanel('scenes', 'Scenes')" 
+                    title="Toggle Scenes"
+                >
+                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2" /><line x1="3" y1="9" x2="21" y2="9" /><line x1="9" y1="21" x2="9" y2="9" /></svg>
+                </button>
+                <!-- Hierarchy -->
+                <button 
+                    class="p-1 rounded transition-colors"
+                    :class="layoutStore.isPanelOpen('hierarchy') ? 'text-accent-color bg-bg-selection' : 'text-text-disabled hover:text-text-primary'"
+                    @click="layoutStore.togglePanel('hierarchy', 'Hierarchy')" 
+                    title="Toggle Hierarchy"
+                >
+                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
+                </button>
+                 <!-- Assets -->
+                <button 
+                    class="p-1 rounded transition-colors"
+                    :class="layoutStore.isPanelOpen('assets') ? 'text-accent-color bg-bg-selection' : 'text-text-disabled hover:text-text-primary'"
+                    @click="layoutStore.togglePanel('assets', 'Assets')" 
+                    title="Toggle Assets"
+                >
+                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>
+                </button>
+                <!-- Scene View Removed (Permanent) -->
+                <!-- Console -->
+                <button 
+                    class="p-1 rounded transition-colors"
+                    :class="layoutStore.isPanelOpen('console') ? 'text-accent-color bg-bg-selection' : 'text-text-disabled hover:text-text-primary'"
+                    @click="layoutStore.togglePanel('console', 'Console')" 
+                    title="Toggle Console"
+                >
+                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
+                </button>
+                 <!-- Inspector -->
+                <button 
+                    class="p-1 rounded transition-colors"
+                    :class="layoutStore.isPanelOpen('inspector') ? 'text-accent-color bg-bg-selection' : 'text-text-disabled hover:text-text-primary'"
+                    @click="layoutStore.togglePanel('inspector', 'Inspector')" 
+                    title="Toggle Inspector"
+                >
+                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+                </button>
+                <!-- Layers -->
+                <button 
+                    class="p-1 rounded transition-colors"
+                    :class="layoutStore.isPanelOpen('layers') ? 'text-accent-color bg-bg-selection' : 'text-text-disabled hover:text-text-primary'"
+                    @click="layoutStore.togglePanel('layers', 'Layers')" 
+                    title="Toggle Layers"
+                >
+                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 2 7 12 12 22 7 12 2"></polygon><polyline points="2 17 12 22 22 17"></polyline><polyline points="2 12 12 17 22 12"></polyline></svg>
+                </button>
+            </div>
+
+            <!-- Grid Settings Icon -->
+            <button class="p-1 hover:text-accent-color rounded text-text-secondary" @click="showGridSettings = true" title="Grid Settings">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="9" y1="3" x2="9" y2="21"/><line x1="15" y1="3" x2="15" y2="21"/></svg>
+            </button>
+
+            <!-- Project Info -->
+            <div class="flex items-center text-xs text-text-disabled">
+                <span class="mr-4">{{ projectState.projectName }}</span>
+                <span>v0.0.1</span>
+            </div>
         </div>
+        
+        </div>
+        
+        <GridSettingsModal v-model:open="showGridSettings" />
+        <ProjectSettingsModal v-model:open="showProjectSettings" />
     </div>
 </template>
 

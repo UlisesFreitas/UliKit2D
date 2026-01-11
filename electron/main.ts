@@ -180,18 +180,27 @@ ipcMain.handle('project:create', async (_event, folderPath: string) => {
 
         try {
             console.log(`[Main] Looking for default assets at: ${sourceAssetsPath}`);
-            const files = await fs.readdir(sourceAssetsPath);
-            console.log(`[Main] Found ${files.length} assets.`);
-            for (const file of files) {
-                const src = path.join(sourceAssetsPath, file);
-                const dest = path.join(assetsPath, file);
-                
-                const stat = await fs.stat(src);
-                if (stat.isFile()) {
-                    await fs.copyFile(src, dest);
-                    console.log(`[Main] Copied ${file} to ${dest}`);
+            
+            // Recursive Copy Helper
+            const copyRecursive = async (src: string, dest: string) => {
+                try {
+                    const stats = await fs.stat(src);
+                    if (stats.isDirectory()) {
+                        await fs.mkdir(dest, { recursive: true });
+                        const entries = await fs.readdir(src);
+                        for (const entry of entries) {
+                            await copyRecursive(path.join(src, entry), path.join(dest, entry));
+                        }
+                    } else {
+                        await fs.copyFile(src, dest);
+                    }
+                } catch(e) {
+                     console.warn(`[Main] Skipping ${src}:`, e);
                 }
-            }
+            };
+
+            await copyRecursive(sourceAssetsPath, assetsPath);
+            console.log(`[Main] Default assets copied recursively.`);
         } catch (err) {
             console.error('Failed to copy default assets:', err);
         }

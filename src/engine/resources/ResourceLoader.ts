@@ -1,5 +1,6 @@
-import { Texture, Assets } from 'pixi.js';
+import { Texture, Assets, TextureStyle } from 'pixi.js';
 import { getFileSystem } from '../../api/FileSystem';
+import { useProjectSettingsStore } from '../../stores/useProjectSettingsStore';
 
 export class ResourceLoader {
     
@@ -21,16 +22,35 @@ export class ResourceLoader {
      * Loads a PIXI Texture from a resolved URL
      */
     public async loadTexture(url: string): Promise<Texture> {
+        let texture: Texture;
+
         if (url.startsWith('blob:') || url.startsWith('data:') || url.startsWith('file:')) {
             // Robust loading for Blobs and Local Files (Electron) via Image tag
             // bypassing fetch restrictions
             const img = new Image();
             img.src = url;
             await img.decode();
-            return Texture.from(img);
+            texture = Texture.from(img);
         } else {
-            return await Assets.load(url);
+            texture = await Assets.load(url);
         }
+
+        // Enforce Project Settings (Pixel Art Mode)
+        try {
+             // Access store lazily to avoid circular dependency issues during init
+             const settings = useProjectSettingsStore().settings;
+             if (settings && settings.display) {
+                 const mode = settings.display.pixelArt ? 'nearest' : 'linear';
+                 // PixiJS v8: TextureSource handles filtering
+                 if (texture.source) {
+                     texture.source.scaleMode = mode;
+                 }
+             }
+        } catch (e) {
+            // Store might not be initialized or other error, fallback to defaults
+        }
+
+        return texture;
     }
 
     /**

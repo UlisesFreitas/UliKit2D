@@ -1,5 +1,6 @@
 import { reactive } from 'vue';
 import { getFileSystem, type FileChangeEvent } from '../../api/FileSystem';
+import { ProjectSettingsManager } from './ProjectSettingsManager';
 
 export const projectState = reactive({
     currentProjectPath: null as string | FileSystemDirectoryHandle | null,
@@ -35,6 +36,9 @@ export class ProjectManager {
                     // This will be handled by AssetStore usually
                  });
                  console.log('Project Created:', projectState.projectName);
+
+                 // INITIALIZE SETTINGS
+                 await ProjectSettingsManager.saveSettings(pathOrHandle);
 
                  // LOAD THE INITIAL SCENE
                  // Dynamic import to avoid circular dependency issues if any
@@ -78,6 +82,9 @@ export class ProjectManager {
             await fs.watchProject(pathOrHandle as any, (_event: FileChangeEvent) => {});
             
             console.log('Project Opened:', projectState.projectName);
+
+            // LOAD SETTINGS
+            await ProjectSettingsManager.loadSettings(pathOrHandle);
 
             // Load Initial Scene
             const { SceneManager } = await import('../../engine/managers/SceneManager');

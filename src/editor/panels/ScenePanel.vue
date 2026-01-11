@@ -4,6 +4,7 @@ import { instance as engine } from '../../engine/core/Engine';
 import { GizmoManager } from '../gizmos/GizmoManager';
 import { world } from '../../engine/ecs/ECS';
 import { useEditorStore } from '../../stores/useEditorStore';
+import { usePreferencesStore } from '../../stores/usePreferencesStore';
 import SceneToolbar from '../components/SceneToolbar.vue';
 import Toolbar from '../components/Toolbar.vue';
 import { projectState } from '../managers/ProjectManager';
@@ -43,11 +44,13 @@ onMounted(async () => {
         sceneGrid = grid;
         
         // Initial Draw
-        grid.draw(cameraX.value, cameraY.value, zoom.value);
+        if (preferencesStore.grid.visible) {
+             grid.draw(cameraX.value, cameraY.value, zoom.value, preferencesStore.grid);
+        }
         
         // Redraw on Resize
         engine.app.renderer.on('resize', () => {
-             grid.draw();
+             if(preferencesStore.grid.visible) grid.draw(cameraX.value, cameraY.value, zoom.value, preferencesStore.grid);
         });
 
         // Handle Entity Clicks (Selection)
@@ -164,7 +167,11 @@ const lastMouseX = ref(0);
 const lastMouseY = ref(0);
 
 // Tool State
-const showGrid = ref(true);
+const preferencesStore = usePreferencesStore();
+const showGrid = computed({
+    get: () => preferencesStore.grid.visible,
+    set: (val: boolean) => preferencesStore.grid.visible = val
+});
 const snapToGrid = ref(false);
 
 const updateGizmoSnap = (val: boolean) => {
@@ -189,6 +196,10 @@ const onWheel = (e: WheelEvent) => {
 watch(zoom, () => {
     updateView();
 });
+
+watch(() => preferencesStore.grid, () => {
+    updateView();
+}, { deep: true });
 
 // ... imports
 import { useTilemapStore } from '../stores/useTilemapStore';
@@ -394,7 +405,7 @@ const updateView = () => {
     if (sceneGrid) {
         if (showGrid.value) {
             sceneGrid.gridGraphics.visible = true; // Ensure visible
-            sceneGrid.draw(cameraX.value, cameraY.value, zoom.value);
+            sceneGrid.draw(cameraX.value, cameraY.value, zoom.value, preferencesStore.grid);
         } else {
              sceneGrid.gridGraphics.visible = false;
         }

@@ -79,7 +79,7 @@ export class WebFileSystem implements IFileSystem {
              if (existingProjects.includes(name)) {
                  return name; // Found! Open it.
              } else {
-                 await ui.alert({
+                 await ui.confirm({
                      title: 'Project Not Found',
                      message: `Project "${name}" does not exist.`
                  });
@@ -109,25 +109,41 @@ export class WebFileSystem implements IFileSystem {
             await fs.promises.mkdir(`${projectPath}/assets/imported`, { recursive: true });
 
             // 2. Load Default Assets
-            const defaultAssets = import.meta.glob('../resources/default_assets/*.*', { query: '?url', import: 'default', eager: true });
+            // Use recursive glob to capture subfolders (e.g. player/)
+            const defaultAssets = import.meta.glob('../resources/default_assets/**/*.*', { query: '?url', import: 'default', eager: true });
             
             console.log('[WebFileSystem] Default Assets Object:', defaultAssets);
 
             for (const [key, url] of Object.entries(defaultAssets)) {
-                const fileName = key.split('/').pop();
-                if (!fileName) continue;
+                // Key is like "../resources/default_assets/player/sprite.png"
+                // Extract relative part: "player/sprite.png"
+                const relativePath = key.replace(/^\.\.\/resources\/default_assets\//, '');
                 
-                console.log(`[WebFileSystem] Processing asset: ${fileName} -> ${url}`);
+                if (!relativePath) continue;
+                
+                console.log(`[WebFileSystem] Processing asset: ${relativePath} -> ${url}`);
 
                 try {
                     const response = await fetch(url as string);
                     if (!response.ok) throw new Error(`Fetch failed ${response.status}`);
                     const blob = await response.blob();
                     const buffer = await blob.arrayBuffer();
-                    await fs.promises.writeFile(`${projectPath}/assets/${fileName}`, new Uint8Array(buffer));
-                    console.log(`[WebFileSystem] Wrote ${fileName} to assets`);
+                    
+                    // Determine dest path inside project
+                    const destPath = `${projectPath}/assets/${relativePath}`;
+                    
+                    // Ensure directory exists
+                    const parts = relativePath.split('/');
+                    parts.pop(); // Remove filename
+                    if (parts.length > 0) {
+                        const subDir = parts.join('/');
+                        await fs.promises.mkdir(`${projectPath}/assets/${subDir}`, { recursive: true });
+                    }
+
+                    await fs.promises.writeFile(destPath, new Uint8Array(buffer));
+                    console.log(`[WebFileSystem] Wrote ${relativePath} to assets`);
                 } catch (e) {
-                    console.error(`[WebFileSystem] Failed to load asset ${fileName}`, e);
+                    console.error(`[WebFileSystem] Failed to load asset ${relativePath}`, e);
                 }
             }
 

@@ -74,8 +74,8 @@ export const useEditorStore = defineStore('editor', () => {
     const zoomLevel = ref(1);
     
     const setZoom = (value: number) => {
-        // Clamp between 0.1 and 5
-        zoomLevel.value = Math.max(0.1, Math.min(value, 5));
+        // Clamp between 0.1 and 10
+        zoomLevel.value = Math.max(0.1, Math.min(value, 10));
     };
 
     const zoomIn = () => setZoom(zoomLevel.value + 0.1);

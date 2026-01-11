@@ -110,28 +110,7 @@ onMounted(() => {
         } as any);
     }
 
-    // Add Tilemap Settings Floating Group
-    if (!api.getPanel('tilemap-settings')) {
-         try {
-             // Create the panel first internally handled by 'addView' or just 'addFloatingGroup' with full descriptor?
-             // Dockview addFloatingGroup takes 'igroup' options.
-             api.addFloatingGroup({
-                 height: 400,
-                 width: 300,
-                 x: 100,
-                 y: 200,
-                 data: {
-                     views: [{
-                         id: 'tilemap-settings',
-                         component: 'tilemap-settings',
-                         title: 'Tilemap Settings'
-                     }]
-                 }
-             } as any);
-         } catch(e) {
-             console.warn('Floating group creation failed', e);
-         }
-    }
+    // Floating Group Removed (Caused Error)
 
     // Auto-save layout on change
     api.onDidLayoutChange(() => {

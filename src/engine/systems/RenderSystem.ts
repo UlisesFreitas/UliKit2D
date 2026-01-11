@@ -49,9 +49,8 @@ export class RenderSystem {
                 // Add Background if needed
                 if (layer.color) {
                      const bg = new Graphics();
-                     bg.beginFill(layer.color);
-                     bg.drawRect(-10000, -10000, 20000, 20000); 
-                     bg.endFill();
+                     bg.rect(-10000, -10000, 20000, 20000);
+                     bg.fill({ color: layer.color });
                      container.addChildAt(bg, 0); // Always at bottom
                      this.layerBackgrounds.set(layer.id, bg);
                 }
@@ -73,9 +72,8 @@ export class RenderSystem {
                  const bg = this.layerBackgrounds.get(layer.id);
                  if (bg) {
                      bg.clear();
-                     bg.beginFill(layer.color);
-                     bg.drawRect(-10000, -10000, 20000, 20000);
-                     bg.endFill();
+                     bg.rect(-10000, -10000, 20000, 20000);
+                     bg.fill({ color: layer.color });
                  }
              }
 

@@ -11,6 +11,27 @@ const projectLocation = ref('');
 const isElectron = (window as any).electronAPI !== undefined;
 const ui = useUIStore();
 
+const PROJECT_NAMES = [
+    "Quantum Pulse", "Neon Forge", "Project Zenith", "Nexus Alpha", 
+    "Cyber Glyph", "Aether Core", "Titan Script", "Silver Edge", 
+    "Prism Flow", "Orion Peak", "Logic Gate", "Hyper Drive", 
+    "Void Sphere", "Pixel Storm", "Astro Code", "Vortex Mind", 
+    "Solar Flare", "Infinite Loop", "Iron Link", "Giga Bit", 
+    "Nova Spark", "Data Drift", "Omega Point", "Delta Shift", 
+    "Flux Capacitor", "Cobalt Blue", "Gravity Well", "Echo Shell", 
+    "Phantom Phase", "Shadow Mesh", "Sonic Boom", "Terra Form", 
+    "Plasma Grid", "Krypton Key", "Atomic Node", "Binary Star", 
+    "Cortex Hub", "Digital Zen", "Entity X", "Fusion Cell", 
+    "Glitch Mode", "Helix Rise", "Icarus Wing", "Jade Matrix"
+];
+
+const getRandomName = () => PROJECT_NAMES[Math.floor(Math.random() * PROJECT_NAMES.length)] || 'New Project';
+
+const goToCreate = () => {
+    projectName.value = getRandomName();
+    step.value = 'CREATE';
+};
+
 const selectLocation = async () => {
     const fs = getFileSystem();
     const result = await fs.selectFolder();
@@ -79,7 +100,7 @@ const onCreate = async () => {
                 <div v-if="step === 'HOME'" class="flex gap-8 max-w-4xl w-full justify-center animate-fade-in">
                     
                     <!-- New Project Card -->
-                    <button @click="step = 'CREATE'" 
+                    <button @click="goToCreate" 
                         class="group flex flex-col items-center justify-center w-64 h-64 bg-bg-panel border border-border rounded-xl hover:border-accent hover:bg-bg-hover transition-all duration-200 shadow-lg hover:shadow-accent/20">
                         <div class="w-16 h-16 rounded-full bg-accent/10 flex items-center justify-center mb-4 group-hover:bg-accent/20 transition">
                             <span class="text-3xl text-accent">+</span>
@@ -111,7 +132,7 @@ const onCreate = async () => {
                         <!-- Project Name -->
                         <div>
                             <label class="block text-sm font-medium text-text-secondary mb-2">Project Name</label>
-                            <input v-model="projectName" type="text" placeholder="MyAwesomeGame" autfocus
+                            <input v-model="projectName" type="text" placeholder="MyAwesomeGame" autofocus
                                 class="w-full bg-bg-input border border-border rounded px-3 py-2 text-text-primary focus:border-accent outline-none transition" />
                         </div>
 
