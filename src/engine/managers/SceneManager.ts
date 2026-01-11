@@ -12,6 +12,7 @@ export interface SceneLayer {
     tileData?: Record<string, number>; // Sparse map "x,y" -> tileId
     tileset?: string; // Path/URL to texture
     gridSize?: { x: number, y: number };
+    isCollision?: boolean; // Defines if this layer generates physics bodies
 
     // Runtime Registry (Not serialized directly, rebuilt on load)
     _entityIds?: Set<string>; 

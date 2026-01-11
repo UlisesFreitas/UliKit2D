@@ -19,6 +19,7 @@ import { EditorTilemapSystem } from '../systems/EditorTilemapSystem'; // Static 
 const container = ref<HTMLElement | null>(null);
 let gizmoManager: GizmoManager;
 let tilemapSystem: EditorTilemapSystem; // Add this
+let resizeObserver: ResizeObserver;
 
 onMounted(async () => {
     if (container.value) {
@@ -47,6 +48,34 @@ onMounted(async () => {
         // Redraw on Resize
         engine.app.renderer.on('resize', () => {
              grid.draw();
+        });
+
+        // Handle Entity Clicks (Selection)
+        engine.renderSystem.onEntityClicked = (id: string) => {
+            // Priority: If painting, ignore selection
+            if (isTilemapMode.value) return; 
+
+            // Otherwise, select
+            store.selectEntity(id);
+        };
+
+        // Handle Resizing
+        resizeObserver = new ResizeObserver(() => engine.app?.resize());
+        resizeObserver.observe(container.value);
+
+        // Highlight Graphics
+        const { Graphics, Rectangle } = await import('pixi.js');
+        highlightGraphics.value = new Graphics();
+        highlightGraphics.value.zIndex = 9999; // Top
+        engine.app.stage.addChild(highlightGraphics.value);
+        
+        // Background Deselection Logic
+        engine.app.stage.eventMode = 'static';
+        engine.app.stage.hitArea = new Rectangle(-100000, -100000, 200000, 200000);
+        engine.app.stage.on('pointerdown', (e) => {
+             if (e.button === 0 && !isTilemapMode.value) {
+                  store.selectEntity(null);
+             }
         });
         
         // ...
@@ -87,6 +116,7 @@ onMounted(async () => {
 
 
 onUnmounted(() => {
+    resizeObserver?.disconnect();
     if (gizmoManager) {
         gizmoManager.dispose();
     }
@@ -246,20 +276,7 @@ const onMouseDown = (e: MouseEvent) => {
 const highlightGraphics = ref<any>(null);
 const gridGraphics = ref<any>(null);
 
-onMounted(async () => {
-    // ... (existing init)
-    
-    // Highlight Graphics
-    const { Graphics } = await import('pixi.js');
-    highlightGraphics.value = new Graphics();
-    highlightGraphics.value.zIndex = 9999; // Top
-    engine.app.stage.addChild(highlightGraphics.value);
 
-    // Grid Graphics
-    gridGraphics.value = new Graphics();
-    gridGraphics.value.zIndex = -1; // Below everything
-    engine.app.stage.addChild(gridGraphics.value);
-});
 
 const drawGrid = () => {
     if (!gridGraphics.value) return;

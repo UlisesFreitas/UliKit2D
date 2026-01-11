@@ -1,6 +1,6 @@
-
 import Matter from 'matter-js';
 import { world } from '../ecs/ECS';
+import { SceneManager } from '../managers/SceneManager';
 
 export class PhysicsSystem {
     public engine: Matter.Engine;
@@ -17,16 +17,63 @@ export class PhysicsSystem {
         });
     }
 
-    public update(deltaTime: number) {
-        // Matter.js uses a fixed timestep usually, but for now we can update it with delta
-        // Note: Matter.Runner.tick or Engine.update can be used.
-        // We use Engine.update with a correction for different framerates if needed.
-        Matter.Engine.update(this.engine, deltaTime);
+    private tileBodies: Map<string, Matter.Body> = new Map();
 
+    public update(deltaTime: number) {
+        Matter.Engine.update(this.engine, deltaTime);
         this.syncBodies();
+        this.syncTilemapBodies();
+    }
+
+    private syncTilemapBodies() {
+        // Find collision layers (Flexible Tag System)
+        const collisionLayers = SceneManager.layers.filter(l => l.isCollision && l.visible !== false);
+        
+        // Track current valid keys to identify removals
+        const validKeys = new Set<string>();
+
+        for (const layer of collisionLayers) {
+             if (!layer.tileData) continue;
+             
+             const gw = layer.gridSize?.x || 16;
+             const gh = layer.gridSize?.y || 16;
+
+             for (const posKey of Object.keys(layer.tileData)) {
+                 const uniqueKey = `${layer.id}:${posKey}`;
+                 validKeys.add(uniqueKey);
+
+                 if (!this.tileBodies.has(uniqueKey)) {
+                     // Create Body
+                     const parts = posKey.split(',');
+                     const gx = Number(parts[0]);
+                     const gy = Number(parts[1]);
+                     
+                     // Matter.js body origin is center
+                     const x = gx * gw + (gw / 2);
+                     const y = gy * gh + (gh / 2);
+                     
+                     const body = Matter.Bodies.rectangle(x, y, gw, gh, {
+                         isStatic: true,
+                         label: 'TileWall'
+                     });
+                     
+                     Matter.World.add(this.engine.world, body);
+                     this.tileBodies.set(uniqueKey, body);
+                 }
+             }
+        }
+
+        // Cleanup removed tiles (only checking keys in our map)
+        for (const [key, body] of this.tileBodies.entries()) {
+            if (!validKeys.has(key)) {
+                Matter.World.remove(this.engine.world, body);
+                this.tileBodies.delete(key);
+            }
+        }
     }
 
     private syncBodies() {
+        // ... (existing) ...
         // 1. Initialize bodies for new entities (Box or Circle)
         const entitiesWithBody = world.with('transform', 'rigidBody');
         

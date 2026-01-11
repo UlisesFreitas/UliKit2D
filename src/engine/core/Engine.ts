@@ -1,4 +1,5 @@
 import { PhysicsSystem } from '../physics/PhysicsSystem';
+import { PhysicsDebugSystem } from '../systems/PhysicsDebugSystem';
 import { ScriptSystem } from '../scripting/ScriptSystem';
 import { AudioSystem } from '../audio/AudioSystem';
 import { AnimationSystem } from '../systems/AnimationSystem';
@@ -18,6 +19,7 @@ export class Engine {
     private animationSystem: AnimationSystem;
     public renderSystem: RenderSystem;
     public editorDebugSystem: EditorDebugSystem;
+    public physicsDebugSystem: PhysicsDebugSystem;
 
     public onUpdate: ((deltaTime: number) => void) | null = null;
     public onRender: (() => void) | null = null;
@@ -33,6 +35,7 @@ export class Engine {
         // Actually app is created in constructor, so we can pass it.
         this.renderSystem = new RenderSystem(this.app);
         this.editorDebugSystem = new EditorDebugSystem(this.app);
+        this.physicsDebugSystem = new PhysicsDebugSystem(this.app);
     }
 
     public async init(container: HTMLElement) {
@@ -94,6 +97,7 @@ export class Engine {
 
         // Render Update (Syncs ECS to Pixi)
         this.renderSystem.update();
+        this.physicsDebugSystem.update();
         if (this.editorDebugSystem) {
              this.editorDebugSystem.update();
         }

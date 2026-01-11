@@ -51,11 +51,38 @@ Refactor `EditorTilemapSystem.ts`:
     -   Call `chunk.rebuild()`.
     -   Culling: Hide chunks outside `camera` bounds (optional, Pixi handles generic culling well if bounds are set).
 
-## Phase 4: Collision Optimization (Spatial Hash)
+## Phase 4: Collision Optimization (Spatial Hash) [DONE]
 
 (Optional but recommended for performance)
 -   Do not iterate all 10,000 tiles for physics.
 -   Only generate bodies for tiles near the player (or use a Spatial Hash grid).
+
+## Phase 5: Tile Selection & Interaction (Sprite-like Behavior)
+
+Allow users to select individual tiles when **NOT** in Paint Mode, viewing their properties in the Inspector as if they were Entities.
+
+### Goals
+-   **Selection**: Click on a tile -> Highlight it.
+-   **Inspector**: Show Tile Coordinates (X, Y) and ID.
+-   **Editing**: Allow changing Tile ID or deleting via Inspector/Keyboard.
+
+### Implementation Strategy
+1.  **Store Update**:
+    -   Add `selectedTile: { x: number, y: number, layerId: string } | null` to `useEditorStore`.
+    -   Clear `selectedEntityId` when a tile is selected (and vice versa).
+
+2.  **ScenePanel Interaction**:
+    -   In `onMouseDown`, if no Entity is clicked and `!isTilemapMode`:
+    -   Calculate Grid Coords (gx, gy).
+    -   Check if a tile exists at (gx, gy) on the Active Layer.
+    -   If yes, `store.selectTile({ x: gx, y: gy, layerId: activeLayer.id })`.
+
+3.  **Visual Feedback**:
+    -   Draw a Cyan/Yellow border around the `selectedTile` in `ScenePanel` (similar to highligher).
+
+4.  **Inspector Support**:
+    -   Update `InspectorPanel.vue` to check `store.selectedTile`.
+    -   If set, render a generic "Tile Inspector" (Position, ID, Delete Button).
 
 ## Execution Steps
 

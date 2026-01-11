@@ -106,8 +106,18 @@
                 <svg v-else xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-text-disabled"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path><line x1="1" y1="1" x2="23" y2="23"></line></svg>
             </button>
 
+             <!-- Collision Toggle -->
+             <button 
+                class="p-1 hover:text-accent-color focus:outline-none"
+                @click.stop="toggleCollision(layer)"
+                :title="layer.isCollision ? 'Disable Physics' : 'Enable Physics'"
+             >
+                <svg v-if="layer.isCollision" xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-accent-warning"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
+                <svg v-else xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-text-disabled opacity-50"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
+             </button>
+
              <!-- Lock Toggle (Hidden for Base Layer) -->
-            <button 
+             <button 
                 v-if="layer.id !== 'Base Layer'"
                 class="p-1 hover:text-accent-color focus:outline-none"
                  @click.stop="toggleLock(layer)"
@@ -214,6 +224,11 @@ const toggleVisibility = (layer: SceneLayer) => {
 
 const toggleLock = (layer: SceneLayer) => {
     layer.locked = !layer.locked;
+    SceneManager.setDirty(true);
+};
+
+const toggleCollision = (layer: SceneLayer) => {
+    layer.isCollision = !layer.isCollision;
     SceneManager.setDirty(true);
 };
 

@@ -1,4 +1,5 @@
-import { Application, Sprite, Texture, Text, BitmapText, FederatedPointerEvent, NineSliceSprite, Container, Graphics } from 'pixi.js';
+import { Application, Sprite, Texture, Text, BitmapText, FederatedPointerEvent, NineSliceSprite, Container, Graphics, Rectangle } from 'pixi.js';
+
 import { world } from '../ecs/ECS';
 import { resourceManager } from '../resources/ResourceManager';
 import { SceneManager } from '../managers/SceneManager';
@@ -121,7 +122,9 @@ export class RenderSystem {
 
             // Iterate Data
             for (const [coord, tileId] of Object.entries(layer.tileData)) {
-                const [gx, gy] = coord.split(',').map(Number);
+                const parts = coord.split(',');
+                const gx = Number(parts[0]);
+                const gy = Number(parts[1]);
                 const tileIndex = Number(tileId);
 
                 activeCoords.add(coord);
@@ -144,7 +147,7 @@ export class RenderSystem {
                     // We clone the texture with a specific frame
                      const tileTex = new Texture({
                          source: baseTexture.source,
-                         frame: { x: tx, y: ty, width: gridSize.x, height: gridSize.y }
+                         frame: new Rectangle(tx, ty, gridSize.x, gridSize.y)
                      });
                      
                      sprite = new Sprite(tileTex);
@@ -159,7 +162,7 @@ export class RenderSystem {
                     if ((sprite as any)._tileId !== tileIndex) {
                         sprite.texture = new Texture({
                             source: baseTexture.source,
-                            frame: { x: tx, y: ty, width: gridSize.x, height: gridSize.y }
+                            frame: new Rectangle(tx, ty, gridSize.x, gridSize.y)
                         });
                         (sprite as any)._tileId = tileIndex;
                     }
@@ -378,7 +381,9 @@ export class RenderSystem {
         if (sprite.zIndex !== (entity.transform.zIndex || 0)) {
             sprite.zIndex = entity.transform.zIndex || 0;
         }
-        sprite.scale.set(entity.transform.scale.x, entity.transform.scale.y);
+        const sx = entity.transform.scale?.x ?? 1;
+        const sy = entity.transform.scale?.y ?? 1;
+        sprite.scale.set(sx, sy);
 
         // Sync Visibility
         sprite.visible = entity.visible !== false;

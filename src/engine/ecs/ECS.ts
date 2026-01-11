@@ -25,6 +25,7 @@ export type Entity = {
       friction: number;
       restitution: number; // Bounciness
   };
+  physicsBody?: any; // Runtime Matter body
   boxCollider?: {
       width: number;
       height: number;
@@ -86,9 +87,6 @@ export type Entity = {
           speed?: number;
       }>;
   };
-
-  // Runtime only
-  physicsBody?: any; // Matter.js body declaration
 };
 
 // Create the unified world
