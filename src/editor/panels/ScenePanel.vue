@@ -22,6 +22,7 @@ let tilemapSystem: EditorTilemapSystem; // Add this
 
 onMounted(async () => {
     if (container.value) {
+        (window as any).engine = engine; // Expose for debug
         await engine.init(container.value);
         engine.start();
         
@@ -243,6 +244,7 @@ const onMouseDown = (e: MouseEvent) => {
 
 // ...
 const highlightGraphics = ref<any>(null);
+const gridGraphics = ref<any>(null);
 
 onMounted(async () => {
     // ... (existing init)
@@ -252,8 +254,35 @@ onMounted(async () => {
     highlightGraphics.value = new Graphics();
     highlightGraphics.value.zIndex = 9999; // Top
     engine.app.stage.addChild(highlightGraphics.value);
+
+    // Grid Graphics
+    gridGraphics.value = new Graphics();
+    gridGraphics.value.zIndex = -1; // Below everything
+    engine.app.stage.addChild(gridGraphics.value);
 });
 
+const drawGrid = () => {
+    if (!gridGraphics.value) return;
+
+    const graphics = gridGraphics.value;
+    graphics.clear();
+    
+    // Pixi v8: Build path then stroke
+    const w = 2000;
+    const h = 2000;
+    const step = 32;
+
+    for (let x = 0; x <= w; x += step) {
+        graphics.moveTo(x, 0);
+        graphics.lineTo(x, h);
+    }
+    for (let y = 0; y <= h; y += step) {
+        graphics.moveTo(0, y);
+        graphics.lineTo(w, y);
+    }
+    
+    graphics.stroke({ width: 1, color: 0x333333, alpha: 0.5 });
+};
 
 const updateHighlight = (screenX: number, screenY: number) => {
     if (!highlightGraphics.value || !isTilemapMode.value || !activeLayer.value) {
@@ -281,14 +310,24 @@ const updateHighlight = (screenX: number, screenY: number) => {
     const g = highlightGraphics.value;
     g.clear();
     
-    g.lineStyle(2, color, 0.8);
-    g.beginFill(color, 0.2);
-    g.drawRect(tx, ty, gridSize.x, gridSize.y);
-    g.endFill();
+    // Pixi v8 API
+    g.rect(tx, ty, gridSize.x, gridSize.y);
+    g.fill({ color: color, alpha: 0.2 });
+    g.stroke({ width: 2, color: color, alpha: 1 });
 };
 
 const onMouseMove = (e: MouseEvent) => {
-    const rect = engine.app?.canvas?.getBoundingClientRect() ?? container.value?.getBoundingClientRect();
+    let rect: DOMRect | undefined;
+    try {
+        rect = engine.app?.canvas?.getBoundingClientRect();
+    } catch (e) {
+        // Pixi getter might throw if not ready
+    }
+
+    // Fallback
+    if (!rect) {
+        rect = container.value?.getBoundingClientRect();
+    }
 
     if (rect) {
         updateHighlight(e.clientX - rect.left, e.clientY - rect.top);

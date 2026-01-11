@@ -92,11 +92,12 @@
     {
       "id": "9",
       "name": "Scene Tools",
-      "status": "completed",
-      "tasks": [
-        "Grid Rendering",
-        "Snap to Grid",
-        "Rotate/Scale Gizmos"
+      "status": "complete",
+      "description": "Refactor Tilemap to use Chunk-based Mesh rendering.",
+      "implementation_steps": [
+        "Create TilemapChunk class",
+        "Integrate with EditorTilemapSystem",
+        "Debug Rendering"
       ]
     },
     {

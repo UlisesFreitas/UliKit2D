@@ -1,12 +1,19 @@
 
-import { Application, Container, Sprite, Rectangle, Texture } from 'pixi.js';
+import { Application, Container, Texture } from 'pixi.js';
 import { SceneManager } from '../../engine/managers/SceneManager';
 import { resourceManager } from '../../engine/resources/ResourceManager';
+import { TilemapChunk } from './tilemap/TilemapChunk';
 
 export class EditorTilemapSystem {
     private app: Application;
     private rootContainer: Container;
-    private layerContainers: Map<string, Container> = new Map();
+    
+    // LayerId -> Root Container
+    private layerRoots: Map<string, Container> = new Map();
+    
+    // LayerId -> ChunkKey -> Chunk
+    private layerChunks: Map<string, Map<string, TilemapChunk>> = new Map();
+    
     private textureCache: Map<string, Texture> = new Map();
     
     // Dirty flag mapping layerId -> boolean
@@ -15,9 +22,11 @@ export class EditorTilemapSystem {
 
     constructor(app: Application) {
         this.app = app;
+        // Ensure Z-Sorting is enabled so layers stack correctly
+        this.app.stage.sortableChildren = true;
         this.rootContainer = new Container();
         this.rootContainer.label = 'TilemapSystemRoot';
-        this.rootContainer.zIndex = -1; 
+        this.rootContainer.zIndex = 1; 
         
         this.app.stage.addChild(this.rootContainer);
     }
@@ -50,11 +59,11 @@ export class EditorTilemapSystem {
         this.rootContainer.removeChildren();
         
         for (const layer of SceneManager.layers) {
-            let container = this.layerContainers.get(layer.id);
+            let container = this.layerRoots.get(layer.id);
             if (!container) {
                 container = new Container();
                 container.label = `TilemapLayer-${layer.name}`;
-                this.layerContainers.set(layer.id, container);
+                this.layerRoots.set(layer.id, container);
             }
             this.rootContainer.addChild(container);
         }
@@ -62,15 +71,29 @@ export class EditorTilemapSystem {
 
     private async renderLayer(layerId: string) {
         const layer = SceneManager.getLayerById(layerId);
-        const container = this.layerContainers.get(layerId);
-        
-        if (!layer || !container) return;
+        if (!layer) return;
 
-        // Clear current Loop
-        container.removeChildren();
+        // Ensure Root Container Exists
+        let layerRoot = this.layerRoots.get(layerId);
+        if (!layerRoot) {
+            layerRoot = new Container();
+            layerRoot.label = `TilemapLayer-${layer.name}`;
+            this.layerRoots.set(layerId, layerRoot);
+            this.rebuildLayerOrder(); // Force re-add
+        }
 
-        // Check if it has data
-        if (!layer.tileData || Object.keys(layer.tileData).length === 0 || !layer.tileset) {
+        // Ensure Chunks Map Exists
+        // Ensure Chunks Map Exists
+        let chunks = this.layerChunks.get(layerId);
+        if (!chunks) {
+            chunks = new Map<string, TilemapChunk>();
+            this.layerChunks.set(layerId, chunks);
+        }
+
+        // Check data availability
+        if (!layer.tileset) {
+            layerRoot.removeChildren();
+            chunks.clear();
             return;
         }
         
@@ -92,53 +115,67 @@ export class EditorTilemapSystem {
         }
         
         if (!texture) return;
-
+        
         // Grid Size
-        const gw = layer.gridSize?.x || 32;
-        const gh = layer.gridSize?.y || 32;
+        const gw = layer.gridSize?.x || 8;
+        const gh = layer.gridSize?.y || 8;
 
-        // Draw Tiles
-        for (const [key, tileId] of Object.entries(layer.tileData)) {
-            const parts = key.split(',');
-            if (parts.length !== 2) continue;
-            
-            const gx = Number(parts[0]);
-            const gy = Number(parts[1]);
-            
-            // Calculate Source Rect
-            // Width in tiles?
-            const cols = Math.floor(texture.width / gw);
-            
-            const tx = (tileId % cols) * gw;
-            const ty = Math.floor(tileId / cols) * gh;
+        // Step 1: Reset existing chunks (prepare for rebuild)
+        // We do strictly sparse update from tileData
+        chunks.forEach(c => c.reset());
 
-            try {
-                // Create Frame
-                const frame = new Rectangle(tx, ty, gw, gh);
-                const tileTexture = new Texture({
-                    source: texture.source,
-                    frame: frame
-                });
-
-                const sprite = new Sprite(tileTexture);
-                sprite.x = gx * gw;
-                sprite.y = gy * gh;
-                // Avoid blurring
-                sprite.roundPixels = true; 
+        // Step 2: Populate Chunks
+        if (layer.tileData) {
+            for (const [key, tileId] of Object.entries(layer.tileData)) {
+                const parts = key.split(',');
+                if (parts.length !== 2) continue;
                 
-                container.addChild(sprite);
-            } catch (e) {
-                // Ignore invalid frames
+                const gx = Number(parts[0]);
+                const gy = Number(parts[1]);
+                
+                // Chunk logic (16x16)
+                const chunkSize = 16;
+                const cx = Math.floor(gx / chunkSize);
+                const cy = Math.floor(gy / chunkSize);
+                
+                const chunkKey = `${cx},${cy}`;
+                let chunk = chunks.get(chunkKey);
+                
+                if (!chunk) {
+                    chunk = new TilemapChunk(cx, cy, { x: gw, y: gh }, texture);
+                    chunks.set(chunkKey, chunk);
+                    layerRoot.addChild(chunk);
+                }
+                
+                // Local Coords in Chunk
+                // gx could be negative. cx*16 handles base.
+                // lx = gx - cx*16
+                const lx = gx - (cx * chunkSize);
+                const ly = gy - (cy * chunkSize);
+                
+                chunk.setTile(lx, ly, tileId);
+            }
+        }
+
+        // Step 3: Refresh or Cull
+        for (const [key, chunk] of chunks.entries()) {
+            if (chunk.isEmpty) {
+                chunk.destroy({ children: true }); // Pixi destroy
+                chunks.delete(key);
+                layerRoot.removeChild(chunk);
+            } else {
+                chunk.refresh();
             }
         }
         
         // Layer Visibility
-        container.visible = layer.visible !== false;
+        layerRoot.visible = layer.visible !== false;
     }
     
     public dispose() {
         this.rootContainer.destroy({ children: true });
-        this.layerContainers.clear();
+        this.layerRoots.clear();
+        this.layerChunks.clear();
         this.textureCache.clear();
     }
 }
