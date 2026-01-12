@@ -113,11 +113,27 @@ export class GizmoManager {
              h = 100 * this.selectedEntity.transform.scale.y;
         }
 
-        return { x, y, w, h, rotation: this.selectedEntity.transform.rotation };
+        // Apply Anchor Offset to find Geometric Center (visual center)
+        // If Sprite has custom anchor, 'x/y' is the Anchor Point.
+        // We need the center of the bounding box.
+        const anchor = this.selectedEntity.sprite?.anchor || { x: 0.5, y: 0.5 };
+        
+        // Offset from Anchor to Center
+        // e.g. Anchor 0 (Left) -> we need to move Right (+0.5 * w) to reach center
+        const dx = (0.5 - anchor.x) * w;
+        const dy = (0.5 - anchor.y) * h;
+        
+        const rot = this.selectedEntity.transform.rotation;
+        const cos = Math.cos(rot);
+        const sin = Math.sin(rot);
+        
+        const centerX = x + (dx * cos - dy * sin);
+        const centerY = y + (dx * sin + dy * cos);
+
+        return { x: centerX, y: centerY, w, h, rotation: rot };
     }
 
     private render() {
-        engine.app.stage.hitArea = engine.app.screen;
         this.gizmoGraphics.clear();
         
         const bounds = this.getBounds();
@@ -129,15 +145,12 @@ export class GizmoManager {
 
         this.gizmoGraphics.visible = true;
         const { x, y, w, h, rotation } = bounds;
-
-        // Apply rotation to gizmo container? No, easier to simple draw rotated
-        // Actually for correct hit testing and drawing, standard practice is to transform points.
-        // For simplicity, let's assume no rotation visualization on the box itself initially, 
-        // OR we use graphics Context to rotate.
         
-        // Let's rely on Pixi container transform if we wanted, but we are drawing into a single graphics.
-        // We will simple rotate the 'graphics' context for the box? No, that rotates everything.
-        // We will do manual point calculation for corners.
+        // Calculate Zoom-invariant Handle Size
+        const zoom = engine.app.stage.scale.x || 1;
+        const size = this.HANDLE_SIZE / zoom;
+        const strokeWidth = 2 / zoom;
+        const subStrokeWidth = 1 / zoom;
 
         const cos = Math.cos(rotation);
         const sin = Math.sin(rotation);
@@ -146,11 +159,6 @@ export class GizmoManager {
         const hh = h / 2;
 
         // Corners (Local to Center)
-        // NW: -hw, -hh
-        // NE: +hw, -hh
-        // SE: +hw, +hh
-        // SW: -hw, +hh
-        
         const corners = [
             { id: 'nw', lx: -hw, ly: -hh },
             { id: 'ne', lx: hw, ly: -hh },
@@ -171,46 +179,46 @@ export class GizmoManager {
             this.gizmoGraphics.lineTo(c3.x, c3.y);
             this.gizmoGraphics.lineTo(c0.x, c0.y);
         }
-        this.gizmoGraphics.stroke({ width: 2, color: 0xffff00 });
+        this.gizmoGraphics.stroke({ width: strokeWidth, color: 0xffff00 });
         // Use transparent fill to catch clicks for move
         this.gizmoGraphics.fill({ color: 0xffff00, alpha: 0.05 });
 
         // Draw Corners
         corners.forEach(c => {
-            const size = this.HANDLE_SIZE;
             const color = (this.hoverHandle === c.id || this.dragHandle === c.id) ? 0xffffff : 0xffff00;
             
             this.gizmoGraphics.rect(c.x - size/2, c.y - size/2, size, size);
             this.gizmoGraphics.fill({ color });
-            this.gizmoGraphics.stroke({ width: 1, color: 0x000000 });
+            this.gizmoGraphics.stroke({ width: subStrokeWidth, color: 0x000000 });
         });
 
-        // Rotation Handle (Top Right + Offset) note: usually Top Center, but user asked for "Right"?
-        // "handler that is a little point just to the right"
-        // Let's place it at Center + (Width/2 + Offset) rotated.
-        
-        const rotX = x + ((hw + this.ROTATE_OFFSET) * cos);
-        const rotY = y + ((hw + this.ROTATE_OFFSET) * sin);
+        // Rotation Handle (Top Right + Offset)
+        const offset = this.ROTATE_OFFSET / zoom;
+        const rotX = x + ((hw + offset) * cos);
+        const rotY = y + ((hw + offset) * sin);
         
         // Line to handle
-        // From right edge center: (hw, 0)
         const edgeX = x + (hw * cos);
         const edgeY = y + (hw * sin);
         
         this.gizmoGraphics.moveTo(edgeX, edgeY);
         this.gizmoGraphics.lineTo(rotX, rotY);
-        this.gizmoGraphics.stroke({ width: 1, color: 0xffff00 });
+        this.gizmoGraphics.stroke({ width: subStrokeWidth, color: 0xffff00 });
 
         // Circle
         const rotColor = (this.hoverHandle === 'rotate' || this.dragHandle === 'rotate') ? 0xffffff : 0xffff00;
-        this.gizmoGraphics.circle(rotX, rotY, 6);
+        this.gizmoGraphics.circle(rotX, rotY, size / 2);
         this.gizmoGraphics.fill({ color: rotColor });
-        this.gizmoGraphics.stroke({ width: 1, color: 0x000000 });
+        this.gizmoGraphics.stroke({ width: subStrokeWidth, color: 0x000000 });
     }
 
     private getHitHandle(gx: number, gy: number): HandleType {
         const bounds = this.getBounds();
         if (!bounds) return null;
+
+        const zoom = engine.app.stage.scale.x || 1;
+        const handleSize = this.HANDLE_SIZE / zoom;
+        const rotateOffset = this.ROTATE_OFFSET / zoom;
 
         const { x, y, w, h, rotation } = bounds;
         const cos = Math.cos(rotation);
@@ -223,9 +231,9 @@ export class GizmoManager {
         };
 
         // Check Rotate Handle
-        const rotX = x + ((hw + this.ROTATE_OFFSET) * cos);
-        const rotY = y + ((hw + this.ROTATE_OFFSET) * sin);
-        if (dist(gx, gy, rotX, rotY) < 10) return 'rotate';
+        const rotX = x + ((hw + rotateOffset) * cos);
+        const rotY = y + ((hw + rotateOffset) * sin);
+        if (dist(gx, gy, rotX, rotY) < handleSize) return 'rotate';
 
         // Check Corners
         // We have to reuse corner logic
@@ -241,7 +249,7 @@ export class GizmoManager {
         }));
 
         for (const c of corners) {
-            if (dist(gx, gy, c.x, c.y) < this.HANDLE_SIZE) {
+            if (dist(gx, gy, c.x, c.y) < handleSize) {
                 return c.id as HandleType;
             }
         }

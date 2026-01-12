@@ -31,6 +31,20 @@ const stopAnimation = () => {
     }
 }
 
+const updateAnchor = (axis: 'x'|'y', val: number) => {
+    if (!props.sprite.anchor) props.sprite.anchor = { x: 0.5, y: 0.5 };
+    props.sprite.anchor[axis] = val;
+    onUpdate();
+};
+
+const applyPreset = (val: string) => {
+    const [x, y] = val.split(',').map(Number);
+    if (!props.sprite.anchor) props.sprite.anchor = { x: 0.5, y: 0.5 };
+    props.sprite.anchor.x = x;
+    props.sprite.anchor.y = y;
+    onUpdate();
+};
+
 const onSelectAsset = (path: string) => {
     // 1. Mutate
     // Normalize path to forward slashes
@@ -125,6 +139,7 @@ onMounted(async () => {
                     v-if="thumbnailUrl" 
                     :src="thumbnailUrl" 
                     class="w-full h-full object-contain"
+                    style="image-rendering: pixelated"
                     @error="(e) => console.error('[SpriteEditor] Image load failed:', thumbnailUrl, e)"
                     @load="() => console.log('[SpriteEditor] Image loaded successfully:', thumbnailUrl)"
                 />
@@ -171,6 +186,53 @@ onMounted(async () => {
                          <div class="w-full h-5 rounded border border-border flex items-center px-2 text-xs font-mono bg-bg-input" :style="{ backgroundColor: '#' + ((sprite.tint || 0xFFFFFF).toString(16).padStart(6, '0')) }">
                             #{{ (sprite.tint || 0xFFFFFF).toString(16).toUpperCase().padStart(6, '0') }}
                          </div>
+                    </div>
+                 </div>
+
+                 <!-- Anchor -->
+                 <div class="flex flex-col gap-1 mt-1 border-t border-border pt-2">
+                    <div class="flex items-center justify-between">
+                         <label class="text-xs text-text-secondary">Anchor / Pivot</label>
+                         <select 
+                             class="bg-bg-input border border-border rounded text-[10px] text-text-primary px-1 py-0.5"
+                             @change="(e:any) => applyPreset(e.target.value)"
+                         >
+                            <option value="" disabled selected>Presets</option>
+                            <option value="0.5,0.5">Center</option>
+                            <option value="0,0">Top Left</option>
+                            <option value="0.5,0">Top Center</option>
+                            <option value="1,0">Top Right</option>
+                            <option value="0,0.5">Left</option>
+                            <option value="1,0.5">Right</option>
+                            <option value="0,1">Bottom Left</option>
+                            <option value="0.5,1">Bottom Center</option>
+                            <option value="1,1">Bottom Right</option>
+                         </select>
+                    </div>
+                    
+                    <div class="flex gap-2">
+                         <!-- X -->
+                        <div class="flex items-center gap-1 flex-1">
+                            <span class="text-[10px] text-text-disabled font-bold text-red-400">X</span>
+                            <input 
+                                type="number" 
+                                step="0.1"
+                                class="w-full bg-bg-input border border-border rounded px-1 text-xs text-text-primary"
+                                :value="sprite.anchor?.x ?? 0.5"
+                                @input="(e:any) => updateAnchor('x', parseFloat(e.target.value))"
+                            />
+                        </div>
+                        <!-- Y -->
+                        <div class="flex items-center gap-1 flex-1">
+                            <span class="text-[10px] text-text-disabled font-bold text-green-400">Y</span>
+                             <input 
+                                type="number" 
+                                step="0.1"
+                                class="w-full bg-bg-input border border-border rounded px-1 text-xs text-text-primary"
+                                :value="sprite.anchor?.y ?? 0.5"
+                                @input="(e:any) => updateAnchor('y', parseFloat(e.target.value))"
+                            />
+                        </div>
                     </div>
                  </div>
             </div>

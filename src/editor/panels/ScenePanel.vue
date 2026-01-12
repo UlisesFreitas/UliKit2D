@@ -183,13 +183,39 @@ const updateGizmoSnap = (val: boolean) => {
 
 const onWheel = (e: WheelEvent) => {
     e.preventDefault();
-    const zoomFactor = 0.1;
     const direction = e.deltaY > 0 ? -1 : 1;
-    let newZoom = zoom.value + (direction * zoomFactor);
-    newZoom = Math.round(newZoom * 10) / 10;
     
-    zoom.value = newZoom; // This triggers store update
-    // updateView() will be triggered by watch
+    // Dynamic Zoom Factor
+    const zoomFactor = Math.max(0.1, zoom.value * 0.1);
+    
+    // Limits
+    const minZoom = 0.1;
+    const maxZoom = 15.0; 
+    
+    const prevZoom = zoom.value;
+    let newZoom = prevZoom + (direction * zoomFactor);
+    newZoom = Math.max(minZoom, Math.min(maxZoom, Math.round(newZoom * 10) / 10));
+
+    if (newZoom === prevZoom) return;
+
+    if (container.value) {
+        const rect = container.value.getBoundingClientRect();
+        const mouseX = e.clientX - rect.left;
+        const mouseY = e.clientY - rect.top;
+
+        // Current World Pos
+        const worldX = (mouseX - cameraX.value) / prevZoom;
+        const worldY = (mouseY - cameraY.value) / prevZoom;
+
+        // Apply new zoom
+        zoom.value = newZoom;
+
+        // Adjust Camera to keep Mouse over same World Pos
+        cameraX.value = mouseX - (worldX * newZoom);
+        cameraY.value = mouseY - (worldY * newZoom);
+    } else {
+        zoom.value = newZoom;
+    }
 };
 
 // Watch zoom changes to update view

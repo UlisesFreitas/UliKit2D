@@ -185,6 +185,7 @@ const importAssets = async () => {
                               v-if="type === 'image' || asset.name.endsWith('.png') || asset.name.endsWith('.jpg')"
                               :src="thumbnails[asset.path]" 
                               class="w-full h-full object-contain"
+                              style="image-rendering: pixelated"
                           />
                            <span v-else class="text-2xl opacity-50">📄</span>
                       </div>

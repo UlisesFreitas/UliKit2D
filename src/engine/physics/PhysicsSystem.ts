@@ -72,21 +72,47 @@ export class PhysicsSystem {
         }
     }
 
+    private getBodyOffset(entity: any, w: number, h: number, rotation: number) {
+        const anchor = entity.sprite?.anchor || { x: 0.5, y: 0.5 };
+        const dx = (0.5 - anchor.x) * w;
+        const dy = (0.5 - anchor.y) * h;
+        
+        const cos = Math.cos(rotation);
+        const sin = Math.sin(rotation);
+        
+        return {
+            x: dx * cos - dy * sin,
+            y: dx * sin + dy * cos
+        };
+    }
+
     private syncBodies() {
-        // ... (existing) ...
         // 1. Initialize bodies for new entities (Box or Circle)
         const entitiesWithBody = world.with('transform', 'rigidBody');
         
         for (const entity of entitiesWithBody) {
+            let w = 0, h = 0;
+            if (entity.boxCollider) { 
+                w = entity.boxCollider.width; 
+                h = entity.boxCollider.height; 
+            } else if (entity.circleCollider) { 
+                w = entity.circleCollider.radius * 2; 
+                h = w; 
+            }
+
             if (!entity.physicsBody) {
                 const { x, y, rotation } = entity.transform;
                 const { isStatic, friction, restitution } = entity.rigidBody;
                 
+                // Calculate Offset Position
+                const offset = this.getBodyOffset(entity, w, h, rotation);
+                const bx = x + offset.x;
+                const by = y + offset.y;
+
                 let body: Matter.Body | null = null;
 
                 if (entity.boxCollider) {
-                    const { width, height } = entity.boxCollider;
-                    body = Matter.Bodies.rectangle(x, y, width, height, {
+                    body = Matter.Bodies.rectangle(bx, by, w, h, {
                         isStatic,
                         angle: rotation,
                         friction,
@@ -94,7 +120,7 @@ export class PhysicsSystem {
                     });
                 } else if (entity.circleCollider) {
                      const { radius } = entity.circleCollider;
-                     body = Matter.Bodies.circle(x, y, radius, {
+                     body = Matter.Bodies.circle(bx, by, radius, {
                         isStatic,
                         angle: rotation,
                         friction,
@@ -109,13 +135,20 @@ export class PhysicsSystem {
             } else {
                 // 2. Sync Physics -> ECS (for dynamic bodies)
                 if (!entity.rigidBody.isStatic) {
-                   entity.transform.x = entity.physicsBody.position.x;
-                   entity.transform.y = entity.physicsBody.position.y;
-                   entity.transform.rotation = entity.physicsBody.angle;
+                   const rotation = entity.physicsBody.angle;
+                   // Calculate reverse offset based on NEW rotation
+                   const offset = this.getBodyOffset(entity, w, h, rotation);
+
+                   entity.transform.x = entity.physicsBody.position.x - offset.x;
+                   entity.transform.y = entity.physicsBody.position.y - offset.y;
+                   entity.transform.rotation = rotation;
                 } else {
                     // 3. Sync ECS -> Physics (for static bodies moved in editor)
-                    Matter.Body.setPosition(entity.physicsBody, { x: entity.transform.x, y: entity.transform.y });
-                    Matter.Body.setAngle(entity.physicsBody, entity.transform.rotation);
+                    const { x, y, rotation } = entity.transform;
+                    const offset = this.getBodyOffset(entity, w, h, rotation);
+
+                    Matter.Body.setPosition(entity.physicsBody, { x: x + offset.x, y: y + offset.y });
+                    Matter.Body.setAngle(entity.physicsBody, rotation);
                 }
             }
         }

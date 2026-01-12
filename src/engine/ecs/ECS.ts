@@ -18,6 +18,7 @@ export type Entity = {
       tint?: number;
       width?: number;
       height?: number;
+      anchor?: { x: number, y: number };
   };
   rigidBody?: {
       mass: number;

@@ -19,9 +19,26 @@ export class PhysicsDebugSystem {
         this.app.stage.addChild(this.container);
     }
 
+    private getBodyOffset(entity: any, w: number, h: number, rotation: number) {
+        const anchor = entity.sprite?.anchor || { x: 0.5, y: 0.5 };
+        const dx = (0.5 - anchor.x) * w;
+        const dy = (0.5 - anchor.y) * h;
+        
+        const cos = Math.cos(rotation);
+        const sin = Math.sin(rotation);
+        
+        return {
+            x: dx * cos - dy * sin,
+            y: dx * sin + dy * cos
+        };
+    }
+
     public update() {
         this.graphics.clear();
         
+        const zoom = this.app.stage.scale.x || 1;
+        const lineWidth = 2 / zoom;
+
         // Draw Static/Dynamic Bodies from ECS
         const entities = world.with('physicsBody');
         
@@ -46,19 +63,10 @@ export class PhysicsDebugSystem {
             }
 
             // Stroke Style
-            // Green for active, Gray for sleeping?
-            this.graphics.stroke({ width: 2, color: 0x00FF00, alpha: 0.8 });
+            this.graphics.stroke({ width: lineWidth, color: 0x00FF00, alpha: 0.8 });
         }
 
         // Also Draw BoxCollider/CircleCollider Gizmos even if NO BODY (Editor Mode)
-        // This helps user see where colliders ARE defined even if simulation is stopped.
-        const nonBodyEntities = world.with('transform'); // We iterate all transform to check colliders
-        
-        // Use a different color for "Editor Definitions" (Cyan) vs "Live Physics" (Green)
-        // But preventing overlapping mess...
-        // Let's draw "Live Physics" (Green) if body exists.
-        // And "Definition" (Cyan) if NO body exists.
-
         const editorEntities = world.with('transform');
         for (const entity of editorEntities) {
             if (entity.physicsBody) continue; // Already drawn by body loop
@@ -67,12 +75,9 @@ export class PhysicsDebugSystem {
             
             if (entity.boxCollider) {
                  const w = entity.boxCollider.width * t.scale.x;
-                 const h = entity.boxCollider.height * t.scale.y; // Match Entity Scale!
+                 const h = entity.boxCollider.height * t.scale.y; 
                  
-                 // Apply Rotation math if needed... simplified for AABB debug or rotate graphics?
-                 // Pixi Graphics rotation is local.
-                 // We can draw untransformed rect inside a transformed container? No, expensive.
-                 // Calc vertices manually.
+                 const offset = this.getBodyOffset(entity, w, h, t.rotation);
                  
                  const corners = [
                      { x: -w/2, y: -h/2 },
@@ -81,13 +86,15 @@ export class PhysicsDebugSystem {
                      { x: -w/2, y: h/2 }
                  ];
 
-                 // Rotate and Translate
                  const cos = Math.cos(t.rotation);
                  const sin = Math.sin(t.rotation);
                  
+                 const cx = t.x + offset.x;
+                 const cy = t.y + offset.y;
+
                  const transformed = corners.map(p => ({
-                     x: (p.x * cos - p.y * sin) + t.x,
-                     y: (p.x * sin + p.y * cos) + t.y
+                     x: (p.x * cos - p.y * sin) + cx,
+                     y: (p.x * sin + p.y * cos) + cy
                  }));
 
                  this.graphics.beginPath();
@@ -100,16 +107,18 @@ export class PhysicsDebugSystem {
                  }
                  if (p0) this.graphics.lineTo(p0.x, p0.y);
                  
-                 this.graphics.stroke({ width: 2, color: 0x00FFFF, alpha: 0.5 }); // Cyan for Definition
+                 this.graphics.stroke({ width: lineWidth, color: 0x00FFFF, alpha: 0.5 });
             }
 
             if (entity.circleCollider) {
-                // Circle doesn't rotate (visually)
-                // Radius scales with max scale?
                 const r = entity.circleCollider.radius * Math.max(t.scale.x, t.scale.y);
+                
+                const w = r * 2;
+                const offset = this.getBodyOffset(entity, w, w, t.rotation);
+
                 this.graphics.beginPath();
-                this.graphics.circle(t.x, t.y, r);
-                this.graphics.stroke({ width: 2, color: 0x00FFFF, alpha: 0.5 });
+                this.graphics.circle(t.x + offset.x, t.y + offset.y, r);
+                this.graphics.stroke({ width: lineWidth, color: 0x00FFFF, alpha: 0.5 });
             }
         }
     }

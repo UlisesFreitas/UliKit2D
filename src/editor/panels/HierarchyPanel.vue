@@ -4,6 +4,7 @@ import { useEditorStore } from '../../stores/useEditorStore';
 import { world, type Entity } from '../../engine/ecs/ECS';
 
 import { SceneManager } from '../../engine/managers/SceneManager';
+import { instance as engine } from '../../engine/core/Engine';
 
 const editorStore = useEditorStore();
 const entities = ref<Entity[]>([]);
@@ -15,10 +16,28 @@ const updateList = () => {
     entities.value = world.entities.map(e => ({ ...e }));
 };
 
+const focus = (id: string | undefined) => {
+    if (!id) return;
+    const entity = world.where(e => e.id === id).first;
+    if (entity && entity.transform) {
+         // Focus Logic: Center Camera on Entity
+         // Assuming engine.app.stage controls the view transform
+         const screenW = engine.app.screen.width;
+         const screenH = engine.app.screen.height;
+         const scale = engine.app.stage.scale.x;
+
+         engine.app.stage.position.set(
+             (screenW / 2) - (entity.transform.x * scale),
+             (screenH / 2) - (entity.transform.y * scale)
+         );
+    }
+};
+
 let unsubAdd: any;
 let unsubRemove: any;
 
 import { eventBus } from '../../engine/core/EventBus';
+import defaultSprite from '../../resources/internal_default_assets/default_sprite.png';
 
 // ... (existing imports)
 
@@ -67,7 +86,7 @@ const createEntity = (type: 'Empty' | 'Sprite' | 'Camera' | 'Text' | 'BitmapText
     };
 
     if (type === 'Sprite') {
-        data.sprite = { texture: '' }; // Will be visualizable with cyan box even if empty
+        data.sprite = { texture: defaultSprite };
     } else if (type === 'Camera') {
         data.camera = { zoom: 1, isPrimary: false, backgroundColor: '#000000' };
     } else if (type === 'Text') {
@@ -231,6 +250,7 @@ const duplicateEntity = () => {
                     :key="entity.id"
                     :id="`hierarchy-item-${entity.id}`"
                     @click="select(entity.id)"
+                    @dblclick="focus(entity.id)"
                     @contextmenu.stop.prevent="showContextMenu($event, entity.id || '')"
                     :class="[
                         'cursor-pointer px-2 py-0.5 rounded text-xs transition-colors flex items-center border',

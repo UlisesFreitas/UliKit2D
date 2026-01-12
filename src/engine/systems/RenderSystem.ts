@@ -344,7 +344,7 @@ export class RenderSystem {
 
             // Create placeholder or waiting sprite
             sprite = new Sprite(Texture.EMPTY); 
-            sprite.anchor.set(0.5);
+            sprite.anchor.set(entity.sprite.anchor?.x ?? 0.5, entity.sprite.anchor?.y ?? 0.5);
             
             // Enable interaction
             sprite.eventMode = 'static';
@@ -382,6 +382,13 @@ export class RenderSystem {
         const sx = entity.transform.scale?.x ?? 1;
         const sy = entity.transform.scale?.y ?? 1;
         sprite.scale.set(sx, sy);
+
+        // Sync Anchor
+        const ax = entity.sprite.anchor?.x ?? 0.5;
+        const ay = entity.sprite.anchor?.y ?? 0.5;
+        if (sprite.anchor.x !== ax || sprite.anchor.y !== ay) {
+            sprite.anchor.set(ax, ay);
+        }
 
         // Sync Visibility
         sprite.visible = entity.visible !== false;
