@@ -17,7 +17,9 @@ Update the `TransformComponent` or `SpriteComponent`?
 - **PixiJS**: Uses `anchor` (0.0 to 1.0) for Sprites. Default is (0,0) or (0.5, 0.5) depending on setup.
 - **Components**:
     - Add `anchor: { x: number, y: number }` to `SpriteComponent` interface.
-    - Default to `{ x: 0.5, y: 0.5 }` (Center) for better UX, or `{ x: 0, y: 0 }` (Top-Left) if adhering to standard defaults.
+    - Default to `{ x: 0.5, y: 0.5 }` (Center).
+    - **Runtime Anchor**: This is the "active" anchor used by the Renderer.
+    - **Animation Handling**: If an Entity has an `Animator`, the `AnimationSystem` may override this `anchor` value frame-by-frame (see Phase 3).
 
 ### 2. Editor UI (Inspector)
 - **Sprite Component Editor**:
@@ -52,10 +54,18 @@ Update the `TransformComponent` or `SpriteComponent`?
 ```typescript
 interface PolygonColliderComponent {
     points: { x: number, y: number }[]; // Local coordinates relative to Anchor
+// ...
     isTrigger: boolean;
     // Material properties...
 }
 ```
+// ...
+    isTrigger: boolean;
+    // Material properties...
+}
+```
+- **Runtime Collider**: This component holds the *active* points used by Physics.
+- **Animation Handling**: Similarly to Anchors, `AnimationSystem` can update `points` per frame (Phase 3).
 - Mutually exclusive with `BoxCollider` / `CircleCollider`? Or allow multiple?
     - For simplicity: One collider per entity initially, or a list of colliders.
     - Current System: `boxCollider`, `circleCollider` are optional props. Add `polygonCollider`.
@@ -88,12 +98,67 @@ This is the complex part (similar to GDevelop's screenshot).
 
 ---
 
+---
+
+## Phase 3: Per-Frame Animation Data (Advanced)
+
+**Objective**: Allow each frame of an animation to have a distinct **Anchor** and **Collision Mask**.
+
+### 1. Data Structure Update
+We need to upgrade the simple `frames: string[]` array in `AnimatorComponent` to a richer structure.
+
+```typescript
+interface AnimationFrame {
+    textureId: string;
+    duration?: number; // ms override
+    anchor?: { x: number, y: number }; // Optional override
+    collisionPoints?: { x: number, y: number }[]; // Optional override
+}
+
+interface AnimationData {
+    name: string;
+    speed: number;
+    loop: boolean;
+    frames: AnimationFrame[]; // Array of rich frames
+}
+```
+
+### 2. Engine Integration (AnimationSystem)
+- **Update Loop**:
+    1. Determine current Frame.
+    2. Set `sprite.texture`.
+    3. **Check for Anchor**:
+       - If frame has `anchor`, set `sprite.anchor = frame.anchor`.
+       - Else, revert to `defaultAnchor` (or keep last?). *Design Decision*: Usually revert to Component default.
+    4. **Check for Collision**:
+       - If frame has `collisionPoints`, update `polygonCollider.points`.
+       - **Physics Re-body**: Updating vertices in Matter.js is expensive (requires creating new body parts or scaling).
+       - *Optimization*: Pre-pool bodies or use `Body.setVertices`.
+
+### 3. Editor UI (Animator Panel)
+- **Timeline**: Select a specific frame.
+- **Inspector**:
+    - Show "Frame Properties".
+    - "Set Anchor for this Frame" button.
+    - "Edit Collision for this Frame" button.
+- **Gizmos**: Show "Ghost" of the collider updating as you scrub the timeline.
+
+---
+
 ## Action Plan
 
-1.  **Modify `SpriteComponent`** (ECS) to include `anchor`.
-2.  **Update `RenderSystem`** to apply anchor.
-3.  **Update `InspectorPanel`** to show Anchor fields.
-4.  **Define `PolygonCollider`** in ECS.
-5.  **Implement `PolygonEditor`** (Canvas overlay or Gizmo).
-6.  **Update `PhysicsSystem`** to generate Polygon bodies.
+1.  **Phase 1 (Origin Core)**:
+    - Implement `anchor` in `SpriteComponent`.
+    - Update `RenderSystem`.
+    - Update `Inspector` for static anchor.
+
+2.  **Phase 2 (Collision Core)**:
+    - Implement `PolygonColliderComponent`.
+    - Update `PhysicsSystem` to build bodies from points.
+    - Implement `CollisionEditor` (Edit Mode).
+
+3.  **Phase 3 (Animation Integration)**:
+    - Refactor `AnimatorComponent` to handle `RichFrames`.
+    - Update `AnimationSystem` to apply per-frame Anchor/Collider.
+    - Add UI support for per-frame editing.
 
