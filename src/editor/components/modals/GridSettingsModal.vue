@@ -1,6 +1,9 @@
 <script setup lang="ts">
 import { usePreferencesStore } from '../../../stores/usePreferencesStore';
 import BaseDialog from '../ui/BaseDialog.vue';
+import { useEditorStore } from '../../../stores/useEditorStore';
+import { SceneManager } from '../../../engine/managers/SceneManager';
+import { watch } from 'vue';
 
 const props = defineProps<{
     open: boolean;
@@ -11,6 +14,25 @@ const emit = defineEmits<{
 }>();
 
 const prefs = usePreferencesStore();
+const store = useEditorStore();
+
+// Sync Prefs -> SceneManager (Logic)
+watch(() => [prefs.grid.width, prefs.grid.height], ([w, h]) => {
+    SceneManager.setLayerGridSize(store.activeLayerId, w || 32, h || 32);
+});
+
+// Sync SceneManager (Logic) -> Prefs (Visuals) when opening or switching layer
+watch(() => [props.open, store.activeLayerId], () => {
+    if (props.open) {
+        const layer = SceneManager.getLayerById(store.activeLayerId);
+        if (layer && layer.gridSize) {
+             // Only update if different to avoid loop? 
+             // Watch above will trigger setLayerGridSize again, which is harmless (idempotent-ish).
+             if (prefs.grid.width !== layer.gridSize.x) prefs.grid.width = layer.gridSize.x;
+             if (prefs.grid.height !== layer.gridSize.y) prefs.grid.height = layer.gridSize.y;
+        }
+    }
+}, { immediate: true });
 </script>
 
 <template>

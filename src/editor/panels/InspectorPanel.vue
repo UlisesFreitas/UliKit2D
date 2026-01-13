@@ -21,6 +21,7 @@ import CircleColliderEditor from '../components/inspectors/CircleColliderEditor.
 import NineSliceEditor from '../components/inspectors/NineSliceEditor.vue';
 
 import AddComponentModal from '../components/modals/AddComponentModal.vue';
+import defaultSprite from '../../resources/internal_default_assets/default_sprite.png';
 
 
 
@@ -226,6 +227,11 @@ const handleAddComponent = async (payload: { type: string, data: any }) => {
              data = { text: 'New Text', fontSize: 24, fontFamily: 'Arial', color: '#ffffff', align: 'center' };
         } else if (payload.type === 'animator' && Object.keys(data).length === 0) {
              data = { currentAnim: '', isPlaying: false, speed: 1, elapsedTime: 0, animations: {} };
+             
+             // Auto-add Sprite if missing (Animator needs it)
+             if (!rawEntity.sprite) {
+                 world.addComponent(rawEntity, 'sprite', { texture: defaultSprite });
+             }
         } else if (payload.type === 'bitmapText' && Object.keys(data).length === 0) {
              data = { text: 'Bitmap Text', fontSize: 32, fontName: '', tint: 0xffffff, align: 'left' };
         } else if (payload.type === 'nineSliceSprite' && Object.keys(data).length === 0) {

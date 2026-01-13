@@ -66,6 +66,27 @@ export class SceneManager {
         }
     }
 
+    static setLayerGridSize(layerId: string, width: number, height: number) {
+        const layer = this.getLayerById(layerId);
+        if (layer) {
+            layer.gridSize = { x: width, y: height };
+            this._isDirty = true;
+        }
+    }
+
+    static moveEntityToLayer(entityId: string, newLayerId: string) {
+        const entity = world.where(e => e.id === entityId).first;
+        if (!entity) return;
+
+        const oldLayerId = entity.layer || 'Base Layer';
+        if (oldLayerId === newLayerId) return;
+
+        this.unregisterEntity(entityId, oldLayerId);
+        entity.layer = newLayerId;
+        this.registerEntity(entityId, newLayerId);
+        this._isDirty = true;
+    }
+
     static addLayer(name: string) {
         const id = `layer-${crypto.randomUUID()}`;
         this._layers.push({ 

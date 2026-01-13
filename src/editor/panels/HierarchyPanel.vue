@@ -98,7 +98,7 @@ const createEntity = (type: 'Empty' | 'Sprite' | 'Camera' | 'Text' | 'BitmapText
             align: 'center' 
         };
     } else if (type === 'Animator') {
-        data.sprite = { texture: '' }; // Animator needs a sprite
+        data.sprite = { texture: defaultSprite }; // Animator needs a sprite
         data.animator = {
             currentAnim: '',
             isPlaying: true,

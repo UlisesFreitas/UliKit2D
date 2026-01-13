@@ -125,6 +125,70 @@ const onDropTexture = async (event: DragEvent) => {
             </div>
         </div>
 
+
+
+         <!-- Anchor -->
+         <div class="flex flex-col gap-1 border-t border-border-dim pt-2">
+            <div class="flex items-center justify-between">
+                 <label class="text-xs text-text-secondary">Anchor / Pivot</label>
+                 <select 
+                     class="bg-bg-dark border border-border-dim rounded text-[10px] text-text-primary px-1 py-0.5 outline-none"
+                     @change="(e:any) => {
+                        const [x, y] = e.target.value.split(',').map(Number);
+                        // We need a helper or direct update. Let's do direct for now since we have updateComponent
+                        // But updateComponent takes one field. We need to update nested or object.
+                        // Best way: Create a new anchor object
+                        const newAnchor = { x, y };
+                        updateComponent('anchor', newAnchor);
+                     }"
+                 >
+                    <option value="" disabled selected>Presets</option>
+                    <option value="0.5,0.5">Center</option>
+                    <option value="0,0">Top Left</option>
+                    <option value="0.5,0">Top Center</option>
+                    <option value="1,0">Top Right</option>
+                    <option value="0,0.5">Left</option>
+                    <option value="1,0.5">Right</option>
+                    <option value="0,1">Bottom Left</option>
+                    <option value="0.5,1">Bottom Center</option>
+                    <option value="1,1">Bottom Right</option>
+                 </select>
+            </div>
+            
+            <div class="flex gap-2">
+                 <!-- X -->
+                <div class="flex items-center gap-1 flex-1">
+                    <span class="text-[10px] text-text-muted font-bold">X</span>
+                    <input 
+                        type="number" 
+                        step="0.1"
+                        class="w-full bg-bg-dark border border-border-dim rounded px-1 text-xs text-text-primary outline-none"
+                        :value="component.anchor?.x ?? 0.5"
+                        @input="(e:any) => {
+                             const val = parseFloat(e.target.value);
+                             const curY = component.anchor?.y ?? 0.5;
+                             updateComponent('anchor', { x: val, y: curY });
+                        }"
+                    />
+                </div>
+                <!-- Y -->
+                <div class="flex items-center gap-1 flex-1">
+                    <span class="text-[10px] text-text-muted font-bold">Y</span>
+                     <input 
+                        type="number" 
+                        step="0.1"
+                        class="w-full bg-bg-dark border border-border-dim rounded px-1 text-xs text-text-primary outline-none"
+                        :value="component.anchor?.y ?? 0.5"
+                        @input="(e:any) => {
+                             const val = parseFloat(e.target.value);
+                             const curX = component.anchor?.x ?? 0.5;
+                             updateComponent('anchor', { x: curX, y: val });
+                        }"
+                    />
+                </div>
+            </div>
+         </div>
+
         <!-- Slices (Grid Layout) -->
         <div class="space-y-2">
             <span class="text-xs text-text-secondary block">Slices (L / R / T / B)</span>

@@ -76,6 +76,7 @@ export type Entity = {
       right: number; // Right slice width
       top: number; // Top slice height
       bottom: number; // Bottom slice height
+      anchor?: { x: number, y: number };
   };
   animator?: {
       currentAnim: string;

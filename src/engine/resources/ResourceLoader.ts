@@ -10,7 +10,7 @@ export class ResourceLoader {
     public async loadUrl(virtualPath: string): Promise<string> {
         if (!virtualPath) throw new Error('Empty path');
         
-        if (virtualPath.startsWith('blob:') || virtualPath.startsWith('data:')) {
+        if (virtualPath.startsWith('blob:') || virtualPath.startsWith('data:') || virtualPath.startsWith('/src/')) {
             return virtualPath;
         }
 

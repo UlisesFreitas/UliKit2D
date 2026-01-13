@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, watch, computed } from 'vue';
+import { Rectangle } from 'pixi.js';
 import { instance as engine } from '../../engine/core/Engine';
 import { GizmoManager } from '../gizmos/GizmoManager';
 import { world } from '../../engine/ecs/ECS';
@@ -8,19 +9,16 @@ import { usePreferencesStore } from '../../stores/usePreferencesStore';
 import SceneToolbar from '../components/SceneToolbar.vue';
 import Toolbar from '../components/Toolbar.vue';
 import { projectState } from '../managers/ProjectManager';
+import { CoordinateUtils } from '../../engine/utils/CoordinateUtils';
 
-// ... imports
-import { EditorTilemapSystem } from '../systems/EditorTilemapSystem'; // Static import ok? Or dynamic? ScenePanel uses dynamic for some. Static is fine.
-// Actually ScenePanel uses dynamic GridSystem import. I'll stick to consistency or static.
-// Static is better for Types.
+import { EditorTilemapSystem } from '../systems/EditorTilemapSystem';
 
-// ...
 
-// Force Rebuild
 const container = ref<HTMLElement | null>(null);
 let gizmoManager: GizmoManager;
-let tilemapSystem: EditorTilemapSystem; // Add this
-let resizeObserver: ResizeObserver;
+let tilemapSystem: EditorTilemapSystem; 
+
+import { SceneManager } from '../../engine/managers/SceneManager';
 
 onMounted(async () => {
     if (container.value) {
@@ -31,6 +29,11 @@ onMounted(async () => {
         // ... (store, selection setup) ...
 
         gizmoManager = new GizmoManager();
+        gizmoManager.getGridSizeCallback = (layerId) => {
+             const layer = SceneManager.getLayerById(layerId);
+             return layer?.gridSize;
+        };
+        
         
         // Tilemap System
         tilemapSystem = new EditorTilemapSystem(engine.app);
@@ -53,31 +56,54 @@ onMounted(async () => {
              if(preferencesStore.grid.visible) grid.draw(cameraX.value, cameraY.value, zoom.value, preferencesStore.grid);
         });
 
-        // Handle Entity Clicks (Selection)
-        engine.renderSystem.onEntityClicked = (id: string) => {
-            // Priority: If painting, ignore selection
-            if (isTilemapMode.value) return; 
 
-            // Otherwise, select
-            store.selectEntity(id);
-        };
 
-        // Handle Resizing
-        resizeObserver = new ResizeObserver(() => engine.app?.resize());
-        resizeObserver.observe(container.value);
-
-        // Highlight Graphics
-        const { Graphics, Rectangle } = await import('pixi.js');
-        highlightGraphics.value = new Graphics();
-        highlightGraphics.value.zIndex = 9999; // Top
-        engine.app.stage.addChild(highlightGraphics.value);
-        
-        // Background Deselection Logic
+        // Global Selection Logic (Stage Click)
         engine.app.stage.eventMode = 'static';
+        // HitArea massive to ensure stage captures all background clicks
         engine.app.stage.hitArea = new Rectangle(-100000, -100000, 200000, 200000);
+        
         engine.app.stage.on('pointerdown', (e) => {
-             if (e.button === 0 && !isTilemapMode.value) {
-                  store.selectEntity(null);
+             // Only Left Click, No Alt (Pan), No Tilemap Mode
+             if (e.button === 0 && !e.altKey && !isTilemapMode.value) {
+                  // If Gizmo handled this, it would have stopped propagation. 
+                  // So if we are here, we act on the Scene.
+
+                  const screenX = e.global.x;
+                  const screenY = e.global.y;
+                  
+                  // Use Pixi's native transform to get World Pos (Stage Local)
+                  const worldPos = engine.app.stage.toLocal(e.global);
+
+                  // console.log(`[Selection] Raw Global: ${screenX.toFixed(2)}, ${screenY.toFixed(2)}`);
+                  // console.log(`[Selection] Pixi World: ${worldPos.x.toFixed(2)}, ${worldPos.y.toFixed(2)}`);
+                  // console.log(`[Selection] Camera: ${cameraX.value}, ${cameraY.value} Zoom: ${zoom.value}`);
+
+                  // Raycast / Hit Test
+                  // 1. Get Entities Sorted by Z-Index (Top to Bottom)
+                  const entities = world.entities.slice().sort((a, b) => {
+                       const zA = a.transform?.zIndex || 0;
+                       const zB = b.transform?.zIndex || 0;
+                       return zB - zA;
+                  });
+
+                  let foundId: string | null = null;
+                  
+                  for (const entity of entities) {
+                      if (!entity.transform || !entity.visible === false) continue; // Skip invisible? visible is explicit false check
+
+                      // Get Visual Bounds from RenderSystem
+                      const displayObject = engine.renderSystem.getDisplayObject(entity.id!);
+                      
+                      if (CoordinateUtils.isPointInEntity(worldPos, entity, displayObject, e.global)) {
+                           foundId = entity.id!;
+                           // Special Case: Locked Layers/Entities? 
+                           // For now, allow selecting anything.
+                           break;
+                      }
+                  }
+                  
+                  store.selectEntity(foundId); // Selects Entity or Null (Deselect)
              }
         });
         
@@ -119,7 +145,6 @@ onMounted(async () => {
 
 
 onUnmounted(() => {
-    resizeObserver?.disconnect();
     if (gizmoManager) {
         gizmoManager.dispose();
     }
@@ -229,7 +254,7 @@ watch(() => preferencesStore.grid, () => {
 
 // ... imports
 import { useTilemapStore } from '../stores/useTilemapStore';
-import { SceneManager } from '../../engine/managers/SceneManager';
+
 import type { SceneLayer } from '../../engine/managers/SceneManager';
 
 // ... (existing state)

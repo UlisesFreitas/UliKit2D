@@ -20,6 +20,8 @@ export class GizmoManager {
     
     public snapToGrid: boolean = false; 
     
+    public getGridSizeCallback: ((layerId: string) => { x: number, y: number } | undefined) | null = null;
+    
     // Hover state
     private hoverHandle: HandleType = null;
 
@@ -326,14 +328,18 @@ export class GizmoManager {
            const dx = currentPos.x - this.dragStartPos.x;
            const dy = currentPos.y - this.dragStartPos.y;
            
-           // TODO: Add Grid Snap logic back if needed
-           const gridSize = 50;
            let newX = this.entityStart.x + dx;
            let newY = this.entityStart.y + dy;
            
            if (this.snapToGrid) {
-                newX = Math.round(newX / gridSize) * gridSize;
-                newY = Math.round(newY / gridSize) * gridSize;
+                const layerId = this.selectedEntity.layer || 'Base Layer';
+                // Use Sync Callback
+                const grid = this.getGridSizeCallback?.(layerId);
+                const gx = grid?.x || 32;
+                const gy = grid?.y || 32;
+
+                newX = Math.round(newX / gx) * gx;
+                newY = Math.round(newY / gy) * gy;
            }
            
            this.selectedEntity.transform!.x = newX;

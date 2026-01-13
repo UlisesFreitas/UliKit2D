@@ -21,7 +21,15 @@ export class RenderSystem {
     // Track which entities need texture updates (due to invalidation)
     private pendingUpdates: Set<string> = new Set(); 
     
-    public onEntityClicked: ((id: string) => void) | null = null;
+    public onEntityClicked: ((id: string) => void) | null = null; // Deprecated, but keeping for compatibility if referenced elsewhere temporarily? 
+    // Actually rework plan says REMOVE it.
+
+    public getDisplayObject(id: string): Container | undefined {
+        return this.spriteCache.get(id) || 
+               this.textCache.get(id) || 
+               this.nineSliceCache.get(id) || 
+               this.bitmapTextCache.get(id);
+    }
 
     constructor(app: Application) {
         this.app = app;
@@ -256,17 +264,9 @@ export class RenderSystem {
                  rightWidth: entity.nineSliceSprite.right,
                  bottomHeight: entity.nineSliceSprite.bottom,
              });
-             nSlice.anchor.set(0.5);
+             nSlice.anchor.set(entity.nineSliceSprite.anchor?.x ?? 0.5, entity.nineSliceSprite.anchor?.y ?? 0.5);
 
-             // Interaction
-             nSlice.eventMode = 'static';
-             nSlice.cursor = 'pointer';
-             nSlice.on('pointerdown', (e: FederatedPointerEvent) => {
-                 e.stopPropagation();
-                 if (this.onEntityClicked && entity.id) {
-                     this.onEntityClicked(entity.id);
-                 }
-             });
+             // Interaction removed
 
              // Layer Parenting
              const layerId = entity.layer || 'Base Layer';
@@ -298,6 +298,13 @@ export class RenderSystem {
         // Option B: Set width/height strictly, and let Scale be 1.
         // Standard in Game Engines: NineSlice uses Width/Height property for sizing, Transform Scale applies on top.
         nSlice.scale.set(entity.transform.scale.x, entity.transform.scale.y); 
+        
+        // Sync Anchor
+        const ax = entity.nineSliceSprite.anchor?.x ?? 0.5;
+        const ay = entity.nineSliceSprite.anchor?.y ?? 0.5;
+        if (nSlice.anchor.x !== ax || nSlice.anchor.y !== ay) {
+             nSlice.anchor.set(ax, ay);
+        }
 
         // Sync Dimensions & Slices
         if (nSlice.width !== entity.nineSliceSprite.width) nSlice.width = entity.nineSliceSprite.width;
@@ -346,15 +353,8 @@ export class RenderSystem {
             sprite = new Sprite(Texture.EMPTY); 
             sprite.anchor.set(entity.sprite.anchor?.x ?? 0.5, entity.sprite.anchor?.y ?? 0.5);
             
-            // Enable interaction
-            sprite.eventMode = 'static';
-            sprite.cursor = 'pointer';
-            sprite.on('pointerdown', (e: FederatedPointerEvent) => {
-                e.stopPropagation();
-                if (this.onEntityClicked && entity.id) {
-                    this.onEntityClicked(entity.id);
-                }
-            });
+            // Interaction removed: Handled by ScenePanel Raycast
+
 
             // Layer Parenting
             const layerId = entity.layer || 'Base Layer';
@@ -436,15 +436,7 @@ export class RenderSystem {
              });
              textFn.anchor.set(0.5);
              
-             // Interaction
-             textFn.eventMode = 'static';
-             textFn.cursor = 'pointer';
-             textFn.on('pointerdown', (e: FederatedPointerEvent) => {
-                    e.stopPropagation();
-                    if (this.onEntityClicked && entity.id) {
-                        this.onEntityClicked(entity.id);
-                    }
-             });
+             // Interaction removed
 
              const layerId = entity.layer || 'Base Layer';
              const parent = this.layerContainers.get(layerId) || this.app.stage;
@@ -499,15 +491,7 @@ export class RenderSystem {
             bText.anchor.set(0.5);
             bText.tint = entity.bitmapText.tint;
             
-            // Interaction
-            bText.eventMode = 'static';
-            bText.cursor = 'pointer';
-            bText.on('pointerdown', (e: FederatedPointerEvent) => {
-                e.stopPropagation();
-                if (this.onEntityClicked && entity.id) {
-                    this.onEntityClicked(entity.id);
-                }
-            });
+            // Interaction removed
 
             const layerId = entity.layer || 'Base Layer';
             const parent = this.layerContainers.get(layerId) || this.app.stage;
