@@ -1,4 +1,5 @@
 import { world, createEntity, type Entity } from '../ecs/ECS';
+import { eventBus } from '../core/EventBus';
 
 export interface SceneLayer {
     id: string; // Unique ID (e.g. "layer-1")
@@ -100,6 +101,7 @@ export class SceneManager {
             _entityIds: new Set()
         });
         this._isDirty = true;
+        eventBus.emit('layer-update');
         return id;
     }
 
@@ -116,12 +118,14 @@ export class SceneManager {
             }
             this._layers.splice(index, 1);
             this._isDirty = true;
+            eventBus.emit('layer-update');
         }
     }
 
     static reorderLayers(newLayers: SceneLayer[]) {
         this._layers = newLayers;
         this._isDirty = true;
+        eventBus.emit('layer-update');
     }
 
     static saveScene(): string {
@@ -267,6 +271,7 @@ export class SceneManager {
 
             this._isDirty = false;
             console.log(`Scene loaded from ${path}`);
+            eventBus.emit('scene-loaded', this._activeSceneName);
             return true;
         } else {
             console.error('SceneManager: Failed to load scene or invalid format', path);

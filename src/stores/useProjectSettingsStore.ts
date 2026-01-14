@@ -22,6 +22,7 @@ export interface IProjectSettings {
     };
     tags: string[];
     layers: string[];
+    layouts: Record<string, any>;
 }
 
 const DEFAULT_SETTINGS: IProjectSettings = {
@@ -42,7 +43,8 @@ const DEFAULT_SETTINGS: IProjectSettings = {
         debugDraw: false
     },
     tags: ['Player', 'Enemy', 'Ground'],
-    layers: ['Default', 'UI', 'Player', 'Background']
+    layers: ['Default', 'UI', 'Player', 'Background'],
+    layouts: {}
 };
 
 export const useProjectSettingsStore = defineStore('projectSettings', () => {

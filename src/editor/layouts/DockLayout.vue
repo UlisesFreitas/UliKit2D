@@ -51,8 +51,7 @@ onMounted(() => {
     
     // Restore Layout or Default
     const savedLayout = layoutStore.loadLayout();
-    // FORCE DEFAULT for testing new panel config (User Request)
-    if (false && savedLayout) {
+    if (savedLayout) {
         api!.fromJSON(savedLayout);
     } else {
         // --- Default Layout Construction (Explicit JSON Strategy v15) ---
@@ -101,7 +100,7 @@ onMounted(() => {
                 'hierarchy': { id: 'hierarchy', title: 'Hierarchy', component: 'hierarchy', contentComponent: 'hierarchy' },
                 'assets': { id: 'assets', title: 'Assets', component: 'assets', contentComponent: 'assets' },
                 'scenes': { id: 'scenes', title: 'Scenes', component: 'scenes', contentComponent: 'scenes' },
-                'scene': { id: 'scene', title: 'Scene View', component: 'scene', contentComponent: 'scene' },
+                'scene': { id: 'scene', title: 'Scene View', component: 'scene', contentComponent: 'scene', params: { closable: false, locked: true } },
                 'console': { id: 'console', title: 'Console', component: 'console', contentComponent: 'console' },
                 'inspector': { id: 'inspector', title: 'Inspector', component: 'inspector', contentComponent: 'inspector' },
                 'layers': { id: 'layers', title: 'Layers', component: 'layers', contentComponent: 'layers' }
@@ -213,3 +212,5 @@ onUnmounted(() => {
   overflow: hidden;
 }
 </style>
+
+

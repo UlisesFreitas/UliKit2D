@@ -3,6 +3,7 @@ import { Application, Sprite, Texture, Text, BitmapText, FederatedPointerEvent, 
 import { world } from '../ecs/ECS';
 import { resourceManager } from '../resources/ResourceManager';
 import { SceneManager } from '../managers/SceneManager';
+import defaultCameraIcon from '../../resources/internal_default_assets/default_camera.png';
 
 
 export class RenderSystem {
@@ -17,6 +18,7 @@ export class RenderSystem {
     private textCache: Map<string, Text> = new Map();
     private bitmapTextCache: Map<string, BitmapText> = new Map();
     private nineSliceCache: Map<string, NineSliceSprite> = new Map();
+    private cameraIconCache: Map<string, Container> = new Map();
 
     // Track which entities need texture updates (due to invalidation)
     private pendingUpdates: Set<string> = new Set(); 
@@ -28,12 +30,21 @@ export class RenderSystem {
         return this.spriteCache.get(id) || 
                this.textCache.get(id) || 
                this.nineSliceCache.get(id) || 
-               this.bitmapTextCache.get(id);
+               this.bitmapTextCache.get(id) ||
+               this.cameraIconCache.get(id);
     }
+
+    private editorOverlay: Container; // For Helper Icons (Camera, audio, etc)
 
     constructor(app: Application) {
         this.app = app;
         this.app.stage.sortableChildren = true;
+        
+        // Editor Overlay - Always on Top
+        this.editorOverlay = new Container();
+        this.editorOverlay.label = 'Editor Overlay';
+        this.editorOverlay.zIndex = 9999; 
+        this.app.stage.addChild(this.editorOverlay);
     }
     
     private tileSpriteCache: Map<string, Map<string, Sprite>> = new Map(); // LayerID -> "x,y" -> Sprite
@@ -100,9 +111,14 @@ export class RenderSystem {
                 this.layerContainers.delete(id);
                 this.layerBackgrounds.delete(id);
                 this.layerTileContainers.delete(id);
+                this.layerTileContainers.delete(id);
                 this.tileSpriteCache.delete(id);
             }
         }
+        
+        // Remove dead camera icons
+        // (Handled in cleanupZombies, but ensure layers don't strand them if layer deleted)
+        // Camera icons live in layers too.
         
         // Sort Stage (Layers)
         this.app.stage.sortChildren();
@@ -215,12 +231,20 @@ export class RenderSystem {
                 this.removeBitmapText(entity.id!);
                 this.removeLabel(entity.id!);
                 this.removeNineSlice(entity.id!);
+                this.removeCameraIcon(entity.id!);
+            } else if (entity.camera) {
+                 this.updateCamera(entity);
+                 this.removeSprite(entity.id!);
+                 this.removeLabel(entity.id!);
+                 this.removeBitmapText(entity.id!);
+                 this.removeNineSlice(entity.id!);
             } else {
                  // Cleanup
                  this.removeBitmapText(entity.id!);
                  this.removeLabel(entity.id!);
                  this.removeSprite(entity.id!);
                  this.removeNineSlice(entity.id!);
+                 this.removeCameraIcon(entity.id!);
             }
             activeIds.add(entity.id!);
         }
@@ -241,6 +265,9 @@ export class RenderSystem {
         }
         for (const id of this.nineSliceCache.keys()) {
             if (!activeIds.has(id)) this.removeNineSlice(id);
+        }
+        for (const id of this.cameraIconCache.keys()) {
+            if (!activeIds.has(id)) this.removeCameraIcon(id);
         }
 
     }
@@ -572,5 +599,65 @@ export class RenderSystem {
             this.bitmapTextCache.delete(id);
         }
     }
-}
 
+    private removeCameraIcon(id: string) {
+        if (this.cameraIconCache.has(id)) {
+            const icon = this.cameraIconCache.get(id)!;
+            if (icon.parent) icon.parent.removeChild(icon);
+            icon.destroy({ children: true });
+            this.cameraIconCache.delete(id);
+        }
+    }
+
+    private updateCamera(entity: any) {
+        let container = this.cameraIconCache.get(entity.id!);
+        
+        if (!container) {
+             container = new Container();
+             
+             // 1. Hit Area (Invisible, Logic Only)
+             container.hitArea = new Rectangle(-16, -16, 32, 32);
+
+             // 2. Icon Sprite (Optional, loads async)
+             const sprite = new Sprite(Texture.EMPTY);
+             sprite.anchor.set(0.5);
+             sprite.width = 24;
+             sprite.height = 24;
+             container.addChild(sprite);
+             
+             // Initial Load
+             resourceManager.loadTexture(defaultCameraIcon).then(tex => {
+                 if (tex && sprite && !sprite.destroyed) {
+                     sprite.texture = tex;
+                 }
+             });
+
+             // Parent to Overlay
+             this.editorOverlay.addChild(container);
+             
+             this.cameraIconCache.set(entity.id!, container);
+        } else {
+             if (container.parent !== this.editorOverlay) {
+                 this.editorOverlay.addChild(container);
+             }
+        }
+        
+        // FORCE CLEANUP: Remove any Graphics (Cyan Box) from previous versions
+        // If user didn't reload, the old Graphics is still there.
+        for (let i = container.children.length - 1; i >= 0; i--) {
+            const child = container.children[i];
+            if (child instanceof Graphics) {
+                child.destroy();
+            }
+        }
+
+        // Sync Transform
+        container.x = entity.transform.x;
+        container.y = entity.transform.y;
+        container.rotation = entity.transform.rotation;
+        
+        container.scale.set(entity.transform.scale.x, entity.transform.scale.y);
+
+        container.visible = entity.visible !== false;
+    }
+}

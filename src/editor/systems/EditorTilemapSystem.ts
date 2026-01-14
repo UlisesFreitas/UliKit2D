@@ -1,8 +1,8 @@
-
 import { Application, Container, Texture } from 'pixi.js';
 import { SceneManager } from '../../engine/managers/SceneManager';
 import { resourceManager } from '../../engine/resources/ResourceManager';
 import { TilemapChunk } from './tilemap/TilemapChunk';
+import { eventBus } from '../../engine/core/EventBus';
 
 export class EditorTilemapSystem {
     private app: Application;
@@ -29,6 +29,18 @@ export class EditorTilemapSystem {
         this.rootContainer.zIndex = 1; 
         
         this.app.stage.addChild(this.rootContainer);
+
+        // Reactivity Fix: Listen to SceneManager changes
+        eventBus.on('layer-update', () => {
+            this.markDirty();
+        });
+        eventBus.on('scene-loaded', () => {
+             this.rootContainer.removeChildren();
+             this.layerRoots.clear();
+             this.layerChunks.clear();
+             this.textureCache.clear();
+             this.markDirty();
+        });
     }
 
     public markDirty(layerId?: string) {

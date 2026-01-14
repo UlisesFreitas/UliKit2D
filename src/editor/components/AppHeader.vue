@@ -20,14 +20,18 @@ import { useUIStore } from '../../stores/useUIStore';
 import { useLayoutStore } from '../../stores/useLayoutStore';
 import GridSettingsModal from './modals/GridSettingsModal.vue';
 import ProjectSettingsModal from './modals/ProjectSettingsModal.vue';
+import SaveLayoutModal from './modals/SaveLayoutModal.vue';
+import { useProjectSettingsStore } from '../../stores/useProjectSettingsStore';
 
 import { world } from '../../engine/ecs/ECS';
 
 const editorStore = useEditorStore();
 const ui = useUIStore();
 const layoutStore = useLayoutStore();
+const projectSettings = useProjectSettingsStore();
 const showGridSettings = ref(false);
 const showProjectSettings = ref(false);
+const showSaveLayoutModal = ref(false);
 
 // Menu Actions
 const onNewProject = async () => {
@@ -248,10 +252,22 @@ const createAsset = (type: 'Empty' | 'Sprite' | 'Camera' | 'Text' | 'Animator' |
                     <MenubarTrigger class="menu-trigger">View</MenubarTrigger>
                     <MenubarPortal>
                         <MenubarContent class="menu-content" align="start" :sideOffset="5">
+                             <MenubarItem class="menu-item" @select="editorStore.zoomIn">Zoom In</MenubarItem>
+                             <MenubarItem class="menu-item" @select="editorStore.zoomOut">Zoom Out</MenubarItem>
+                             <MenubarItem class="menu-item" @select="editorStore.resetZoom">Reset Zoom</MenubarItem>
+                        </MenubarContent>
+                    </MenubarPortal>
+                </MenubarMenu>
+
+                <!-- Layout Menu -->
+                <MenubarMenu>
+                    <MenubarTrigger class="menu-trigger">Layout</MenubarTrigger>
+                    <MenubarPortal>
+                         <MenubarContent class="menu-content" align="start" :sideOffset="5">
                              <MenubarItem class="menu-item" @select="layoutStore.togglePanel('scenes', 'Scenes')">Scenes</MenubarItem>
                              <MenubarItem class="menu-item" @select="layoutStore.togglePanel('hierarchy', 'Hierarchy')">Hierarchy</MenubarItem>
                              <MenubarItem class="menu-item" @select="layoutStore.togglePanel('assets', 'Assets')">Assets</MenubarItem>
-                             <!-- Scene View Removed (Permanent) -->
+                             <MenubarItem class="menu-item" @select="layoutStore.togglePanel('scene', 'Scene View')">Scene View</MenubarItem>
                              <MenubarItem class="menu-item" @select="layoutStore.togglePanel('console', 'Console')">Console</MenubarItem>
                              <MenubarItem class="menu-item" @select="layoutStore.togglePanel('inspector', 'Inspector')">Inspector</MenubarItem>
                              <MenubarItem class="menu-item" @select="layoutStore.togglePanel('layers', 'Layers')">Layers</MenubarItem>
@@ -260,10 +276,32 @@ const createAsset = (type: 'Empty' | 'Sprite' | 'Camera' | 'Text' | 'Animator' |
                                 Tilemap Settings
                             </MenubarItem>
                              <MenubarSeparator class="menu-separator" />
-                             <MenubarItem class="menu-item" @select="editorStore.zoomIn">Zoom In</MenubarItem>
-                             <MenubarItem class="menu-item" @select="editorStore.zoomOut">Zoom Out</MenubarItem>
-                             <MenubarItem class="menu-item" @select="editorStore.resetZoom">Reset Zoom</MenubarItem>
-                        </MenubarContent>
+                             <MenubarItem class="menu-item" @select="showSaveLayoutModal = true">Save Layout...</MenubarItem>
+                             
+                             <MenubarSub>
+                                <MenubarSubTrigger class="menu-item flex justify-between items-center">
+                                    My Layouts
+                                    <span class="ml-auto pl-2">›</span>
+                                </MenubarSubTrigger>
+                                <MenubarPortal>
+                                    <MenubarSubContent class="menu-content" :sideOffset="2" :alignOffset="-5">
+                                        <div v-if="Object.keys(projectSettings.settings.layouts || {}).length === 0" class="px-2 py-1.5 text-xs text-text-disabled italic">No saved layouts</div>
+                                        <MenubarItem 
+                                            v-else
+                                            v-for="(_, name) in projectSettings.settings.layouts" 
+                                            :key="name" 
+                                            class="menu-item" 
+                                            @select="layoutStore.restoreNamedLayout(name as string)"
+                                        >
+                                            {{ name }}
+                                        </MenubarItem>
+                                    </MenubarSubContent>
+                                </MenubarPortal>
+                             </MenubarSub>
+
+                             <MenubarSeparator class="menu-separator" />
+                             <MenubarItem class="menu-item" @select="layoutStore.resetToDefault()">Default Layout</MenubarItem>
+                         </MenubarContent>
                     </MenubarPortal>
                 </MenubarMenu>
 
@@ -359,6 +397,7 @@ const createAsset = (type: 'Empty' | 'Sprite' | 'Camera' | 'Text' | 'Animator' |
         
         <GridSettingsModal v-model:open="showGridSettings" />
         <ProjectSettingsModal v-model:open="showProjectSettings" />
+        <SaveLayoutModal v-model:open="showSaveLayoutModal" />
     </div>
 </template>
 

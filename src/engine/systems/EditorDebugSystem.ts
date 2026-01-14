@@ -1,10 +1,11 @@
-import { Application, Container, Graphics } from 'pixi.js';
+import { Application, Container, Graphics, Text, TextStyle } from 'pixi.js';
 import { world } from '../ecs/ECS';
 
 export class EditorDebugSystem {
     private app: Application;
     private container: Container;
     private debugGraphics: Map<string, Graphics> = new Map();
+    private debugLabels: Map<string, Text> = new Map();
 
     constructor(app: Application) {
         this.app = app;
@@ -25,12 +26,15 @@ export class EditorDebugSystem {
             activeIds.add(id);
 
             // Check if entity needs a debug placeholder
-            // Condition: No Sprite AND No Label
+            // Condition: No Sprite AND No Label AND NOT Camera
+            // Cameras are handled by RenderSystem with an Icon.
             const hasVisibleSprite = entity.sprite && entity.sprite.texture && entity.sprite.texture.trim() !== '';
             const hasVisibleLabel = entity.label && entity.label.text && entity.label.text.trim() !== '';
             const hasVisibleBitmapText = entity.bitmapText && entity.bitmapText.text && entity.bitmapText.text.trim() !== '';
             const hasVisibleNineSlice = entity.nineSliceSprite && entity.nineSliceSprite.texture && entity.nineSliceSprite.texture.trim() !== '';
-            if (!hasVisibleSprite && !hasVisibleLabel && !hasVisibleBitmapText && !hasVisibleNineSlice) {
+            
+            // SKIP CAMERAS (RenderSystem handles them)
+            if (!entity.camera && !hasVisibleSprite && !hasVisibleLabel && !hasVisibleBitmapText && !hasVisibleNineSlice) {
                 let graphics = this.debugGraphics.get(id);
                 if (!graphics) {
                     graphics = new Graphics();
@@ -44,6 +48,9 @@ export class EditorDebugSystem {
                 // If it HAS a sprite, remove debug graphics if exists
                 this.removeGraphics(id);
             }
+
+            // UPDATE DEBUG LABEL
+            this.updateLabel(id, entity);
         }
 
         // Cleanup stale graphics
@@ -52,9 +59,62 @@ export class EditorDebugSystem {
                 this.removeGraphics(id);
             }
         }
+        
+        // Cleanup stale labels
+        for (const [id] of this.debugLabels) {
+            if (!activeIds.has(id)) {
+                this.removeLabel(id);
+            }
+        }
+    }
+
+    private updateLabel(id: string, entity: any) {
+        let text = this.debugLabels.get(id);
+        if (!text) {
+            const style = new TextStyle({
+                fontFamily: 'monospace',
+                fontSize: 10,
+                fill: '#ffffff',
+                stroke: { color: '#000000', width: 3, join: 'round' },
+                align: 'center',
+                dropShadow: {
+                    color: '#000000',
+                    blur: 2,
+                    distance: 1,
+                    alpha: 1,
+                    angle: Math.PI / 6
+                },
+            });
+            text = new Text({ text: '', style });
+            text.anchor.set(0.5, 1); // Bottom Center anchor (grows up)
+            text.eventMode = 'none'; // Ensure clicks pass through to entity
+            this.container.addChild(text);
+            this.debugLabels.set(id, text);
+        }
+        
+        const { x, y } = entity.transform;
+        
+        // Offset based on generic size assumption
+        // Ideally we check bounds, but transform only has pos
+        // Let's float it 40px above
+        text.x = x;
+        text.y = y - 40; 
+        
+        text.text = `${entity.name || 'Entity'}\nX: ${Math.round(x)} Y: ${Math.round(y)}\nL: ${entity.layer || 'Base'} Z: ${entity.transform.zIndex || 0}`;
+        text.zIndex = 1000;
+    }
+
+    private removeLabel(id: string) {
+        const text = this.debugLabels.get(id);
+        if (text) {
+            text.destroy();
+            this.debugLabels.delete(id);
+        }
     }
 
     public onEntityClicked: ((id: string) => void) | null = null;
+    
+    // ... rest of methods
 
     private drawPlaceholder(g: Graphics, entity: any) {
         g.clear();

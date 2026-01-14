@@ -14,7 +14,7 @@ export class GizmoManager {
     
     // Drag state
     private isDragging: boolean = false;
-    private dragHandle: HandleType = null;
+    public dragHandle: HandleType = null;
     private dragStartPos: Point = new Point();
     private entityStart: { x: number, y: number, scaleX: number, scaleY: number, rotation: number } = { x: 0, y: 0, scaleX: 1, scaleY: 1, rotation: 0 };
     
@@ -23,7 +23,7 @@ export class GizmoManager {
     public getGridSizeCallback: ((layerId: string) => { x: number, y: number } | undefined) | null = null;
     
     // Hover state
-    private hoverHandle: HandleType = null;
+    public hoverHandle: HandleType = null;
 
     private storeUnsub: () => void;
     private boundOnDragMove: (e: FederatedPointerEvent) => void;
@@ -69,7 +69,9 @@ export class GizmoManager {
         });
         
         engine.onRender = () => {
-             this.render();
+             if (this.gizmoGraphics && !this.gizmoGraphics.destroyed) {
+                 this.render();
+             }
         };
     }
 
@@ -78,8 +80,13 @@ export class GizmoManager {
         engine.app.stage.off('pointermove', this.boundOnDragMove);
         engine.app.stage.off('pointerup', this.boundOnDragEnd);
         engine.app.stage.off('pointerupoutside', this.boundOnDragEnd);
-        engine.app.stage.removeChild(this.container);
-        this.container.destroy({ children: true });
+        
+        engine.onRender = () => {}; // Clear render loop hook
+
+        if (!this.container.destroyed) {
+            engine.app.stage.removeChild(this.container);
+            this.container.destroy({ children: true });
+        }
     }
 
     private getBounds() {
@@ -93,35 +100,27 @@ export class GizmoManager {
             w = this.selectedEntity.boxCollider.width * this.selectedEntity.transform.scale.x;
             h = this.selectedEntity.boxCollider.height * this.selectedEntity.transform.scale.y;
         } else if (this.selectedEntity.nineSliceSprite) {
-            // NineSlice uses explicit width/height, but Transform.Scale applies ON TOP of it in my RenderSystem logic
-            // nSlice.scale.set(transform.scale.x, ...)
-            // So visual size = nineSlice.width * scale.x
             w = this.selectedEntity.nineSliceSprite.width * this.selectedEntity.transform.scale.x;
             h = this.selectedEntity.nineSliceSprite.height * this.selectedEntity.transform.scale.y;
         } else if (this.selectedEntity.sprite && this.selectedEntity.sprite.width) {
             w = this.selectedEntity.sprite.width * this.selectedEntity.transform.scale.x;
             h = (this.selectedEntity.sprite.height || 100) * this.selectedEntity.transform.scale.y;
         } else if (this.selectedEntity.bitmapText && this.selectedEntity.bitmapText.width) {
-            // New: Sync with BitmapText size
             w = this.selectedEntity.bitmapText.width * this.selectedEntity.transform.scale.x;
             h = (this.selectedEntity.bitmapText.height || 32) * this.selectedEntity.transform.scale.y;
         } else if (this.selectedEntity.label && this.selectedEntity.label.width) {
-             // New: Sync with Label size
              w = this.selectedEntity.label.width * this.selectedEntity.transform.scale.x;
              h = (this.selectedEntity.label.height || 24) * this.selectedEntity.transform.scale.y;
+        } else if (this.selectedEntity.camera) {
+             // Camera Gizmo Size (Standard 32x32)
+             w = 32 * this.selectedEntity.transform.scale.x;
+             h = 32 * this.selectedEntity.transform.scale.y;
         } else {
-             // Fallback for entities with no size data (apply scale)
              w = 100 * this.selectedEntity.transform.scale.x;
              h = 100 * this.selectedEntity.transform.scale.y;
         }
 
-        // Apply Anchor Offset to find Geometric Center (visual center)
-        // If Sprite has custom anchor, 'x/y' is the Anchor Point.
-        // We need the center of the bounding box.
         const anchor = this.selectedEntity.sprite?.anchor || { x: 0.5, y: 0.5 };
-        
-        // Offset from Anchor to Center
-        // e.g. Anchor 0 (Left) -> we need to move Right (+0.5 * w) to reach center
         const dx = (0.5 - anchor.x) * w;
         const dy = (0.5 - anchor.y) * h;
         
@@ -136,6 +135,7 @@ export class GizmoManager {
     }
 
     private render() {
+        if (this.gizmoGraphics.destroyed) return;
         this.gizmoGraphics.clear();
         
         const bounds = this.getBounds();
@@ -173,6 +173,14 @@ export class GizmoManager {
         }));
 
         // Bounding Box
+        // Check if Camera
+        const isCamera = !!this.selectedEntity?.camera;
+        const mainAlpha = isCamera ? 0 : 1; 
+        const fillAlpha = isCamera ? 0.01 : 0.05; // 0.01 is enough for pointer events
+        const cornerAlpha = isCamera ? 0 : 1;
+        const activeStrokeWidth = isCamera ? 0 : strokeWidth;
+
+        // Bounding Box
         const [c0, c1, c2, c3] = corners;
         if (c0 && c1 && c2 && c3) {
             this.gizmoGraphics.moveTo(c0.x, c0.y);
@@ -181,18 +189,20 @@ export class GizmoManager {
             this.gizmoGraphics.lineTo(c3.x, c3.y);
             this.gizmoGraphics.lineTo(c0.x, c0.y);
         }
-        this.gizmoGraphics.stroke({ width: strokeWidth, color: 0xffff00 });
+        this.gizmoGraphics.stroke({ width: activeStrokeWidth, color: 0xffff00, alpha: mainAlpha });
         // Use transparent fill to catch clicks for move
-        this.gizmoGraphics.fill({ color: 0xffff00, alpha: 0.05 });
+        this.gizmoGraphics.fill({ color: 0xffff00, alpha: fillAlpha });
 
         // Draw Corners
         corners.forEach(c => {
             const color = (this.hoverHandle === c.id || this.dragHandle === c.id) ? 0xffffff : 0xffff00;
             
             this.gizmoGraphics.rect(c.x - size/2, c.y - size/2, size, size);
-            this.gizmoGraphics.fill({ color });
-            this.gizmoGraphics.stroke({ width: subStrokeWidth, color: 0x000000 });
+            this.gizmoGraphics.fill({ color, alpha: cornerAlpha });
+            this.gizmoGraphics.stroke({ width: subStrokeWidth, color: 0x000000, alpha: cornerAlpha });
         });
+
+        if (isCamera) return; // Skip Rotate Handle for Camera
 
         // Rotation Handle (Top Right + Offset)
         const offset = this.ROTATE_OFFSET / zoom;

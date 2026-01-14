@@ -1,7 +1,10 @@
 import { defineStore } from 'pinia';
 import { ref } from 'vue';
+import { useProjectSettingsStore } from './useProjectSettingsStore';
+import { ProjectSettingsManager } from '../editor/managers/ProjectSettingsManager';
 
 const LAYOUT_KEY = 'editor-layout-v16';
+const LAYOUT_KEY_CUSTOM = 'editor-layout-custom';
 
 export const useLayoutStore = defineStore('layout', () => {
     const layoutState = ref<any>(null);
@@ -22,6 +25,66 @@ export const useLayoutStore = defineStore('layout', () => {
             }
         }
         return null;
+    };
+    
+    // Custom User Layout Actions (Quick Save)
+    const saveCustomLayout = () => {
+        if (dockApi.value) {
+            const json = dockApi.value.toJSON();
+            localStorage.setItem(LAYOUT_KEY_CUSTOM, JSON.stringify(json));
+            alert('Custom Layout Saved (Quick)');
+        }
+    };
+
+    const restoreCustomLayout = () => {
+        const saved = localStorage.getItem(LAYOUT_KEY_CUSTOM);
+        if (saved && dockApi.value) {
+            try {
+                dockApi.value.fromJSON(JSON.parse(saved));
+            } catch (e) {
+                alert('Failed to load custom layout');
+            }
+        } else {
+             alert('No Quick Layout saved. Use "Save Layout" first.');
+        }
+    };
+
+    // Named Layouts (Project Settings)
+    const saveNamedLayout = async (name: string) => {
+        if (!dockApi.value) return;
+        const projectStore = useProjectSettingsStore();
+        
+        const json = dockApi.value.toJSON();
+        // Ensure layouts object exists (migration safety)
+        if (!projectStore.settings.layouts) projectStore.settings.layouts = {};
+        
+        projectStore.settings.layouts[name] = json;
+        
+        // Persist immediately
+        await ProjectSettingsManager.saveSettings();
+    };
+
+    const restoreNamedLayout = (name: string) => {
+        const projectStore = useProjectSettingsStore();
+        if (!projectStore.settings.layouts) return;
+
+        const json = projectStore.settings.layouts[name];
+        
+        if (json && dockApi.value) {
+            try {
+                dockApi.value.fromJSON(json);
+            } catch (e) {
+                console.error(`Failed to restore layout ${name}`, e);
+            }
+        }
+    };
+
+    const deleteNamedLayout = async (name: string) => {
+        const projectStore = useProjectSettingsStore();
+        if (projectStore.settings.layouts && projectStore.settings.layouts[name]) {
+            delete projectStore.settings.layouts[name];
+            await ProjectSettingsManager.saveSettings();
+        }
     };
 
     const activePanels = ref(new Set<string>());
@@ -52,9 +115,11 @@ export const useLayoutStore = defineStore('layout', () => {
         return !!localStorage.getItem(LAYOUT_KEY);
     };
 
-    const resetLayout = () => {
-        localStorage.removeItem(LAYOUT_KEY);
-        window.location.reload();
+    const resetToDefault = () => {
+        if (confirm('Reset to Default Layout? This will reload the editor.')) {
+            localStorage.removeItem(LAYOUT_KEY);
+            window.location.reload();
+        }
     };
 
     const togglePanel = (id: string, title?: string) => {
@@ -96,6 +161,13 @@ export const useLayoutStore = defineStore('layout', () => {
                 position = { referencePanel: 'scene', direction: 'below' };
                  if (!dockApi.value.getPanel('scene')) position = { direction: 'below' };
                 break;
+            case 'scene':
+                position = { referencePanel: 'console', direction: 'above' };
+                if (!dockApi.value.getPanel('console')) {
+                     const inspector = dockApi.value.getPanel('inspector');
+                     if (inspector) position = { referencePanel: 'inspector', direction: 'left' };
+                }
+                break;
             case 'inspector':
                 position = { direction: 'right' };
                 break;
@@ -130,7 +202,12 @@ export const useLayoutStore = defineStore('layout', () => {
         loadLayout,
         setApi,
         hasSavedLayout,
-        resetLayout,
+        saveCustomLayout,
+        restoreCustomLayout,
+        saveNamedLayout,
+        restoreNamedLayout,
+        deleteNamedLayout,
+        resetToDefault,
         openPanel,
         togglePanel,
         isPanelOpen

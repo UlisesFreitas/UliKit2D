@@ -90,11 +90,11 @@ export class ProjectManager {
             const { SceneManager } = await import('../../engine/managers/SceneManager');
             try {
                 // Try NewScene.json first
+                console.log('[ProjectManager] Loading initial scene: assets/scenes/NewScene.json');
                 const success = await SceneManager.loadSceneFromFile('assets/scenes/NewScene.json');
+                
                 if (!success) {
-                    // Try to list scenes and load first one?
-                    // For now fall back to default
-                    console.warn('[ProjectManager] NewScene.json not found, creating default.');
+                    console.warn('[ProjectManager] NewScene.json load returned false. Creating default scene.');
                     SceneManager.createDefaultScene();
                 }
             } catch (e) {

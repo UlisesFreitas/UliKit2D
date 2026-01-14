@@ -23,7 +23,7 @@ const emit = defineEmits<{
 
 const store = useProjectSettingsStore();
 const ui = useUIStore();
-const activeTab = ref<'general' | 'display' | 'physics' | 'tags'>('general');
+const activeTab = ref<'general' | 'display' | 'physics' | 'tags' | 'layouts'>('general');
 
 const onClose = () => {
     if (store.isDirty) {
@@ -66,7 +66,7 @@ const onApply = () => {
                     <!-- Sidebar Tabs -->
                     <div class="w-48 border-r border-border bg-bg-base/50 flex flex-col py-2">
                         <button 
-                            v-for="tab in ['General', 'Display', 'Physics', 'Tags & Layers']"
+                            v-for="tab in ['General', 'Display', 'Physics', 'Tags & Layers', 'Layouts']"
                             :key="tab"
                             @click="activeTab = (tab.split(' ')[0] || '').toLowerCase() as any"
                             class="px-4 py-2 text-left text-sm transition-colors border-l-2"
@@ -189,6 +189,33 @@ const onApply = () => {
                                         <input v-model="store.settings.layers[index]" class="bg-transparent outline-none flex-1" />
                                          <button @click="store.settings.layers.splice(index, 1)" class="ml-2 text-red-500 hover:text-red-400">×</button>
                                     </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- LAYOUTS TAB -->
+                        <div v-if="activeTab === 'layouts'" class="space-y-4 animate-fade-in">
+                             <h3 class="text-lg font-bold text-accent mb-4">Saved Layouts</h3>
+                             
+                             <div v-if="!store.settings.layouts || Object.keys(store.settings.layouts).length === 0" class="text-text-secondary italic text-sm">
+                                 No saved layouts. Use "Layout -> Save Layout..." to create one.
+                             </div>
+
+                             <div class="flex flex-col gap-2">
+                                <div v-for="(json, name) in store.settings.layouts" :key="name" class="flex items-center justify-between bg-bg-panel border border-border rounded px-4 py-3">
+                                    <div class="flex items-center gap-3">
+                                         <div class="w-8 h-8 rounded bg-bg-base flex items-center justify-center text-accent">
+                                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/></svg>
+                                         </div>
+                                         <span class="font-bold text-sm text-text-primary">{{ name }}</span>
+                                    </div>
+                                    <button 
+                                        @click="delete store.settings.layouts[name]; store.isDirty = true;" 
+                                        class="text-text-secondary hover:text-red-500 transition-colors p-1"
+                                        title="Delete Layout"
+                                    >
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
+                                    </button>
                                 </div>
                             </div>
                         </div>
