@@ -36,7 +36,7 @@ const DEFAULT_SETTINGS: IProjectSettings = {
         height: 720,
         fullscreen: false,
         pixelArt: true,
-        backgroundColor: '#000000'
+        backgroundColor: '#252526' // Matches 'dark_modern' --bg-panel
     },
     physics: {
         gravity: { x: 0, y: 9.81 },

@@ -5,6 +5,7 @@ import { world, type Entity } from '../../engine/ecs/ECS';
 
 import { SceneManager } from '../../engine/managers/SceneManager';
 import { instance as engine } from '../../engine/core/Engine';
+import { SelectionManager } from '../managers/SelectionManager';
 
 const editorStore = useEditorStore();
 const entities = ref<Entity[]>([]);
@@ -58,20 +59,10 @@ onUnmounted(() => {
     eventBus.off('entity-updated', updateList);
 });
 
-watch(() => editorStore.selectedEntityId, (newId) => {
-    if (newId) {
-        nextTick(() => {
-            const el = document.getElementById(`hierarchy-item-${newId}`);
-            if (el) {
-                 el.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
-            }
-        });
-    }
-});
-
 const select = (id: string | undefined) => {
+    // console.log(`[Hierarchy] Selecting: ${id}`);
     if (!id) return;
-    editorStore.selectEntity(id);
+    // editorStore.selectEntity(id);
 };
 
 // Deprecated in favor of Create Asset Menu for direct usage, but kept for logic reference
@@ -134,7 +125,7 @@ const createEntity = (type: 'Empty' | 'Sprite' | 'Camera' | 'Text' | 'BitmapText
     world.add(data);
     SceneManager.registerEntity(id, 'Base Layer');
     // The subscription will update the list automatically
-    select(id);
+    // SelectionManager.select(id);
 };
 
 const menuState = ref({ visible: false, x: 0, y: 0, entityId: '' });
@@ -194,7 +185,7 @@ const deleteEntity = () => {
     if (entity) {
         world.remove(entity);
         if (editorStore.selectedEntityId === id) {
-            editorStore.selectEntity('');
+            // editorStore.selectEntity('');
         }
     }
     updateList();
@@ -214,7 +205,7 @@ const duplicateEntity = () => {
             name: `${entity.name} (Copy)`
         });
         SceneManager.registerEntity(newId, entity.layer || 'Base Layer');
-        select(newId);
+        // SelectionManager.select(newId);
     }
 };
 </script>
@@ -249,7 +240,6 @@ const duplicateEntity = () => {
                     v-for="entity in entities" 
                     :key="entity.id"
                     :id="`hierarchy-item-${entity.id}`"
-                    @click="select(entity.id)"
                     @dblclick="focus(entity.id)"
                     @contextmenu.stop.prevent="showContextMenu($event, entity.id || '')"
                     :class="[

@@ -60,6 +60,10 @@ export class Engine {
         this.isSimulationRunning = false;
     }
 
+    public resize() {
+        this.app.resize();
+    }
+
     public startSimulation() {
         this.isSimulationRunning = true;
         Input.reset();

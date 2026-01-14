@@ -1,4 +1,4 @@
-import { Container, Graphics, Application } from 'pixi.js';
+import { Container, Graphics, Application, Color } from 'pixi.js';
 
 export class GridSystem {
     private container: Container;
@@ -17,6 +17,27 @@ export class GridSystem {
         this.container.addChild(this.gridGraphics);
     }
 
+    private getThemeColor(varName: string, fallback: number | string): number {
+        // Try to read CSS variable
+        const style = getComputedStyle(document.body);
+        const cssVal = style.getPropertyValue(varName).trim();
+        
+        try {
+            if (cssVal && cssVal !== '') {
+                return new Color(cssVal).toNumber();
+            }
+        } catch (e) {
+            // Ignore parse error
+        }
+        
+        // Fallback
+        try {
+            return new Color(fallback).toNumber();
+        } catch (e) {
+            return 0x000000;
+        }
+    }
+
     public draw(
         cameraX: number, 
         cameraY: number, 
@@ -31,6 +52,7 @@ export class GridSystem {
         }
     ) {
         const g = this.gridGraphics;
+        g.visible = true;
         g.clear();
         
         const screenWidth = this.app.screen.width;
@@ -48,15 +70,9 @@ export class GridSystem {
         const endWorldX = (screenWidth - cameraX) / scale;
         const endWorldY = (screenHeight - cameraY) / scale;
 
-        g.stroke({ width: 1 / scale, color: options.color || '#333333', alpha: 0.5 });
-
-        // Calculate Alignment with Offset
-        // We want lines at: N * cell + offset
+        // --- DRAW GRID LINES ---
+        // DRAW FIRST, THEN STROKE
         
-        // Vertical Lines (X)
-        // Find first X:  N * cellW + offX >= startWorldX
-        // N * cellW >= startWorldX - offX
-        // N >= (startWorldX - offX) / cellW
         const startN_X = Math.floor((startWorldX - offX) / cellW);
         const endN_X = Math.ceil((endWorldX - offX) / cellW);
         
@@ -66,7 +82,6 @@ export class GridSystem {
             g.lineTo(x, endWorldY);
         }
 
-        // Horizontal Lines (Y)
         const startN_Y = Math.floor((startWorldY - offY) / cellH);
         const endN_Y = Math.ceil((endWorldY - offY) / cellH);
         
@@ -75,18 +90,37 @@ export class GridSystem {
             g.moveTo(startWorldX, y);
             g.lineTo(endWorldX, y);
         }
+
+        // Apply Stroke for Lines
+        // Note: In PixiJS, stroke() applies to the path constructed so far.
+        let strokeColor: number;
+        try {
+            strokeColor = new Color(options.color || '#333333').toNumber();
+        } catch (e) {
+            strokeColor = new Color('#333333').toNumber();
+        }
+        g.stroke({ width: 1 / scale, color: strokeColor, alpha: 0.5 });
+
+        // --- DRAW AXES ---
         
-        // Origin Axes (Thicker)
-        g.stroke({ width: 2 / scale, color: 0x666666, alpha: 0.8 });
+        let hasAxis = false;
         
         if (startWorldX <= 0 && endWorldX >= 0) {
             g.moveTo(0, startWorldY);
             g.lineTo(0, endWorldY);
+            hasAxis = true;
         }
         
         if (startWorldY <= 0 && endWorldY >= 0) {
             g.moveTo(startWorldX, 0);
             g.lineTo(endWorldX, 0);
+            hasAxis = true;
+        }
+
+        // Apply Stroke for Axes
+        if (hasAxis) {
+            const axisColor = this.getThemeColor('--grid-axis', 0x666666);
+            g.stroke({ width: 2 / scale, color: axisColor, alpha: 0.8 });
         }
     }
 }

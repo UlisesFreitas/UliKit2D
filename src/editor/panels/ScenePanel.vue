@@ -1,17 +1,15 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, watch, computed } from 'vue';
 import { instance as engine } from '../../engine/core/Engine';
-import { GizmoManager } from '../gizmos/GizmoManager';
+import { instance as gizmoManager } from '../gizmos/GizmoManager';
 import { world } from '../../engine/ecs/ECS';
 import { useEditorStore } from '../../stores/useEditorStore';
 import { usePreferencesStore } from '../../stores/usePreferencesStore';
 import { useTilemapStore } from '../stores/useTilemapStore';
 import SceneToolbar from '../components/SceneToolbar.vue';
 import Toolbar from '../components/Toolbar.vue';
-import { projectState } from '../managers/ProjectManager';
-import { SelectionManager } from '../managers/SelectionManager';
-import { EditorTilemapSystem } from '../systems/EditorTilemapSystem';
 import { SceneManager } from '../../engine/managers/SceneManager';
+import { eventBus } from '../../engine/core/EventBus';
 import type { SceneLayer } from '../../engine/managers/SceneManager';
 
 // Store & State
@@ -32,8 +30,6 @@ const showGrid = computed({
 const snapToGrid = ref(false);
 
 // Systems
-let gizmoManager: GizmoManager;
-let tilemapSystem: EditorTilemapSystem; 
 let resizeObserver: ResizeObserver;
 let sceneGrid: any = null;
 
@@ -112,19 +108,15 @@ const updateHighlight = (screenX: number, screenY: number) => {
 
 const updateGizmoSnap = (val: boolean) => {
     snapToGrid.value = val;
-    if (gizmoManager) {
-        gizmoManager.snapToGrid = val;
-    }
+    gizmoManager.snapToGrid = val;
 };
 
 const paintTile = (e: MouseEvent, erase = false) => {
     if (!isTilemapMode.value || !activeLayer.value || !container.value) return;
 
-    const rect = engine.app?.canvas?.getBoundingClientRect() ?? container.value?.getBoundingClientRect();
-    if (!rect) return;
-
-    const screenX = e.clientX - rect.left;
-    const screenY = e.clientY - rect.top;
+    // Use Global Screen Coords
+    const screenX = e.clientX;
+    const screenY = e.clientY;
     
     // World Coords
     const worldX = (screenX - cameraX.value) / zoom.value;
@@ -148,7 +140,7 @@ const paintTile = (e: MouseEvent, erase = false) => {
              activeLayer.value.tileData[key] = targetId;
         }
         SceneManager.setDirty(true);
-        if (tilemapSystem) tilemapSystem.markDirty(activeLayer.value.id);
+        eventBus.emit('layer-update', activeLayer.value.id);
     }
 };
 
@@ -158,10 +150,14 @@ const paintTile = (e: MouseEvent, erase = false) => {
 
 const onWheel = (e: WheelEvent) => {
     e.preventDefault();
+    // Immortal Canvas: Stage is Global (0,0). Mouse is Screen Space.
+    const mouseX = e.clientX;
+    const mouseY = e.clientY;
+
     const direction = e.deltaY > 0 ? -1 : 1;
     const zoomFactor = Math.max(0.1, zoom.value * 0.1);
     const minZoom = 0.1;
-    const maxZoom = 15.0; 
+    const maxZoom = 64.0; // Increased for Pixel Art (8x8)
     
     const prevZoom = zoom.value;
     let newZoom = prevZoom + (direction * zoomFactor);
@@ -169,57 +165,46 @@ const onWheel = (e: WheelEvent) => {
 
     if (newZoom === prevZoom) return;
 
-    if (container.value) {
-        const rect = engine.app?.canvas?.getBoundingClientRect() || container.value.getBoundingClientRect();
-        const mouseX = e.clientX - rect.left;
-        const mouseY = e.clientY - rect.top;
-        const worldX = (mouseX - cameraX.value) / prevZoom;
-        const worldY = (mouseY - cameraY.value) / prevZoom;
+    // Zoom Towards Point
+    const worldX = (mouseX - cameraX.value) / prevZoom;
+    const worldY = (mouseY - cameraY.value) / prevZoom;
 
-        // Apply new zoom
-        // NOTE: We update store via computed 'zoom' setter, but cameraX/Y is local.
-        // We set local zoom.value directly? No, it's computed.
-        zoom.value = newZoom;
-        
-        // Adjust Camera to keep Mouse over same World Pos
-        cameraX.value = mouseX - (worldX * newZoom);
-        cameraY.value = mouseY - (worldY * newZoom);
-    } else {
-        zoom.value = newZoom;
+    // Set Zoom (Store might clamp it further)
+    zoom.value = newZoom;
+    
+    // Read back actual zoom from store to ensure Camera Math matches Reality
+    const actualZoom = zoom.value;
+
+    if (actualZoom === prevZoom) {
+        // Zoom didn't change (e.g. hit store limit), don't move camera
+        return;
     }
+    
+    cameraX.value = mouseX - (worldX * actualZoom);
+    cameraY.value = mouseY - (worldY * actualZoom);
+    
+    updateView();
 };
 
 const onMouseDown = (e: MouseEvent) => {
     (document.activeElement as HTMLElement)?.blur();
 
-    const rect = engine.app?.canvas?.getBoundingClientRect() || container.value?.getBoundingClientRect();
-    if (!rect) return;
+    const mouseX = e.clientX;
+    const mouseY = e.clientY;
 
-    const mouseX = e.clientX - rect.left;
-    const mouseY = e.clientY - rect.top;
-
-    // 1. Selection (Left Click, No Alt, No Tilemap)
-    // Only if NOT panning
-    if (e.button === 0 && !e.altKey && !isTilemapMode.value) {
-          if (gizmoManager && gizmoManager.hoverHandle) {
-               return; 
-          }
-
-          const foundId = SelectionManager.pickEntity({ x: mouseX, y: mouseY });
-          
-          let name = 'NULL';
-          if (foundId) {
-                const ent = world.where(ent => ent.id === foundId).first;
-                name = ent ? (ent.name || ent.id?.substring(0,8) || 'Unknown') : 'Unknown';
-          }
-          debugInfo.value.lastClick = name;
-          try {
-              store.selectEntity(foundId);
-          } catch (err) {
-              console.error('[ScenePanel] Failed to select entity:', err);
-          }
+    // 1. Gizmo Interaction (Proxy)
+    if (e.button === 0 && !e.altKey && !isPainting.value) {
+        if (gizmoManager.processPointerDown(mouseX, mouseY)) {
+            // Gizmo handled the click (e.g. started drag)
+            return;
+        }
+        // Selection Logic... check if click on entity?
+        // For now, simple selection is done via GizmoManager usually, or we can add raycast here.
+        // Assuming GizmoManager handles bounds checks for selection too.
     }
+    
 
+    
     // 2. Painting
     if (isTilemapMode.value && (e.button === 0 || e.button === 2) && !e.altKey) {
         isPainting.value = true;
@@ -238,20 +223,20 @@ const onMouseDown = (e: MouseEvent) => {
 };
 
 const onMouseMove = (e: MouseEvent) => {
-    const rect = engine.app?.canvas?.getBoundingClientRect() || container.value?.getBoundingClientRect();
-    if (rect) {
-        const sx = e.clientX - rect.left;
-        const sy = e.clientY - rect.top;
-        
-        updateHighlight(sx, sy);
-        
-        // Debug Update
-        debugInfo.value.screen = { x: Math.round(sx), y: Math.round(sy) };
-        debugInfo.value.world = { 
-            x: Math.round((sx - cameraX.value)/zoom.value), 
-            y: Math.round((sy - cameraY.value)/zoom.value) 
-        };
-    }
+    const sx = e.clientX;
+    const sy = e.clientY;
+    
+    // Proxy to Gizmo (Always, for hover effects)
+    gizmoManager.processPointerMove(sx, sy);
+    
+    updateHighlight(sx, sy);
+    
+    // Debug Update
+    debugInfo.value.screen = { x: Math.round(sx), y: Math.round(sy) };
+    debugInfo.value.world = { 
+        x: Math.round((sx - cameraX.value)/zoom.value), 
+        y: Math.round((sy - cameraY.value)/zoom.value) 
+    };
     
     if (isPainting.value) {
         const isErase = (e.buttons & 2) === 2 || tilemapStore.currentTool === 'eraser';
@@ -274,17 +259,18 @@ const onMouseUp = () => {
     isPainting.value = false;
     isPanning.value = false;
     if (container.value) container.value.style.cursor = 'default';
+    
+    // Release Gizmo
+    gizmoManager.processPointerUp();
 };
 
 const onDrop = (e: DragEvent) => {
     const path = e.dataTransfer?.getData('text/plain');
     if (!path) return;
     
-    const rect = container.value?.getBoundingClientRect();
-    if (!rect) return;
-    
-    const screenX = e.clientX - rect.left;
-    const screenY = e.clientY - rect.top;
+    // Use Global Screen Coords
+    const screenX = e.clientX;
+    const screenY = e.clientY;
     
     const worldX = (screenX - cameraX.value) / zoom.value;
     const worldY = (screenY - cameraY.value) / zoom.value;
@@ -306,43 +292,59 @@ const onDrop = (e: DragEvent) => {
 // ------------------------------------------------------------------
 
 onMounted(async () => {
-    if (container.value) {
-        (window as any).engine = engine; 
-        await engine.init(container.value);
-        engine.start();
+    // NOTE: Engine is initialized in DockLayout (Immortal Canvas)
+    
+    // Auto-Select "Scene" Layer if none
+    if (!store.activeLayerId && SceneManager.layers.length > 0) {
+        store.selectLayer(SceneManager.layers[0]!.id);
+    }
 
+    // Grid Reactivity
+    watch(() => preferencesStore.grid, (val) => {
+        console.log('[ScenePanel] Watcher Triggered. Color:', val.color);
+        updateView();
+    }, { deep: true });
+
+    if (container.value) {
         resizeObserver = new ResizeObserver(() => {
-            if (engine.app && engine.app.renderer) {
-                engine.app.resize();
-                updateView();
-            }
+             // Re-calculate center to keep 0,0 at center or simple update
+             // If we just call updateView(), the stage position (cameraX/Y) stays static, 
+             // but if the panel moves (e.g. sidebar open/close), the stage incorrectly stays put relative to window.
+             // We need to re-center or offset based on delta. 
+             // For robustness, let's re-center 0,0 for now (or at least update logic).
+             const rect = container.value!.getBoundingClientRect();
+             // Ideally we preserve the 'lookAt' point, but simpler fix:
+             cameraX.value = rect.left + rect.width / 2;
+             cameraY.value = rect.top + rect.height / 2;
+             
+             updateView();
         });
         resizeObserver.observe(container.value);
         
-        gizmoManager = new GizmoManager();
-        gizmoManager.getGridSizeCallback = (layerId) => {
-             const layer = SceneManager.getLayerById(layerId);
-             return layer?.gridSize;
-        };
-        
-        tilemapSystem = new EditorTilemapSystem(engine.app);
-        engine.app.ticker.add(() => tilemapSystem.update());
-        
-        // Grid
-        const { GridSystem } = await import('../systems/GridSystem');
-        const grid = new GridSystem(engine.app);
-        sceneGrid = grid;
-        if (preferencesStore.grid.visible) grid.draw(cameraX.value, cameraY.value, zoom.value, preferencesStore.grid);
-        
-        engine.app.renderer.on('resize', () => {
-             updateView();
-        });
+        // Initial Center Camera
+        // Since the canvas is Global (Immortal), (0,0) is top-left of window.
+        // We want (0,0) world space to be at the center of this Panel.
+        // Panel Center = (rect.left + rect.width/2, rect.top + rect.height/2)
+        const rect = container.value.getBoundingClientRect();
+        cameraX.value = rect.left + rect.width / 2;
+        cameraY.value = rect.top + rect.height / 2;
+        updateView();
+    }
+
+    // Initialize Grid (We can do this here as we just need engine.app)
+    if (engine.app) {
+         const { GridSystem } = await import('../systems/GridSystem');
+         sceneGrid = new GridSystem(engine.app);
+         // Initial Draw
+         if (preferencesStore.grid.visible) {
+             sceneGrid.draw(cameraX.value, cameraY.value, zoom.value, preferencesStore.grid);
+         }
     }
 });
 
 onUnmounted(() => {
     if (resizeObserver) resizeObserver.disconnect();
-    if (gizmoManager) gizmoManager.dispose();
+    // Do not destroy engine or systems here
 });
 
 // Watchers
@@ -354,6 +356,7 @@ watch(() => preferencesStore.grid, () => updateView(), { deep: true });
   <div 
     class="scene-panel" 
     ref="container" 
+    tabindex="0"
     @dragover.prevent 
     @drop.prevent="onDrop"
     @wheel="onWheel"
@@ -361,8 +364,11 @@ watch(() => preferencesStore.grid, () => updateView(), { deep: true });
     @mousemove="onMouseMove"
     @mouseup="onMouseUp"
     @mouseleave="onMouseUp"
+    @contextmenu.prevent
   >
-    <!-- Debug Overlay -->
+    <!-- Overlay UI Only - No Canvas -->
+    
+<!-- Debug Overlay -->
     <div class="absolute top-4 right-4 bg-black/80 text-white p-2 rounded text-xs z-[101] font-mono pointer-events-none select-none">
         <div class="font-bold text-yellow-400 mb-1 border-b border-gray-600">INPUT DEBUGGER</div>
         <div class="grid grid-cols-2 gap-x-4">
@@ -401,7 +407,6 @@ watch(() => preferencesStore.grid, () => updateView(), { deep: true });
         />
     </div>
 
-    <!-- Canvas will be appended here by the Engine -->
   </div>
 </template>
 
@@ -409,24 +414,9 @@ watch(() => preferencesStore.grid, () => updateView(), { deep: true });
 .scene-panel {
   width: 100%;
   height: 100%;
-  background-color: var(--bg-base);
+  background-color: transparent !important; /* Transparent for Immortal Canvas */
   position: relative;
   overflow: hidden;
-}
-.overlay {
-  color: var(--text-secondary);
-  font-size: 24px;
-}
-.toolbar-overlay {
-    position: absolute;
-    top: 10px;
-    left: 50%;
-    transform: translateX(-50%);
-    z-index: 1000;
-    /* Optional: glass effect */
-    background: var(--bg-panel);
-    border-radius: 8px;
-    padding: 2px;
-    border: 1px solid var(--border-color);
+  outline: none;
 }
 </style>

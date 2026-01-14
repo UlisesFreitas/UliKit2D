@@ -15,7 +15,7 @@ export const useEditorStore = defineStore('editor', () => {
 
     // Actions
     const selectEntity = (id: string | null) => {
-        selectedEntityId.value = id;
+        // selectedEntityId.value = id;
     };
 
     const executeCommand = (command: ICommand) => {
@@ -75,7 +75,7 @@ export const useEditorStore = defineStore('editor', () => {
     
     const setZoom = (value: number) => {
         // Clamp between 0.1 and 10
-        zoomLevel.value = Math.max(0.1, Math.min(value, 10));
+        zoomLevel.value = Math.max(0.1, Math.min(value, 64));
     };
 
     const zoomIn = () => setZoom(zoomLevel.value + 0.1);
@@ -141,7 +141,7 @@ export const useEditorStore = defineStore('editor', () => {
         });
         
         // Select the new entity
-        selectEntity(newId);
+        // selectEntity(newId);
     };
 
     // Layer Selection

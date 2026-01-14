@@ -125,3 +125,25 @@ html, body, #app {
 }
 
 
+/* Force Transparency for Scene View Panel Container using :has() */
+
+/* Broad selectors based on User Logs */
+.dockview-theme-abyss .dv-group-view:has(.scene-panel-host),
+.dockview-theme-light .dv-group-view:has(.scene-panel-host),
+.dockview-theme-abyss .dv-groupview:has(.scene-panel-host), /* User reported typo/variant? */
+.dockview-theme-light .dv-groupview:has(.scene-panel-host),
+.dockview-theme-abyss .dv-grid-view:has(.scene-panel-host), /* Root grid */
+.dockview-theme-light .dv-grid-view:has(.scene-panel-host),
+.scene-panel-host {
+    background-color: transparent !important;
+    background: transparent !important; 
+}
+
+/* Ensure global app container allows see-through if z-index goes weird */
+.app-container {
+    background-color: transparent !important; 
+}
+/* Move base color to body to ensure we don't look broken */
+body {
+    background-color: var(--bg-base);
+}

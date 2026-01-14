@@ -33,7 +33,7 @@ onMounted(() => {
   flex-direction: column;
   height: 100vh;
   width: 100vw;
-  background-color: var(--bg-base);
+  /* Background handled in style.css / body to allow transparency */
   color: var(--text-primary);
 }
 

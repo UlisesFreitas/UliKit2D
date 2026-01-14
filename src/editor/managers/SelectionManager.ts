@@ -4,87 +4,74 @@ import { CoordinateUtils } from '../../engine/utils/CoordinateUtils';
 import { SceneManager } from '../../engine/managers/SceneManager';
 import { Point } from 'pixi.js';
 
+import { useEditorStore } from '../../stores/useEditorStore';
+
+// Helper to access store lazily
+let _store: any = null;
+const getStore = () => {
+    if (!_store) _store = useEditorStore();
+    return _store;
+};
+
 export class SelectionManager {
+    
+    /**
+     * Selects an entity by ID (or deselects if null).
+     * Central point for all selection actions.
+     */
+    public static select(id: string | null) {
+        getStore().selectEntity(id);
+    }
 
     /**
-     * Finds the best entity under the global point.
-     * Prioritizes:
-     * 1. Editor Overlay (Cameras)
-     * 2. Top Layers (as per SceneManager order)
-     * 3. Higher Z-Index within Layer
+     * Determines which entity is under the given GLOBAL point.
+     * Respects: Visibility, Renderability, Layers, and Z-Index.
      */
-    public static pickEntity(globalPoint: Point | {x: number, y: number}): string | null {
+    public static pickEntity(globalPoint: {x: number, y: number}): string | null {
         // Convert to Pixi Point
         const point = new Point(globalPoint.x, globalPoint.y);
 
-        // 1. Get all candidates
-        const candidates = this.getCandidatesAt(point);
-
-        if (candidates.length > 0) {
-            // Return top-most
-            return candidates[0].id!;
-        }
-
-        return null;
-    }
-
-    private static getCandidatesAt(point: Point): any[] {
-        // Get all transform entities
+        // 1. Get all candidate entities
+        const candidates: any[] = [];
         const entities = world.with('transform');
-        const hits: any[] = [];
 
         for (const entity of entities) {
-            // Visibility Check
             if (entity.visible === false) continue;
-
-            const id = entity.id!;
-            const displayObject = engine.renderSystem.getDisplayObject(id);
+            
+            // Get Display Object
+            const displayObject = engine.renderSystem.getDisplayObject(entity.id!);
+            if (!displayObject || !displayObject.visible || !displayObject.renderable) continue;
 
             // Hit Test
-            const hit = CoordinateUtils.isPointInEntity(entity, displayObject, point);
-            
-            // DEBUG SELECTION
-            // if (hit) console.log(`[SelectionManager] Hit: ${entity.name} (${entity.id})`);
-            
-            if (hit) {
-                hits.push(entity);
+            if (CoordinateUtils.isPointInEntity(entity, displayObject, point)) {
+                candidates.push(entity);
             }
         }
 
-        // Sort Hits
-        // Priority:
-        // 1. Camera (Overlay, Z=9999 effectively)
-        // 2. Layer Index (Higher is on top)
-        // 3. Z-Index (Higher is on top)
+        if (candidates.length === 0) return null;
+
+        // 2. Sort Candidates (Topmost first)
+        // Order: Layer Index (Desc) > Z-Index (Desc)
         
-        // Cache layer indices for speed
         const layerOrder = new Map<string, number>();
         SceneManager.layers.forEach((l, i) => layerOrder.set(l.id, i));
 
-        return hits.sort((a, b) => {
-            // A. Check Camera (Always Top)
-            const aIsCam = !!a.camera;
-            const bIsCam = !!b.camera;
-            if (aIsCam && !bIsCam) return -1;
-            if (!aIsCam && bIsCam) return 1;
-
-            // B. Layer Priority
+        candidates.sort((a, b) => {
             const layerA = layerOrder.get(a.layer || 'Base Layer') ?? 0;
             const layerB = layerOrder.get(b.layer || 'Base Layer') ?? 0;
             
             if (layerA !== layerB) {
-                return layerB - layerA; // Descending (Higher layer first)
+                return layerB - layerA; // Higher layer index = Top
             }
 
-            // C. Z-Index Priority
             const zA = a.transform.zIndex || 0;
             const zB = b.transform.zIndex || 0;
             
-            return zB - zA; // Descending
+            return zB - zA; // Higher Z = Top
         });
-    }
 
-    public static getEntitiesAt(globalPoint: {x: number, y: number}) {
-        return this.getCandidatesAt(new Point(globalPoint.x, globalPoint.y));
+        // 3. Return winner
+        // return candidates[0].id!;
+        return null; // Disabled by User Request
     }
 }

@@ -26,7 +26,10 @@ import defaultSprite from '../../resources/internal_default_assets/default_sprit
 
 
 
+
+
 const editorStore = useEditorStore();
+
 const revision = ref(0);
 const isAddModalOpen = ref(false);
 

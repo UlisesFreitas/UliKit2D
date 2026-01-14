@@ -33,8 +33,8 @@ export class EditorDebugSystem {
             const hasVisibleBitmapText = entity.bitmapText && entity.bitmapText.text && entity.bitmapText.text.trim() !== '';
             const hasVisibleNineSlice = entity.nineSliceSprite && entity.nineSliceSprite.texture && entity.nineSliceSprite.texture.trim() !== '';
             
-            // SKIP CAMERAS (RenderSystem handles them)
-            if (!entity.camera && !hasVisibleSprite && !hasVisibleLabel && !hasVisibleBitmapText && !hasVisibleNineSlice) {
+            // RenderSystem handles Sprites/Labels. DebugSystem handles the rest (Mockups, Invisible Entities, CAMERAS).
+            if (!hasVisibleSprite && !hasVisibleLabel && !hasVisibleBitmapText && !hasVisibleNineSlice) {
                 let graphics = this.debugGraphics.get(id);
                 if (!graphics) {
                     graphics = new Graphics();
@@ -119,15 +119,14 @@ export class EditorDebugSystem {
     private drawPlaceholder(g: Graphics, entity: any) {
         g.clear();
         
-        // Make interactive
-        g.eventMode = 'static';
-        g.cursor = 'pointer';
-        g.on('pointerdown', (e) => {
-            if (this.onEntityClicked) {
-                 this.onEntityClicked(entity.id);
-            }
-            e.stopPropagation(); // Prevent scene drag start if possible
-        });
+        g.eventMode = 'none';
+        g.cursor = 'default';
+        // g.on('pointerdown', (e) => {
+        //    if (this.onEntityClicked) {
+        //         this.onEntityClicked(entity.id);
+        //    }
+        //    e.stopPropagation(); 
+        // });
 
         const { x, y, rotation } = entity.transform;
         
