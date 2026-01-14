@@ -15,7 +15,7 @@ export const useEditorStore = defineStore('editor', () => {
 
     // Actions
     const selectEntity = (id: string | null) => {
-        // selectedEntityId.value = id;
+        selectedEntityId.value = id;
     };
 
     const executeCommand = (command: ICommand) => {

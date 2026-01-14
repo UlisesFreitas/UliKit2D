@@ -1,4 +1,4 @@
-import { Texture, Assets, TextureStyle } from 'pixi.js';
+import { Texture, Assets } from 'pixi.js';
 import { getFileSystem } from '../../api/FileSystem';
 import { useProjectSettingsStore } from '../../stores/useProjectSettingsStore';
 
@@ -24,14 +24,21 @@ export class ResourceLoader {
     public async loadTexture(url: string): Promise<Texture> {
         let texture: Texture;
 
-        if (url.startsWith('blob:') || url.startsWith('data:') || url.startsWith('file:')) {
-            // Robust loading for Blobs and Local Files (Electron) via Image tag
-            // bypassing fetch restrictions
-            const img = new Image();
-            img.src = url;
-            await img.decode();
-            texture = Texture.from(img);
+        if (url.startsWith('blob:') || url.startsWith('data:') || url.startsWith('file:') || url.startsWith('/src/')) {
+
+            try {
+                const img = new Image();
+                img.src = url;
+                await img.decode();
+                texture = Texture.from(img);
+
+            } catch (e) {
+                console.error(`[ResourceLoader] Error loading Image path: ${url}`, e);
+                // Fallback to Assets.load just in case?
+                texture = await Assets.load(url);
+            }
         } else {
+
             texture = await Assets.load(url);
         }
 

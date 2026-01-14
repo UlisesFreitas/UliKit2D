@@ -198,9 +198,18 @@ const onMouseDown = (e: MouseEvent) => {
             // Gizmo handled the click (e.g. started drag)
             return;
         }
-        // Selection Logic... check if click on entity?
-        // For now, simple selection is done via GizmoManager usually, or we can add raycast here.
-        // Assuming GizmoManager handles bounds checks for selection too.
+        
+        // 1.5 Selection Logic (New)
+        // Convert input is already Global Screen (clientX/Y) which works with our SelectionManager
+        const { SelectionManager } = await import('../../engine/managers/SelectionManager');
+        const hitId = SelectionManager.hitTest(mouseX, mouseY);
+        
+        if (hitId) {
+            store.selectEntity(hitId);
+        } else {
+            // Deselect if clicked empty void
+            store.selectEntity(null);
+        }
     }
     
 

@@ -99,6 +99,7 @@ onMounted(async () => {
     if (pixiRoot.value) {
         (window as any).engine = engine;
         await engine.init(pixiRoot.value);
+        engine.start(); // Start the Game Loop (Rendering, Gizmos, etc)
         
         // Initialize Core Editor Systems that depend on Pixi
         // GizmoManager initializes itself on import/singleton access, but relies on Engine being ready.

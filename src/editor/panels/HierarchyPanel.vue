@@ -1,11 +1,10 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, watch, nextTick } from 'vue';
+import { ref, onMounted, onUnmounted } from 'vue';
 import { useEditorStore } from '../../stores/useEditorStore';
 import { world, type Entity } from '../../engine/ecs/ECS';
 
 import { SceneManager } from '../../engine/managers/SceneManager';
 import { instance as engine } from '../../engine/core/Engine';
-import { SelectionManager } from '../managers/SelectionManager';
 
 const editorStore = useEditorStore();
 const entities = ref<Entity[]>([]);
@@ -38,7 +37,6 @@ let unsubAdd: any;
 let unsubRemove: any;
 
 import { eventBus } from '../../engine/core/EventBus';
-import defaultSprite from '../../resources/internal_default_assets/default_sprite.png';
 
 // ... (existing imports)
 
@@ -66,66 +64,36 @@ const select = (id: string | undefined) => {
 };
 
 // Deprecated in favor of Create Asset Menu for direct usage, but kept for logic reference
-const createEntity = (type: 'Empty' | 'Sprite' | 'Camera' | 'Text' | 'BitmapText' | 'Animator' | 'NineSliceSprite' | 'CircleObject' | 'BoxObject' = 'Empty') => {
+import { EntityFactory, type EntityType } from '../../engine/factories/EntityFactory';
+
+// ... (existing imports)
+
+const getSpawnPosition = () => {
+    // 1. Get Screen Center
+    const screenX = engine.app.screen.width / 2;
+    const screenY = engine.app.screen.height / 2;
     
-    const id = crypto.randomUUID();
-    let data: any = {
-        id,
-        name: type === 'Empty' ? 'New Entity' : `New ${type}`,
-        layer: 'Base Layer', // Default Layer
-        transform: { x: 0, y: 0, rotation: 0, scale: { x: 1, y: 1 }, zIndex: 0 }
-    };
+    // 2. Get Global Stage Transform (Controlled by ScenePanel)
+    const stage = engine.app.stage;
+    const zoom = stage.scale.x; 
+    
+    // 3. Project Screen Center to World Space
+    // Screen = StagePos + (World * Zoom)
+    // World = (Screen - StagePos) / Zoom
+    const worldX = (screenX - stage.position.x) / zoom;
+    const worldY = (screenY - stage.position.y) / zoom;
+    
+    return { x: worldX, y: worldY };
+};
 
-    if (type === 'Sprite') {
-        data.sprite = { texture: defaultSprite };
-    } else if (type === 'Camera') {
-        data.camera = { zoom: 1, isPrimary: false, backgroundColor: '#000000' };
-    } else if (type === 'Text') {
-        data.label = { 
-            text: 'New Text', 
-            fontSize: 24, 
-            fontFamily: 'Arial', 
-            color: '#ffffff', 
-            align: 'center' 
-        };
-    } else if (type === 'Animator') {
-        data.sprite = { texture: defaultSprite }; // Animator needs a sprite
-        data.animator = {
-            currentAnim: '',
-            isPlaying: true,
-            speed: 1,
-            elapsedTime: 0,
-            animations: {}
-        };
-    } else if (type === 'BitmapText') {
-        data.bitmapText = {
-            text: 'Bitmap Text',
-            fontName: '',
-            fontSize: 32,
-            tint: 0xffffff,
-            align: 'left'
-        };
-    } else if (type === 'NineSliceSprite') {
-        data.nineSliceSprite = {
-            texture: '',
-            width: 100,
-            height: 100,
-            left: 10, right: 10, top: 10, bottom: 10
-        };
-    } else if (type === 'CircleObject') {
-        data.name = 'Circle Physics';
-        data.rigidBody = { mass: 1, isStatic: false, friction: 0.5, restitution: 0.5 };
-        data.circleCollider = { radius: 25 };
-    } else if (type === 'BoxObject') {
-        data.name = 'Box Physics';
-        data.rigidBody = { mass: 1, isStatic: false, friction: 0.5, restitution: 0.5 };
-        data.boxCollider = { width: 50, height: 50 };
+const createEntity = (type: EntityType = 'Empty') => {
+    const pos = getSpawnPosition();
+    const id = EntityFactory.createEntity(type, pos);
+    
+    // Auto-select
+    if (editorStore) {
+        editorStore.selectEntity(id); 
     }
-
-    world.add(data);
-    SceneManager.registerEntity(id, 'Base Layer');
-    // The subscription will update the list automatically
-    // SelectionManager.select(id);
 };
 
 const menuState = ref({ visible: false, x: 0, y: 0, entityId: '' });
@@ -173,7 +141,7 @@ const showCreateMenu = (e: MouseEvent) => {
     }, 0);
 };
 
-const createAsset = (type: 'Empty' | 'Sprite' | 'Camera' | 'Text' | 'BitmapText' | 'Animator' | 'NineSliceSprite' | 'CircleObject' | 'BoxObject') => {
+const createAsset = (type: EntityType) => {
     createEntity(type);
     createMenuState.value.visible = false;
 };
