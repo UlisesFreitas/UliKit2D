@@ -10,7 +10,7 @@ export class RenderSystem {
     private app: Application;
     
     // Layers
-    private layerContainers: Map<string, Container> = new Map();
+    public readonly layerContainers: Map<string, Container> = new Map();
     private layerBackgrounds: Map<string, Graphics> = new Map(); // For Base Layer color
 
     // ECS Cache
@@ -38,50 +38,12 @@ export class RenderSystem {
      * Returns the visual local AABB bounds of an entity in World Space.
      * Used for Selection Hit Testing.
      */
-    public getVisualBounds(id: string): Rectangle | null {
+    public getVisualBounds(id: string) {
         // Try caches
         const displayObject = this.getDisplayObject(id);
         if (!displayObject) return null;
 
-        // Calculate Bounds
-        // getBounds() returns bounds in GLOBAL (Screen) space? 
-        // No, getBounds(skipUpdate, rect) returns bounds in world space if stage is root?
-        // Actually PIXI getBounds() is usually Global Screen Space.
-        // We want World Space (relative to Stage, but Stage moves...).
-        // Wait, the SelectionManager.hitTest(worldX, worldY) receives World Coords.
-        // So we want the bounds in the same coordinate space as the entities are positioned (Stage Space).
-        // Since entities are children of Layers (which are children of Stage), 
-        // and Layers typically just pass-through transform (except for parallax?), 
-        // The "World" coordinates in ECS map directly to Stage coordinates.
-        // So we can use getLocalBounds() and apply the Entity's Transform? 
-        // OR use getBounds() relative to the Stage.
-        
-        // However, Pixi getBounds() can be expensive.
-        // Let's use getBounds() relative to the App Stage.
-        // bounds = displayObject.getBounds(); -> Global
-        // To get relative to stage: displayObject.getBounds(false, rect, this.app.stage); (if supported)
-        
-        // Simpler approach:
-        return displayObject.getBounds(); // Global Scren Space?
-        // If we want World Space:
-        // We probably assume the input x,y are already transformed to Global if we use getBounds().
-        // BUT the plan says "hittest(worldX, worldY)".
-        
-        // Let's rely on ECS Transform data for BoxCollider-like logic if possible, 
-        // BUT for precise texture selection, Visual Bounds are better.
-        
-        // Standard Pixi: object.getBounds() is Axis Aligned Bounding Box in Global Space.
-        // If we want strict World Space (0,0 is world origin), we need to account for Camera.
-        // 
-        // Let's return the Container so the Manager can decide? 
-        // Or return a Rectangle in WORLD Space?
-        // 
-        // If we simply use displayObject.getBounds(true), it's recursive.
-        
-        // Let's stick to what we know: 
-        // We want to check if point (wx, wy) is inside.
-        // displayObject.containsPoint(new Point(globalX, globalY))? 
-        // That is robust.
+        // Return visual bounds (PixiJS Bounds)
         return displayObject.getBounds();    
     }
 
@@ -102,6 +64,13 @@ export class RenderSystem {
     private tileSpriteCache: Map<string, Map<string, Sprite>> = new Map(); // LayerID -> "x,y" -> Sprite
     private layerTileContainers: Map<string, Container> = new Map();
 
+    // Helper to standardize visual object setup for interaction
+    private prepareVisual(displayObject: Container, id: string) {
+        displayObject.eventMode = 'static';
+        displayObject.cursor = 'pointer';
+        (displayObject as any)._entityId = id;
+    }
+
     private updateLayers() {
         const layers = SceneManager.layers; // Access global state from Manager
 
@@ -114,6 +83,7 @@ export class RenderSystem {
                 container = new Container();
                 container.label = layer.name;
                 container.sortableChildren = true; // Enable zIndex sorting within layer
+                container.eventMode = 'passive'; // Pass-through events to children
                 // Add to stage
                 this.app.stage.addChild(container);
                 this.layerContainers.set(layer.id, container);
@@ -123,6 +93,7 @@ export class RenderSystem {
                      const bg = new Graphics();
                      bg.rect(-10000, -10000, 20000, 20000);
                      bg.fill({ color: layer.color });
+                     bg.eventMode = 'none'; // Background should NOT block selection
                      container.addChildAt(bg, 0); // Always at bottom
                      this.layerBackgrounds.set(layer.id, bg);
                 }
@@ -131,25 +102,12 @@ export class RenderSystem {
                 const tileContainer = new Container();
                 tileContainer.label = `${layer.name}_Tiles`;
                 tileContainer.zIndex = -1; // Behind entities (Entities default to 0)
+                tileContainer.eventMode = 'passive';
                 container.addChild(tileContainer); // Add it
                 this.layerTileContainers.set(layer.id, tileContainer);
             }
             
-    /**
-     * Checks if a Global Screen Point intersects with the entity's visual.
-     */
-    public hitTest(id: string, globalPoint: { x: number, y: number }): boolean {
-        const obj = this.getDisplayObject(id);
-        if (!obj) return false;
-        
-        // PixiJS containers often have hitArea or can compute bounds.
-        // For sprites, we want to check texture bounds.
-        // obj.containsPoint is usually what we want for interaction.
-        // It accounts for rotation, scale, anchor.
-        
-        // NOTE: Input must be GLOBAL (Screen) coordinates.
-        return obj.containsPoint(globalPoint);
-    }
+            // Sync Properties
             container.visible = layer.visible;
             container.zIndex = layers.indexOf(layer); // Pixi sortableChildren handles this
             
@@ -368,8 +326,9 @@ export class RenderSystem {
              const parent = this.layerContainers.get(layerId) || this.app.stage; // Fallback
              parent.addChild(nSlice);
              
-             this.nineSliceCache.set(entity.id!, nSlice);
+            this.nineSliceCache.set(entity.id!, nSlice);
              (nSlice as any)._currentPath = '';
+             this.prepareVisual(nSlice, entity.id!);
         } else {
              // Handle Layer Change
              const layerId = entity.layer || 'Base Layer';
@@ -378,6 +337,7 @@ export class RenderSystem {
                  desiredParent.addChild(nSlice); // Moves it
              }
         }
+        this.prepareVisual(nSlice, entity.id!);
 
         // Sync Transform
         nSlice.x = entity.transform.x;
@@ -447,6 +407,7 @@ export class RenderSystem {
 
             // Create placeholder or waiting sprite
             sprite = new Sprite(Texture.EMPTY); 
+            sprite.hitArea = new Rectangle(-16, -16, 32, 32);
             sprite.anchor.set(entity.sprite.anchor?.x ?? 0.5, entity.sprite.anchor?.y ?? 0.5);
             
             // Interaction removed: Handled by ScenePanel Raycast
@@ -459,7 +420,7 @@ export class RenderSystem {
             
             this.spriteCache.set(entity.id!, sprite);
             (sprite as any)._currentPath = ''; // Init tracker
-            (sprite as any)._entityId = entity.id;
+            this.prepareVisual(sprite, entity.id!);
         } else {
             // Check Layer Change
             const layerId = entity.layer || 'Base Layer';
@@ -468,6 +429,7 @@ export class RenderSystem {
                 parent.addChild(sprite);
             }
         }
+        this.prepareVisual(sprite, entity.id!); // FORCE UPDATE
 
         // Sync Transform
         sprite.x = entity.transform.x;
@@ -523,7 +485,14 @@ export class RenderSystem {
             }
         } else {
              sprite.texture = Texture.EMPTY;
+             // Only set placeholder hitArea if empty
+             sprite.hitArea = new Rectangle(-16, -16, 32, 32); 
              (sprite as any)._currentPath = '';
+        }
+
+        // Fix: If texture is present, clear the placeholder hitArea so the whole texture is clickable
+        if (sprite.texture !== Texture.EMPTY) {
+            sprite.hitArea = null;
         }
     }
 
@@ -550,11 +519,13 @@ export class RenderSystem {
              parent.addChild(textFn);
              
              this.textCache.set(entity.id!, textFn);
+             this.prepareVisual(textFn, entity.id!);
         } else {
              const layerId = entity.layer || 'Base Layer';
              const parent = this.layerContainers.get(layerId);
              if (parent && textFn.parent !== parent) parent.addChild(textFn);
         }
+        this.prepareVisual(textFn, entity.id!);
 
         // Sync Properties
         if (textFn.text !== entity.label.text) textFn.text = entity.label.text;
@@ -606,11 +577,13 @@ export class RenderSystem {
             
             this.bitmapTextCache.set(entity.id!, bText);
             (bText as any)._loadedFontPath = ''; 
+            this.prepareVisual(bText, entity.id!);
         } else {
              const layerId = entity.layer || 'Base Layer';
              const parent = this.layerContainers.get(layerId);
              if (parent && bText.parent !== parent) parent.addChild(bText);
         }
+        this.prepareVisual(bText, entity.id!);
 
         // Load Font if needed
         const fontPath = entity.bitmapText.fontName;
@@ -716,11 +689,13 @@ export class RenderSystem {
              this.editorOverlay.addChild(container);
              
              this.cameraIconCache.set(entity.id!, container);
+             this.prepareVisual(container, entity.id!);
         } else {
              if (container.parent !== this.editorOverlay) {
                  this.editorOverlay.addChild(container);
              }
         }
+        this.prepareVisual(container, entity.id!);
         
         // FORCE CLEANUP: Remove any Graphics (Cyan Box) from previous versions
         // If user didn't reload, the old Graphics is still there.
@@ -739,5 +714,15 @@ export class RenderSystem {
         container.scale.set(entity.transform.scale.x, entity.transform.scale.y);
 
         container.visible = entity.visible !== false;
+    }
+
+    /**
+     * Checks if a Global Screen Point intersects with the entity's visual.
+     */
+    public hitTest(id: string, globalPoint: { x: number, y: number }): boolean {
+        const obj = this.getDisplayObject(id);
+        if (!obj) return false;
+        // Suppress TS error: containsPoint exists in runtime (PixiJS)
+        return (obj as any).containsPoint(globalPoint);
     }
 }

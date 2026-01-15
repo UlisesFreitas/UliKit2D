@@ -7,7 +7,7 @@ export const usePreferencesStore = defineStore('preferences', () => {
         visible: true,
         width: 32,
         height: 32,
-        color: '#333333',
+        color: '#7ad3ff',
         offsetX: 0,
         offsetY: 0,
         isIsometric: false

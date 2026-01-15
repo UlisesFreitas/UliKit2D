@@ -19,7 +19,6 @@ import { ThemeManager } from '../managers/ThemeManager';
 
 // IMMORTAL PIXI IMPORTS
 import { instance as engine } from '../../engine/core/Engine';
-import { instance as gizmoManager } from '../gizmos/GizmoManager';
 import { EditorTilemapSystem } from '../systems/EditorTilemapSystem';
 
 const container = ref<HTMLElement | null>(null);
@@ -100,11 +99,6 @@ onMounted(async () => {
         (window as any).engine = engine;
         await engine.init(pixiRoot.value);
         engine.start(); // Start the Game Loop (Rendering, Gizmos, etc)
-        
-        // Initialize Core Editor Systems that depend on Pixi
-        // GizmoManager initializes itself on import/singleton access, but relies on Engine being ready.
-        // Since we just called engine.init, it should be fine.
-        gizmoManager.init();
         
         new EditorTilemapSystem(engine.app);
         

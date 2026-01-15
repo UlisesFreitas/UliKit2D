@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, watch, computed } from 'vue';
 import { instance as engine } from '../../engine/core/Engine';
-import { instance as gizmoManager } from '../gizmos/GizmoManager';
 import { world } from '../../engine/ecs/ECS';
 import { useEditorStore } from '../../stores/useEditorStore';
 import { usePreferencesStore } from '../../stores/usePreferencesStore';
@@ -106,10 +105,7 @@ const updateHighlight = (screenX: number, screenY: number) => {
     }
 };
 
-const updateGizmoSnap = (val: boolean) => {
-    snapToGrid.value = val;
-    gizmoManager.snapToGrid = val;
-};
+
 
 const paintTile = (e: MouseEvent, erase = false) => {
     if (!isTilemapMode.value || !activeLayer.value || !container.value) return;
@@ -186,31 +182,12 @@ const onWheel = (e: WheelEvent) => {
     updateView();
 };
 
-const onMouseDown = (e: MouseEvent) => {
+const onMouseDown = async (e: MouseEvent) => {
     (document.activeElement as HTMLElement)?.blur();
 
     const mouseX = e.clientX;
     const mouseY = e.clientY;
 
-    // 1. Gizmo Interaction (Proxy)
-    if (e.button === 0 && !e.altKey && !isPainting.value) {
-        if (gizmoManager.processPointerDown(mouseX, mouseY)) {
-            // Gizmo handled the click (e.g. started drag)
-            return;
-        }
-        
-        // 1.5 Selection Logic (New)
-        // Convert input is already Global Screen (clientX/Y) which works with our SelectionManager
-        const { SelectionManager } = await import('../../engine/managers/SelectionManager');
-        const hitId = SelectionManager.hitTest(mouseX, mouseY);
-        
-        if (hitId) {
-            store.selectEntity(hitId);
-        } else {
-            // Deselect if clicked empty void
-            store.selectEntity(null);
-        }
-    }
     
 
     
@@ -235,8 +212,7 @@ const onMouseMove = (e: MouseEvent) => {
     const sx = e.clientX;
     const sy = e.clientY;
     
-    // Proxy to Gizmo (Always, for hover effects)
-    gizmoManager.processPointerMove(sx, sy);
+   
     
     updateHighlight(sx, sy);
     
@@ -269,8 +245,7 @@ const onMouseUp = () => {
     isPanning.value = false;
     if (container.value) container.value.style.cursor = 'default';
     
-    // Release Gizmo
-    gizmoManager.processPointerUp();
+   
 };
 
 const onDrop = (e: DragEvent) => {
@@ -412,7 +387,7 @@ watch(() => preferencesStore.grid, () => updateView(), { deep: true });
             :snapToGrid="snapToGrid"
             @update:zoom="val => { zoom = val; updateView(); }"
             @update:showGrid="val => { showGrid = val; updateView(); }"
-            @update:snapToGrid="updateGizmoSnap"
+           
         />
     </div>
 

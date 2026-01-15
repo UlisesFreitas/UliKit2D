@@ -95,9 +95,9 @@ export class GridSystem {
         // Note: In PixiJS, stroke() applies to the path constructed so far.
         let strokeColor: number;
         try {
-            strokeColor = new Color(options.color || '#333333').toNumber();
+            strokeColor = new Color(options.color || '#7ad3ff').toNumber();
         } catch (e) {
-            strokeColor = new Color('#333333').toNumber();
+            strokeColor = new Color('#7ad3ff').toNumber();
         }
         g.stroke({ width: 1 / scale, color: strokeColor, alpha: 0.5 });
 

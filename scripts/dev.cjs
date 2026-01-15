@@ -20,7 +20,7 @@ try {
 console.log(`[DevScript] Starting dev server on port ${port}...`);
 
 const viteCmd = 'vite';
-const electronCmd = `wait-on tcp:${port} && npm run build:electron && electron dist/electron/main.js --dev`;
+const electronCmd = `wait-on tcp:${port} && npm run build:electron && electron dist/electron/main.js --dev --remote-debugging-port=9333`;
 
 // Use npx (or npm exec) to run concurrently
 const args = [

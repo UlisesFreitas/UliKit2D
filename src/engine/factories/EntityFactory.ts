@@ -39,7 +39,7 @@ export class EntityFactory {
                 // Just transform
                 break;
             case 'Sprite':
-                data.sprite = { texture: defaultSprite, anchor: { x: 0.5, y: 0.5 } };
+                data.sprite = { texture: defaultSprite, anchor: { x: 0.5, y: 0.5 }, width: 32, height: 32 };
                 break;
             case 'Camera':
                 data.camera = { zoom: 1, isPrimary: false, backgroundColor: '#000000' };
