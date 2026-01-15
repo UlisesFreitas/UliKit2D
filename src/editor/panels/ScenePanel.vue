@@ -185,13 +185,36 @@ const onWheel = (e: WheelEvent) => {
 const onMouseDown = async (e: MouseEvent) => {
     (document.activeElement as HTMLElement)?.blur();
 
-    const mouseX = e.clientX;
-    const mouseY = e.clientY;
+    const rect = (engine.app.canvas as HTMLCanvasElement).getBoundingClientRect();
+    const mouseX = e.clientX - rect.left;
+    const mouseY = e.clientY - rect.top;
 
-    
-
+    // 1. Gizmo Interaction (Proxy)
+    if (e.button === 0 && !e.altKey && !isPainting.value) {
+        // Import dynamically to avoid circular dependencies if any
+        const { instance: gizmoManager } = await import('../gizmos/GizmoManager');
+        const gizmoRes = gizmoManager.processPointerDown(mouseX, mouseY);
+        
+        if (gizmoRes) {
+            // Gizmo handled the click (e.g. started drag)
+            return;
+        }
+        
+        // 1.5 Selection Logic
+        const { instance: selectionManager } = await import('../managers/SelectionManager');
+        const hitId = selectionManager.hitTest(mouseX, mouseY);
+        
+        if (hitId) {
+            store.selectEntity(hitId);
+        } else {
+            store.selectEntity(null);
+        }
+    }
     
     // 2. Painting
+    // Note: Painting likely uses global coordinate mapping too, but let's verify map function logic later.
+    // For now, painting uses paintTile logic which likely uses raw events or maps internally.
+    // Leaving raw event passing for paintTile as it might handle it or need refactor separately.
     if (isTilemapMode.value && (e.button === 0 || e.button === 2) && !e.altKey) {
         isPainting.value = true;
         const isErase = e.button === 2 || tilemapStore.currentTool === 'eraser';
@@ -202,17 +225,20 @@ const onMouseDown = async (e: MouseEvent) => {
     // 3. Panning (Middle or Alt+Left)
     if (e.button === 1 || (e.button === 0 && e.altKey)) {
         isPanning.value = true;
-        lastMouseX.value = e.clientX;
+        lastMouseX.value = e.clientX; // Panning uses deltas, so clientX is fine if consistent
         lastMouseY.value = e.clientY;
         container.value!.style.cursor = 'grabbing';
     }
 };
 
-const onMouseMove = (e: MouseEvent) => {
-    const sx = e.clientX;
-    const sy = e.clientY;
+const onMouseMove = async (e: MouseEvent) => {
+    const rect = (engine.app.canvas as HTMLCanvasElement).getBoundingClientRect();
+    const sx = e.clientX - rect.left;
+    const sy = e.clientY - rect.top;
     
-   
+    // Proxy to Gizmo (Always, for hover effects)
+    const { instance: gizmoManager } = await import('../gizmos/GizmoManager');
+    gizmoManager.processPointerMove(sx, sy);
     
     updateHighlight(sx, sy);
     
@@ -230,22 +256,28 @@ const onMouseMove = (e: MouseEvent) => {
     }
 
     if (isPanning.value) {
+        // Delta matches Window movement
         const dx = e.clientX - lastMouseX.value;
         const dy = e.clientY - lastMouseY.value;
+        
         cameraX.value += dx;
         cameraY.value += dy;
+        
         lastMouseX.value = e.clientX;
         lastMouseY.value = e.clientY;
+        
         updateView();
     }
 };
 
-const onMouseUp = () => {
+const onMouseUp = async () => {
     isPainting.value = false;
     isPanning.value = false;
     if (container.value) container.value.style.cursor = 'default';
     
-   
+    // Release Gizmo
+    const { instance: gizmoManager } = await import('../gizmos/GizmoManager');
+    gizmoManager.processPointerUp();
 };
 
 const onDrop = (e: DragEvent) => {
@@ -386,8 +418,7 @@ watch(() => preferencesStore.grid, () => updateView(), { deep: true });
             v-model:showGrid="showGrid"
             :snapToGrid="snapToGrid"
             @update:zoom="val => { zoom = val; updateView(); }"
-            @update:showGrid="val => { showGrid = val; updateView(); }"
-           
+            @update:snapToGrid="val => { snapToGrid = val; import('../gizmos/GizmoManager').then(m => m.instance.snapToGrid = val); }"
         />
     </div>
 

@@ -100,6 +100,10 @@ onMounted(async () => {
         await engine.init(pixiRoot.value);
         engine.start(); // Start the Game Loop (Rendering, Gizmos, etc)
         
+        // Initialize Core Editor Systems that depend on Pixi
+        const { instance: gizmoManager } = await import('../gizmos/GizmoManager');
+        gizmoManager.init();
+        
         new EditorTilemapSystem(engine.app);
         
         // Global Resize Observer for Pixi
