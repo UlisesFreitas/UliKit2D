@@ -7,6 +7,7 @@ import AssetPickerModal from '../modals/AssetPickerModal.vue';
 
 const props = defineProps<{
     entity: Entity;
+    revision?: number;
 }>();
 
 const text = computed({
@@ -81,9 +82,13 @@ const triggerFileSelect = (mode: 'fnt' | 'img') => {
     showAssetPicker.value = true;
 };
 
-const handleAssetSelect = (path: string) => {
+const handleAssetSelect = (path: string | string[]) => {
+    // Handle array case (take first)
+    const singlePath = Array.isArray(path) ? path[0] : path;
+    if (!singlePath) return;
+
     // Normalize path just in case
-    let finalPath = path;
+    let finalPath = singlePath;
     if (finalPath.startsWith('file:///')) {
         finalPath = decodeURI(finalPath.slice(8));
     }

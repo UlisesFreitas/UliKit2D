@@ -1,12 +1,12 @@
 <script setup lang="ts">
 import { computed, ref, onMounted, onUnmounted, toRaw } from 'vue';
+import { useIntervalFn } from '@vueuse/core';
 import { useEditorStore } from '../../stores/useEditorStore';
 import { world } from '../../engine/ecs/ECS';
 import { eventBus } from '../../engine/core/EventBus';
 import { projectState } from '../managers/ProjectManager';
 import { SceneManager } from '../../engine/managers/SceneManager';
 import { getFileSystem } from '../../api/FileSystem';
-
 import TransformEditor from '../components/inspectors/TransformEditor.vue';
 import CameraEditor from '../components/inspectors/CameraEditor.vue';
 import SpriteEditor from '../components/inspectors/SpriteEditor.vue';
@@ -22,11 +22,6 @@ import NineSliceEditor from '../components/inspectors/NineSliceEditor.vue';
 
 import AddComponentModal from '../components/modals/AddComponentModal.vue';
 import defaultSprite from '../../resources/internal_default_assets/default_sprite.png';
-
-
-
-
-
 
 const editorStore = useEditorStore();
 
@@ -49,6 +44,13 @@ onUnmounted(() => {
     eventBus.off('entity-change', handleEntityUpdate);
 });
 
+// Polling for live updates when game is playing
+useIntervalFn(() => {
+    if (editorStore.isPlaying && editorStore.selectedEntityId) {
+        revision.value++;
+    }
+}, 100);
+
 const selectedEntity = computed(() => {
     if (!editorStore.selectedEntityId) return null;
     return world.where(e => e.id === editorStore.selectedEntityId).first || null;
@@ -56,7 +58,7 @@ const selectedEntity = computed(() => {
 
 // Computed "Flat" list of inspector items
 const inspectorItems = computed(() => {
-    revision.value; // Dependency
+    revision.value; // Dependency used to trigger Re-calc
     if (!selectedEntity.value) return [];
 
     const items: { type: string; key: string; data: any; index?: number }[] = [];
@@ -388,6 +390,7 @@ const toggleCollapse = (key: string) => {
                     <LabelEditor 
                         v-else-if="item.key === 'label'" 
                         :label="item.data" 
+                        :revision="revision"
                         @update="onComponentUpdate" 
                     />
 
@@ -400,12 +403,14 @@ const toggleCollapse = (key: string) => {
                     <BitmapTextEditor 
                         v-else-if="item.key === 'bitmapText'" 
                         :entity="(selectedEntity as any)" 
+                        :revision="revision"
                         @update="onComponentUpdate" 
                     />
 
                     <NineSliceEditor 
                         v-else-if="item.key === 'nineSliceSprite'" 
                         :nineSlice="item.data" 
+                        :revision="revision"
                         @update="onComponentUpdate" 
                     />
 

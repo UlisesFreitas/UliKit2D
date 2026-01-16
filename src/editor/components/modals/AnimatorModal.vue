@@ -18,7 +18,6 @@ const version = ref(0);
 // const fileInput = ref<HTMLInputElement | null>(null); // Removed
 const showAssetPicker = ref(false);
 const targetAnimForPicker = ref<string>('');
-const targetAnimForFile = ref<string>(''); // Kept for logic if needed, but likely replaced
 
 const animations = computed(() => {
     version.value;

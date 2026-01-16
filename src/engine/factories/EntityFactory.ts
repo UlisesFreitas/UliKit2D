@@ -58,7 +58,7 @@ export class EntityFactory {
                 data.label = { 
                     text: 'New Text', 
                     fontSize: 24, 
-                    fontFamily: 'Arial', 
+                    fontFamily: 'Dogica Pixel', 
                     color: '#ffffff', 
                     align: 'center' 
                 };
@@ -66,7 +66,7 @@ export class EntityFactory {
             case 'BitmapText':
                 data.bitmapText = {
                     text: 'Bitmap Text',
-                    fontName: '', // Default fallback
+                    fontName: 'Dogica Pixel', // Default fallback
                     fontSize: 32,
                     tint: 0xffffff,
                     align: 'left'

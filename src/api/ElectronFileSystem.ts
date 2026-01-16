@@ -39,7 +39,12 @@ export class ElectronFileSystem implements IFileSystem {
     }
 
     async getAssetURL(relPath: string): Promise<string> {
-        // 1. Normalize slashes
+        // 1. Direct Return for Protocols
+        if (relPath.startsWith('http:') || relPath.startsWith('https:') || relPath.startsWith('blob:') || relPath.startsWith('data:')) {
+            return relPath;
+        }
+
+        // 2. Normalize slashes
         let texturePath = relPath.replace(/\\/g, '/');
         
         // 2. Handle Absolute Paths (Windows Drive Letter)

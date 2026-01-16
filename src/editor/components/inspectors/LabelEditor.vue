@@ -7,6 +7,7 @@ const props = defineProps<{
         color: string;
         align: 'left' | 'center' | 'right';
     };
+    revision?: number;
 }>();
 
 const emit = defineEmits(['update']);

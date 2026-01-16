@@ -28,6 +28,7 @@ export class ResourceLoader {
 
             try {
                 const img = new Image();
+                img.crossOrigin = 'anonymous'; // Important for texture safety
                 img.src = url;
                 await img.decode();
                 texture = Texture.from(img);

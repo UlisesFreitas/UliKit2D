@@ -72,6 +72,12 @@ export class PixiBitmapFontManager {
             console.log('Registering font to Assets cache', Assets);
             Assets.cache.set(`${uniqueName}-bitmap`, font);
             
+            // Also register by Family Name (Friendly Name) if available
+            if (data.fontFamily && data.fontFamily !== uniqueName) {
+                console.log(`[PixiBitmapFontManager] Registering alias: ${data.fontFamily}`);
+                Assets.cache.set(`${data.fontFamily}-bitmap`, font);
+            }
+            
             // Cache mapping
             this.cache.setFont(path + (texturePathOverride || ''), uniqueName);
             
@@ -138,6 +144,12 @@ export class PixiBitmapFontManager {
                 letter: letter,
                 kerning: {}
             };
+
+            // FIX: Manual Offset for Pixel Art Fonts (e.g. Dogica, Retro Gaming)
+            // Shift down by (fontSize - 1) to align with Gizmo/Grid
+            // This assumes all bitmap fonts in this project follow this baseline convention
+            const size = data.fontSize || 8; 
+            data.chars[letter].yOffset -= (size - 1);
         }
 
         // Kernings (optional)

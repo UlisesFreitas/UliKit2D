@@ -1,4 +1,4 @@
-import { Application, Sprite, Texture, Text, BitmapText, NineSliceSprite, Container, Graphics, Rectangle } from 'pixi.js';
+import { Application, Sprite, Texture, Text, BitmapText, NineSliceSprite, Container, Graphics, Rectangle, Assets } from 'pixi.js';
 
 import { world } from '../ecs/ECS';
 import { resourceManager } from '../resources/ResourceManager';
@@ -589,12 +589,19 @@ export class RenderSystem {
         const requestedKey = fontTexture ? `${fontPath}|${fontTexture}` : fontPath;
 
         if (fontPath && loadedKey !== requestedKey) {
-            (bText as any)._loadedFontPath = requestedKey; // Mark as requested
-            resourceManager.loadBitmapFont(fontPath, fontTexture).then(fontFace => {
-                if (fontFace && bText && (bText as any)._loadedFontPath === requestedKey) {
-                    bText.style.fontFamily = fontFace;
-                }
-            });
+            // Check if already available (e.g. preloaded default fonts)
+            // PixiJS stores BitmapFonts with '-bitmap' suffix in cache
+            if (Assets.cache.has(`${fontPath}-bitmap`)) {
+                 bText.style.fontFamily = fontPath;
+                 (bText as any)._loadedFontPath = requestedKey;
+            } else {
+                (bText as any)._loadedFontPath = requestedKey; // Mark as requested
+                resourceManager.loadBitmapFont(fontPath, fontTexture).then(fontFace => {
+                    if (fontFace && bText && (bText as any)._loadedFontPath === requestedKey) {
+                        bText.style.fontFamily = fontFace;
+                    }
+                });
+            }
         }
 
         // Sync Properties

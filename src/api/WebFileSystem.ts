@@ -414,7 +414,7 @@ export class WebFileSystem implements IFileSystem {
     async getAssetURL(relPath: string): Promise<string> {
         await this.ensureInit(); // Usually init is done
         
-        if (relPath.startsWith('blob:') || relPath.startsWith('data:')) return relPath;
+        if (relPath.startsWith('blob:') || relPath.startsWith('data:') || relPath.startsWith('http:') || relPath.startsWith('https:')) return relPath;
         
         // Skip internal assets (Vite served) to prevent ENOENT warnings
         if (relPath.includes('internal_default_assets') || relPath.startsWith('/src/')) return relPath;

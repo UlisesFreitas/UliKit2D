@@ -9,9 +9,31 @@ html, body, #app {
   background-color: var(--bg-base);
   color: var(--text-primary);
   font-family: 'Inter', sans-serif;
+  
+  /* Pixel Art Settings */
+  image-rendering: pixelated;
+  -webkit-font-smoothing: none;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+canvas {
+    image-rendering: pixelated; /* Ensure the game canvas is crisp */
 }
 
 @layer base {
+  @font-face {
+      font-family: 'Dogica Pixel';
+      src: url('./resources/internal_default_assets/dogica/TTF/dogicapixel.ttf') format('truetype');
+      font-weight: normal;
+      font-style: normal;
+  }
+  @font-face {
+      font-family: 'Dogica Pixel';
+      src: url('./resources/internal_default_assets/dogica/TTF/dogicapixelbold.ttf') format('truetype');
+      font-weight: bold;
+      font-style: normal;
+  }
+
   :root {
       --bg-base: #1e1e1e;
       --bg-panel: #252526;

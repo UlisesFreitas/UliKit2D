@@ -5,9 +5,31 @@ import ProjectWizard from './editor/components/ProjectWizard.vue';
 import AppHeader from './editor/components/AppHeader.vue';
 import GlobalOverlay from './editor/components/overlays/GlobalOverlay.vue';
 import { projectState } from './editor/managers/ProjectManager';
+import { resourceManager } from './engine/resources/ResourceManager';
+import dogicaPixelFnt from './resources/internal_default_assets/dogica/BITMAPFONT/dogicapixel.fnt?url';
+import dogicaPixelPng from './resources/internal_default_assets/dogica/BITMAPFONT/dogicapixel.png?url';
+import dogicaPixelTtf from './resources/internal_default_assets/dogica/TTF/dogicapixel.ttf?url';
 
-onMounted(() => {
-  console.log('UliKit2D Editor Mounted');
+onMounted(async () => {
+    console.log('UliKit2D Editor Mounted');
+    
+    // 1. Force Load TTF (For TextLabel)
+    try {
+        const font = new FontFace('Dogica Pixel', `url(${dogicaPixelTtf})`);
+        await font.load();
+        document.fonts.add(font);
+        console.log('Default TTF loaded to DOM: Dogica Pixel');
+    } catch (e) {
+        console.error('Failed to load TTF:', e);
+    }
+
+    // 2. Preload BitmapFont (For BitmapText)
+    try {
+        await resourceManager.loadBitmapFont(dogicaPixelFnt, dogicaPixelPng);
+        console.log('Default BitmapFont loaded: Dogica Pixel');
+    } catch (e) {
+        console.error('Failed to load default font:', e);
+    }
 });
 </script>
 
