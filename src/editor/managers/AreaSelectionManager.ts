@@ -54,7 +54,7 @@ export class AreaSelectionManager {
         this.render();
     }
 
-    public endDrag() {
+    public endDrag(shiftKey: boolean, ctrlKey: boolean) {
         if (!this.isDragging) return;
 
         // Perform Selection
@@ -65,10 +65,32 @@ export class AreaSelectionManager {
             const hits = selectionManager.hitTestRect(rect);
             const store = useEditorStore();
             
-            if (hits.length > 0) {
-                store.selectEntities(hits);
+            if (shiftKey) {
+                // ADD to selection
+                const current = store.selectedEntityIds;
+                const newSelection = [...new Set([...current, ...hits])];
+                store.selectEntities(newSelection);
+            } else if (ctrlKey) {
+                // TOGGLE selection
+                const current = store.selectedEntityIds;
+                const newSelection = [...current];
+                
+                hits.forEach(id => {
+                    const index = newSelection.indexOf(id);
+                    if (index !== -1) {
+                        newSelection.splice(index, 1);
+                    } else {
+                        newSelection.push(id);
+                    }
+                });
+                store.selectEntities(newSelection);
             } else {
-                store.selectEntities([]);
+                // REPLACE selection
+                if (hits.length > 0) {
+                    store.selectEntities(hits);
+                } else {
+                    store.selectEntities([]);
+                }
             }
         }
         

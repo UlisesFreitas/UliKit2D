@@ -137,7 +137,7 @@ export class GizmoManager {
         return false;
     }
 
-    public processPointerMove(screenX: number, screenY: number) {
+    public processPointerMove(screenX: number, screenY: number, shiftKey: boolean = false) {
         if (!this.primaryEntity) return;
 
         // Global for Hit Test, Local for Drag Math
@@ -145,7 +145,7 @@ export class GizmoManager {
         const localPos = this.container.toLocal(globalPos);
 
         if (this.isDragging) {
-            this.handleDragMove(localPos);
+            this.handleDragMove(localPos, shiftKey);
         } else {
              const hit = this.getHitHandleGlobal(screenX, screenY);
              if (hit !== this.hoverHandle) {
@@ -165,7 +165,7 @@ export class GizmoManager {
         }
     }
 
-    private handleDragMove(localPos: Point) {
+    private handleDragMove(localPos: Point, shiftKey: boolean) {
         if (!this.isDragging || !this.dragHandle) return;
 
         const dx = localPos.x - this.dragStartPos.x;
@@ -205,24 +205,15 @@ export class GizmoManager {
         if (!start) return;
 
         if (this.dragHandle === 'rotate') {
-             // Calculate angle relative to Entity Center in Gizmo Space
-             // We need current center of entity in Gizmo Local Space
-             // Since we moved it? No, rotation uses current mouse vs start mouse? 
-             // Or mouse vs object center.
-             // Entity center hasn't changed position (rotation around center).
-             // We need to project Entity Center to Gizmo Local.
-             
              const displayObject = engine.renderSystem.getDisplayObject(entity.id);
              if (displayObject && displayObject.parent) {
-                  // Project (0,0) of entity to Gizmo Local
                   const globalCenter = displayObject.toGlobal(new Point(0,0)); 
                   const localCenter = this.container.toLocal(globalCenter);
                   
                   const angle = Math.atan2(localPos.y - localCenter.y, localPos.x - localCenter.x);
-                  // -90 degrees offset because handle is at top
-                  let newRotation = angle + Math.PI / 2;
+                  let newRotation = angle + Math.PI / 2; // -90 offset
 
-                  if (this.snapToGrid) { 
+                  if (this.snapToGrid || shiftKey) { 
                       const snapRad = Math.PI / 12; // 15 deg
                       newRotation = Math.round(newRotation / snapRad) * snapRad;
                   }
@@ -232,70 +223,60 @@ export class GizmoManager {
 
         } else {
             // SCALING
-            
-            // Rotate mouse point back to unrotated space for easy axis scaling
             const cos = Math.cos(-start.rotation);
             const sin = Math.sin(-start.rotation);
             
-            // Delta from START position of dragging (not object center)
-            // Wait, scaling is usually done relative to pivot. 
-            // If I pull Right Handle, I expect Right side to expand.
-            // Let's rely on Start State + Delta.
-            
-            // To simplify: Calculate Drag Vector in Object Local Space
-            // But 'dx, dy' is from DragStart.
-            
-            // Simple approach:
-            // Calculate distance from Center to Mouse.
-            // Compare to Distance from Center to StartMouse.
-            // Ratio = New / Old.
-            
-            // This is robust against rotation.
-            // BUT this does uniform scaling if we just compare magnitude.
-            // We want axis-aligned scaling.
-            
-            // Project 'localPos' (GizmoSpace) into Unrotated Object Space (centered at object).
-            // Object Center in Gizmo Space:
+            // Generate Unrotated Coordinates relative to object center
             const displayObject = engine.renderSystem.getDisplayObject(entity.id);
             if (!displayObject) return;
              
             const globalCenter = displayObject.toGlobal(new Point(0,0)); 
-            const center = this.container.toLocal(globalCenter); // Object center in Gizmo Local
+            const center = this.container.toLocal(globalCenter); 
              
-            // Point in Unrotated Local Space relative to center
-            const getUnrotated = (p: Point) => {
-                const rx = p.x - center.x;
-                const ry = p.y - center.y;
-                return {
-                    x: rx * cos - ry * sin,
-                    y: rx * sin + ry * cos
-                };
-            };
+            // Delta from center to mouse in unrotated space?
+            // Existing logic uses simple parsing of handles.
             
-            const curU = getUnrotated(localPos);
-            // We need the MouseStart in Unrotated too? 
-            // Actually, we can just look at 'curU' vs 'Half Size'.
+            // Standard approach: Unproject mouse pos to object space
+            const rx = localPos.x - center.x;
+            const ry = localPos.y - center.y;
+            const curUx = rx * cos - ry * sin;
+            const curUy = ry * cos + rx * sin; // Corrected rotation for Y
             
             let newScaleX = start.scaleX;
             let newScaleY = start.scaleY;
             
-            // Handle X
-            if (this.dragHandle?.includes('e')) { // Right
-                // Ratio: curU.x / (origWidth/2)
-                // OrigWidth/2 is start.width * start.scaleX / 2.
-                // But let's just use absolute delta?
-                // Scale = CurrentPos / OriginalHalfWidth
-                // OriginalHalfWidth (Unscaled) = start.width / 2.
-                newScaleX = curU.x / (start.width / 2);
-            } else if (this.dragHandle?.includes('w')) { // Left
-                newScaleX = curU.x / (-start.width / 2);
+            // Distance from center to handle (Local Space Unscaled) -> (width/2)
+            // But width is 'bounds width'.
+            // Let's assume handles are at bounds edges.
+            
+            // X-Axis
+            if (this.dragHandle.includes('e')) {
+                 newScaleX = curUx / (start.width / 2) * start.scaleX; // Approximate logic based on bounds
+            } else if (this.dragHandle.includes('w')) {
+                 newScaleX = curUx / (-start.width / 2) * start.scaleX;
             }
             
-            // Handle Y
-            if (this.dragHandle?.includes('s')) { // Bottom
-                newScaleY = curU.y / (start.height / 2);
-            } else if (this.dragHandle?.includes('n')) { // Top
-                newScaleY = curU.y / (-start.height / 2);
+            // Y-Axis
+            if (this.dragHandle.includes('s')) {
+                newScaleY = curUy / (start.height / 2) * start.scaleY;
+            } else if (this.dragHandle.includes('n')) {
+                newScaleY = curUy / (-start.height / 2) * start.scaleY;
+            }
+            
+            // Proportional Scaling (SHIFT)
+            if (shiftKey) {
+                // Determine which axis changed the most relative to its start
+                const ratioX = Math.abs(newScaleX / start.scaleX);
+                const ratioY = Math.abs(newScaleY / start.scaleY);
+                
+                // If dragging a corner, we usually want to lock ratio
+                if (ratioX > ratioY) {
+                    // X dominates, adjust Y
+                    newScaleY = newScaleX * (start.scaleY / start.scaleX);
+                } else {
+                    // Y dominates, adjust X
+                    newScaleX = newScaleY * (start.scaleX / start.scaleY);
+                }
             }
             
             entity.transform.scale.x = newScaleX;
@@ -354,7 +335,7 @@ export class GizmoManager {
             ne: new Point(lb.x + lb.width, lb.y),
             sw: new Point(lb.x, lb.y + lb.height),
             se: new Point(lb.x + lb.width, lb.y + lb.height),
-            rotate: new Point(lb.x + lb.width / 2, lb.y - 30) // -30px Local Up
+            rotate: new Point(lb.x + lb.width / 2, lb.y - 10) // -10px Local Up
         };
         
         return {

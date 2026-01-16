@@ -210,11 +210,12 @@ const onMouseDown = async (e: MouseEvent) => {
             store.selectEntity(hitId);
         } else {
             // CLICKED EMPTY SPACE -> PREPARE AREA SELECT
-            // We don't clear selection immediately to allow drag-start.
-            // If it's a click-release without drag, we clear then.
+            // FIX: Only clear selection if NOT using modifiers (Shift/Ctrl)
+            // If using modifiers, we want to keep current selection to Add/Toggle against it.
+            if (!e.shiftKey && !e.ctrlKey) {
+                store.selectEntity(null);
+            }
             
-            // Start Area Drag
-            store.selectEntity(null); // Clear first? Yes, usually.
             areaSelectionManager.startDrag(mouseX, mouseY);
         }
     }
@@ -246,7 +247,7 @@ const onMouseMove = async (e: MouseEvent) => {
     
     // Proxy to Gizmo
     const { instance: gizmoManager } = await import('../gizmos/GizmoManager');
-    gizmoManager.processPointerMove(sx, sy);
+    gizmoManager.processPointerMove(sx, sy, e.shiftKey);
     
     // Update Hover State (for Debug Labels)
     const { instance: selectionManager } = await import('../managers/SelectionManager');
@@ -286,7 +287,7 @@ const onMouseMove = async (e: MouseEvent) => {
     }
 };
 
-const onMouseUp = async () => {
+const onMouseUp = async (e: MouseEvent) => {
     isPainting.value = false;
     isPanning.value = false;
     if (container.value) container.value.style.cursor = 'default';
@@ -296,7 +297,7 @@ const onMouseUp = async () => {
     gizmoManager.processPointerUp();
     
     const { instance: areaSelectionManager } = await import('../managers/AreaSelectionManager');
-    areaSelectionManager.endDrag();
+    areaSelectionManager.endDrag(e.shiftKey, e.ctrlKey);
 };
 
 const onDrop = (e: DragEvent) => {
@@ -437,7 +438,17 @@ watch(() => preferencesStore.grid, () => updateView(), { deep: true });
             v-model:showGrid="showGrid"
             :snapToGrid="snapToGrid"
             @update:zoom="val => { zoom = val; updateView(); }"
-            @update:snapToGrid="val => { snapToGrid = val; import('../gizmos/GizmoManager').then(m => m.instance.snapToGrid = val); }"
+             @update:snapToGrid="val => { 
+                snapToGrid = val; 
+                import('../gizmos/GizmoManager').then(m => {
+                    m.instance.snapToGrid = val;
+                    // Inject Grid Size Callback if enabling or just always ensure it's there
+                    m.instance.getGridSizeCallback = () => ({ 
+                        x: preferencesStore.grid.width, 
+                        y: preferencesStore.grid.height 
+                    });
+                }); 
+            }"
         />
     </div>
 

@@ -415,6 +415,9 @@ export class WebFileSystem implements IFileSystem {
         await this.ensureInit(); // Usually init is done
         
         if (relPath.startsWith('blob:') || relPath.startsWith('data:')) return relPath;
+        
+        // Skip internal assets (Vite served) to prevent ENOENT warnings
+        if (relPath.includes('internal_default_assets') || relPath.startsWith('/src/')) return relPath;
 
         // Clean path
         let cleanPath = relPath;

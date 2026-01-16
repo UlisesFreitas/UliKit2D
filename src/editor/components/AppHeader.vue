@@ -23,8 +23,6 @@ import ProjectSettingsModal from './modals/ProjectSettingsModal.vue';
 import SaveLayoutModal from './modals/SaveLayoutModal.vue';
 import { useProjectSettingsStore } from '../../stores/useProjectSettingsStore';
 
-import { world } from '../../engine/ecs/ECS';
-
 const editorStore = useEditorStore();
 const ui = useUIStore();
 const layoutStore = useLayoutStore();
@@ -46,70 +44,32 @@ const onOpenProject = () => ProjectManager.openProject();
 const onSaveProject = () => ProjectManager.saveProject();
 const onExit = () => window.close(); // Simple mock
 
-const createAsset = (type: 'Empty' | 'Sprite' | 'Camera' | 'Text' | 'Animator' | 'BitmapText' | 'NineSliceSprite' | 'CircleObject' | 'BoxObject') => {
-    const id = crypto.randomUUID();
-    let data: any = {
-        id,
-        name: type === 'Empty' ? 'New Entity' : `New ${type}`,
-        visible: true,
-        transform: { x: 0, y: 0, rotation: 0, scale: { x: 1, y: 1 }, zIndex: 0 }
-    };
+import { EntityFactory, type EntityType } from '../../engine/factories/EntityFactory';
+import { instance as engine } from '../../engine/core/Engine';
 
-    if (type === 'Sprite') {
-        data.sprite = { texture: '' };
-    } else if (type === 'Camera') {
-        data.camera = { zoom: 1, isPrimary: false, backgroundColor: '#000000' };
-    } else if (type === 'Text') {
-        data.label = { 
-            text: 'New Text', 
-            fontSize: 24, 
-            fontFamily: 'Arial', 
-            color: '#ffffff', 
-            align: 'center' 
-        };
-    } else if (type === 'Animator') {
-        data.sprite = { texture: '' };
-        data.animator = {
-            currentAnim: '',
-            isPlaying: true,
-            speed: 1,
-            elapsedTime: 0,
-            animations: {}
-        };
-    } else if (type === 'BitmapText') {
-        data.bitmapText = {
-            text: 'Bitmap Text',
-            fontName: '',
-            fontSize: 32,
-            tint: 0xffffff,
-            align: 'left'
-        };
-    } else if (type === 'NineSliceSprite') {
-        data.nineSliceSprite = {
-            texture: '',
-            width: 100, 
-            height: 100,
-            left: 10, right: 10, top: 10, bottom: 10
-        };
-    } else if (type === 'CircleObject') {
-        data.name = 'Circle Physics';
-        data.rigidBody = { mass: 1, isStatic: false, friction: 0.5, restitution: 0.5 };
-        data.circleCollider = { radius: 25 };
-    } else if (type === 'BoxObject') {
-        data.name = 'Box Physics';
-        data.rigidBody = { mass: 1, isStatic: false, friction: 0.5, restitution: 0.5 };
-        data.boxCollider = { width: 50, height: 50 };
-    }
+// ...
 
-    world.add(data);
-    // Use SelectionManager if possible, but store.selectEntity is fine here since it's just ID setting
-    // But to be "Unified", let's use SelectionManager if we import it, or just Store if simple.
-    // The user asked to unify functions inside SelectionManager.
-    // Let's assume we import SelectionManager or just use store but acknowledging the system.
-    // Since I can't easily add imports to AppHeader without context, I'll stick to store.selectEntity but 
-    // effectively it matches SelectionManager.select.
-    // editorStore.selectEntity(id); 
-    // Disabled by user request 
+const getSpawnPosition = () => {
+    // 1. Get Screen Center
+    const screenX = engine.app.screen.width / 2;
+    const screenY = engine.app.screen.height / 2;
+    
+    // 2. Get Global Stage Transform (Controlled by ScenePanel)
+    const stage = engine.app.stage;
+    const zoom = stage.scale.x; 
+    
+    // 3. Project Screen Center to World Space
+    const worldX = (screenX - stage.position.x) / zoom;
+    const worldY = (screenY - stage.position.y) / zoom;
+    
+    return { x: worldX, y: worldY };
+};
+
+const createAsset = (type: EntityType) => {
+    const pos = getSpawnPosition();
+    const id = EntityFactory.createEntity(type, pos);
+    
+    editorStore.selectEntity(id);
 };
 
 </script>

@@ -41,10 +41,12 @@ const handleEntityUpdate = (id: string) => {
 
 onMounted(() => {
     eventBus.on('entity-updated', handleEntityUpdate);
+    eventBus.on('entity-change', handleEntityUpdate);
 });
 
 onUnmounted(() => {
     eventBus.off('entity-updated', handleEntityUpdate);
+    eventBus.off('entity-change', handleEntityUpdate);
 });
 
 const selectedEntity = computed(() => {

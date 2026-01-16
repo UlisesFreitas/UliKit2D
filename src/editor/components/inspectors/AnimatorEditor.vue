@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue';
+import { ref, computed, watch } from 'vue';
 import { type Entity } from '../../../engine/ecs/ECS';
 import AnimatorModal from '../modals/AnimatorModal.vue';
 
@@ -39,9 +39,9 @@ const onModalUpdate = () => {
 };
 
 // Watch for external updates
-// watch(() => props.entity, () => {
-//     // Refresh logic if needed
-// }, { deep: true });
+watch(() => props.entity, () => {
+    version.value++;
+}, { deep: true });
 
 </script>
 

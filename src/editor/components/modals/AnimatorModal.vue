@@ -4,6 +4,7 @@ import { type Entity } from '../../../engine/ecs/ECS';
 import { projectState } from '../../managers/ProjectManager';
 import { getFileSystem } from '../../../api/FileSystem';
 import { useUIStore } from '../../../stores/useUIStore';
+import AssetPickerModal from './AssetPickerModal.vue';
 
 const props = defineProps<{
     isOpen: boolean;
@@ -14,8 +15,10 @@ const emit = defineEmits(['close', 'update']);
 const ui = useUIStore();
 
 const version = ref(0);
-const fileInput = ref<HTMLInputElement | null>(null);
-const targetAnimForFile = ref<string>('');
+// const fileInput = ref<HTMLInputElement | null>(null); // Removed
+const showAssetPicker = ref(false);
+const targetAnimForPicker = ref<string>('');
+const targetAnimForFile = ref<string>(''); // Kept for logic if needed, but likely replaced
 
 const animations = computed(() => {
     version.value;
@@ -102,8 +105,21 @@ const removeFrame = (animName: string, index: number) => {
 };
 
 const openFilePicker = (animName: string) => {
-    targetAnimForFile.value = animName;
-    fileInput.value?.click();
+    targetAnimForPicker.value = animName;
+    showAssetPicker.value = true;
+};
+
+const onAssetSelected = (path: string | string[]) => {
+    const animName = targetAnimForPicker.value;
+    if (!animName || !props.entity.animator?.animations?.[animName]) return;
+    
+    if (Array.isArray(path)) {
+        props.entity.animator.animations[animName].frames.push(...path);
+    } else {
+        props.entity.animator.animations[animName].frames.push(path);
+    }
+    version.value++;
+    emit('update');
 };
 
 // Helper for Auto-Import
@@ -198,58 +214,6 @@ const importExternalFile = async (rawPath: string, _animName: string): Promise<s
         console.warn('[Animator] No project path found!');
     }
     return finalPath;
-};
-
-const onFileSelected = async (e: Event) => {
-    const files = (e.target as HTMLInputElement).files;
-    if (!files || files.length === 0 || !targetAnimForFile.value) return;
-    
-    const animName = targetAnimForFile.value;
-    if (!props.entity.animator?.animations?.[animName]) return;
-
-    const newFrames: string[] = [];
-    const fs = getFileSystem();
-
-    console.log(`[Animator] Processing ${files.length} files for ${animName}`);
-
-    for (let i = 0; i < files.length; i++) {
-        const file = files[i];
-        if (!file) continue;
-        
-        // Robust path retrieval
-        let rawPath = '';
-        if (fs.isElectron) {
-             rawPath = fs.getPathForFile(file);
-        }
-        
-        if (!rawPath) {
-             // @ts-ignore
-             rawPath = file.path ? file.path : URL.createObjectURL(file);
-        }
-
-        if (rawPath) {
-            const finalPath = await importExternalFile(rawPath, animName);
-            if (finalPath) {
-                newFrames.push(finalPath);
-            }
-        }
-    }
-    
-    // Force reactivity
-    if (newFrames.length > 0) {
-        console.log(`[Animator] Adding frames to ${animName}:`, newFrames);
-        props.entity.animator.animations[animName].frames = [
-            ...props.entity.animator.animations[animName].frames,
-            ...newFrames
-        ];
-        version.value++;
-        emit('update');
-        console.log('[Animator] Update emitted');
-    }
-    
-    // Reset
-    if (fileInput.value) fileInput.value.value = '';
-    targetAnimForFile.value = '';
 };
 
 // Drag & Drop Handler
@@ -484,15 +448,7 @@ onUnmounted(() => {
                 </div>
             </div>
             
-            <!-- Hidden File Input -->
-            <input 
-                type="file" 
-                ref="fileInput" 
-                class="hidden" 
-                multiple 
-                accept="image/png, image/jpeg, image/webp, image/gif"
-                @change="onFileSelected"
-            />
+
 
             <!-- Header -->
             <div class="h-12 bg-bg-header border-b border-border flex justify-between items-center px-4 shrink-0">
@@ -610,6 +566,17 @@ onUnmounted(() => {
 
             </div>
         </div>
+
+        <!-- Asset Picker Modal -->
+        <Teleport to="body">
+            <AssetPickerModal 
+                :isOpen="showAssetPicker"
+                type="image"
+                :multiSelect="true"
+                :onSelect="onAssetSelected"
+                :onClose="() => showAssetPicker = false"
+            />
+        </Teleport>
     </div>
 </template>
 

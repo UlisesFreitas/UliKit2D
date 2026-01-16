@@ -7,13 +7,22 @@ import { projectState } from '../../managers/ProjectManager';
 const props = defineProps<{
     isOpen: boolean;
     type: 'image' | 'script' | 'font' | 'all';
-    onSelect: (path: string) => void;
+    multiSelect?: boolean;
+    onSelect: (path: string | string[]) => void;
     onClose: () => void;
 }>();
 
 const assetStore = useAssetStore();
 const searchQuery = ref('');
 const thumbnails = ref<Record<string, string>>({});
+const selectedAssets = ref<Set<string>>(new Set());
+
+// Reset selection when modal opens
+watch(() => props.isOpen, (val) => {
+    if (val) {
+        selectedAssets.value.clear();
+    }
+});
 
 const filteredAssets = computed(() => {
     // 1. Filter by Type
@@ -64,7 +73,20 @@ watch(filteredAssets, () => {
 }, { immediate: true });
 
 const selectAsset = (asset: any) => {
-    props.onSelect(asset.path);
+    if (props.multiSelect) {
+        if (selectedAssets.value.has(asset.path)) {
+            selectedAssets.value.delete(asset.path);
+        } else {
+            selectedAssets.value.add(asset.path);
+        }
+    } else {
+        props.onSelect(asset.path);
+        props.onClose();
+    }
+};
+
+const confirmSelection = () => {
+    props.onSelect(Array.from(selectedAssets.value));
     props.onClose();
 };
 
@@ -177,10 +199,11 @@ const importAssets = async () => {
                       v-for="asset in filteredAssets" 
                       :key="asset.path"
                       @click="selectAsset(asset)"
-                      class="group cursor-pointer flex flex-col items-center p-2 rounded hover:bg-bg-selection border border-transparent hover:border-accent-color transition-all"
+                      class="group cursor-pointer flex flex-col items-center p-2 rounded hover:bg-bg-selection border transition-all"
+                      :class="selectedAssets.has(asset.path) ? 'border-accent-color bg-bg-selection' : 'border-transparent'"
                   >
                       <!-- Thumbnail -->
-                      <div class="w-16 h-16 bg-checkerboard rounded overflow-hidden flex items-center justify-center mb-1 bg-gray-800">
+                      <div class="w-16 h-16 bg-checkerboard rounded overflow-hidden flex items-center justify-center mb-1 bg-gray-800 relative">
                           <img 
                               v-if="type === 'image' || asset.name.endsWith('.png') || asset.name.endsWith('.jpg')"
                               :src="thumbnails[asset.path]" 
@@ -188,6 +211,11 @@ const importAssets = async () => {
                               style="image-rendering: pixelated"
                           />
                            <span v-else class="text-2xl opacity-50">📄</span>
+                           
+                           <!-- Checkmark overlay -->
+                           <div v-if="selectedAssets.has(asset.path)" class="absolute inset-0 bg-accent-color/30 flex items-center justify-center">
+                                <span class="text-xl font-bold text-white drop-shadow-md">✓</span>
+                           </div>
                       </div>
                       <span class="text-xs text-text-primary text-center truncate w-full px-1 group-hover:text-text-accent">{{ asset.name }}</span>
                   </div>
@@ -195,8 +223,19 @@ const importAssets = async () => {
           </div>
           
            <!-- Footer -->
-          <div class="p-2 border-t border-border bg-bg-header flex justify-end text-xs text-text-secondary">
-              {{ filteredAssets.length }} assets
+          <div class="p-2 border-t border-border bg-bg-header flex justify-between items-center text-xs text-text-secondary">
+              <span>{{ filteredAssets.length }} assets</span>
+              <div class="flex items-center gap-2">
+                 <span v-if="multiSelect && selectedAssets.size > 0" class="text-accent-color font-bold">{{ selectedAssets.size }} selected</span>
+                 <button 
+                    v-if="multiSelect" 
+                    @click="confirmSelection"
+                    class="px-3 py-1 bg-accent-color text-white rounded hover:bg-opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
+                    :disabled="selectedAssets.size === 0"
+                 >
+                    Confirm
+                 </button>
+              </div>
           </div>
       </div>
   </div>
