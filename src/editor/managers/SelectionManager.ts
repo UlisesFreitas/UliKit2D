@@ -9,6 +9,7 @@ import { Container } from 'pixi.js';
  * Uses PixiJS Native Event System (v8).
  */
 export class SelectionManager {
+    public hoveredEntityId: string | null = null;
     
     /**
      * Performs a hit test at Global (Screen) Coordinates.
@@ -45,6 +46,63 @@ export class SelectionManager {
         }
 
         return null;
+    }
+
+    public updateHover(screenX: number, screenY: number) {
+        this.hoveredEntityId = this.hitTest(screenX, screenY);
+    }
+
+    /**
+     * Finds ALL Entity IDs within a screen-space rectangle.
+     * @param rect {x, y, width, height} in Screen Coordinates
+     */
+    public hitTestRect(rect: {x: number, y: number, width: number, height: number}): string[] {
+        if (!engine.app || !engine.app.stage) return [];
+
+        const hits: string[] = [];
+
+        // 1. Get all potential targets (Entities)
+        // We can query the ECS or Iterate the Scene Graph.
+        // Iterating Scene Graph ensures we respect current Rendering Order (z-index).
+        
+        // Helper to find entities recursively
+        const candidates: Container[] = [];
+        
+        const traverse = (container: Container) => {
+            if ((container as any)._entityId) {
+                candidates.push(container);
+                return; // Don't drill into entity children for selection purposes
+            }
+            container.children.forEach(child => traverse(child as Container));
+        };
+        
+        engine.app.stage.children.forEach(child => {
+            // Skip Gizmo Overlay if possible (check label?)
+            if (child.label === 'Gizmo Overlay') return;
+            traverse(child as Container);
+        });
+
+        // 2. Check Intersection (Global Bounds vs Rect)
+        // Reverse candidates to check Top-Most first (Render Order)
+        for (let i = candidates.length - 1; i >= 0; i--) {
+            const container = candidates[i];
+            if (!container) continue;
+            const bounds = container.getBounds(); // Global Bounds
+            
+            // Simple AABB Intersection
+            const intersects = (
+                bounds.x < rect.x + rect.width &&
+                bounds.x + bounds.width > rect.x &&
+                bounds.y < rect.y + rect.height &&
+                bounds.y + bounds.height > rect.y
+            );
+
+            if (intersects) {
+                hits.push((container as any)._entityId);
+            }
+        }
+        
+        return hits;
     }
 
     public select(id: string | null) {

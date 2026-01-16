@@ -1,5 +1,7 @@
 import { Application, Container, Graphics, Text, TextStyle } from 'pixi.js';
 import { world } from '../ecs/ECS';
+import { instance as selectionManager } from '../../editor/managers/SelectionManager';
+import { useEditorStore } from '../../stores/useEditorStore';
 
 export class EditorDebugSystem {
     private app: Application;
@@ -34,7 +36,8 @@ export class EditorDebugSystem {
             const hasVisibleNineSlice = entity.nineSliceSprite && entity.nineSliceSprite.texture && entity.nineSliceSprite.texture.trim() !== '';
             
             // RenderSystem handles Sprites/Labels. DebugSystem handles the rest (Mockups, Invisible Entities, CAMERAS).
-            if (!hasVisibleSprite && !hasVisibleLabel && !hasVisibleBitmapText && !hasVisibleNineSlice) {
+            // FIX: Explicitly exclude Camera entities, as they are rendered by RenderSystem (Icon)
+            if (!hasVisibleSprite && !hasVisibleLabel && !hasVisibleBitmapText && !hasVisibleNineSlice && !entity.camera) {
                 let graphics = this.debugGraphics.get(id);
                 if (!graphics) {
                     graphics = new Graphics();
@@ -69,17 +72,30 @@ export class EditorDebugSystem {
     }
 
     private updateLabel(id: string, entity: any) {
+        // VISIBILITY LOGIC:
+        // Show if Hovered OR Selected
+        const isHovered = selectionManager.hoveredEntityId === id;
+        
+        // Access store (should be optimal enough)
+        const store = useEditorStore();
+        const isSelected = store.selectedEntityIds.includes(id);
+
+        if (!isHovered && !isSelected) {
+            this.removeLabel(id);
+            return;
+        }
+
         let text = this.debugLabels.get(id);
         if (!text) {
             const style = new TextStyle({
                 fontFamily: 'monospace',
-                fontSize: 10,
+                fontSize: 12,
                 fill: '#ffffff',
-                stroke: { color: '#000000', width: 3, join: 'round' },
+                stroke: { color: '#000000', width: 2, join: 'round' },
                 align: 'center',
                 dropShadow: {
                     color: '#000000',
-                    blur: 2,
+                    blur: 1,
                     distance: 1,
                     alpha: 1,
                     angle: Math.PI / 6
@@ -114,19 +130,11 @@ export class EditorDebugSystem {
 
     public onEntityClicked: ((id: string) => void) | null = null;
     
-    // ... rest of methods
-
     private drawPlaceholder(g: Graphics, entity: any) {
         g.clear();
         
         g.eventMode = 'none';
         g.cursor = 'default';
-        // g.on('pointerdown', (e) => {
-        //    if (this.onEntityClicked) {
-        //         this.onEntityClicked(entity.id);
-        //    }
-        //    e.stopPropagation(); 
-        // });
 
         const { x, y, rotation } = entity.transform;
         

@@ -191,8 +191,11 @@ const onMouseDown = async (e: MouseEvent) => {
 
     // 1. Gizmo Interaction (Proxy)
     if (e.button === 0 && !e.altKey && !isPainting.value) {
-        // Import dynamically to avoid circular dependencies if any
+        // Import dynamically
         const { instance: gizmoManager } = await import('../gizmos/GizmoManager');
+        const { instance: areaSelectionManager } = await import('../managers/AreaSelectionManager');
+        const { instance: selectionManager } = await import('../managers/SelectionManager');
+
         const gizmoRes = gizmoManager.processPointerDown(mouseX, mouseY);
         
         if (gizmoRes) {
@@ -200,14 +203,19 @@ const onMouseDown = async (e: MouseEvent) => {
             return;
         }
         
-        // 1.5 Selection Logic
-        const { instance: selectionManager } = await import('../managers/SelectionManager');
+        // 1.5 Selection Logic (Single Click)
         const hitId = selectionManager.hitTest(mouseX, mouseY);
         
         if (hitId) {
             store.selectEntity(hitId);
         } else {
-            store.selectEntity(null);
+            // CLICKED EMPTY SPACE -> PREPARE AREA SELECT
+            // We don't clear selection immediately to allow drag-start.
+            // If it's a click-release without drag, we clear then.
+            
+            // Start Area Drag
+            store.selectEntity(null); // Clear first? Yes, usually.
+            areaSelectionManager.startDrag(mouseX, mouseY);
         }
     }
     
@@ -236,9 +244,17 @@ const onMouseMove = async (e: MouseEvent) => {
     const sx = e.clientX - rect.left;
     const sy = e.clientY - rect.top;
     
-    // Proxy to Gizmo (Always, for hover effects)
+    // Proxy to Gizmo
     const { instance: gizmoManager } = await import('../gizmos/GizmoManager');
     gizmoManager.processPointerMove(sx, sy);
+    
+    // Update Hover State (for Debug Labels)
+    const { instance: selectionManager } = await import('../managers/SelectionManager');
+    selectionManager.updateHover(sx, sy);
+
+    // Proxy to Area Selection
+    const { instance: areaSelectionManager } = await import('../managers/AreaSelectionManager');
+    areaSelectionManager.updateDrag(sx, sy);
     
     updateHighlight(sx, sy);
     
@@ -278,6 +294,9 @@ const onMouseUp = async () => {
     // Release Gizmo
     const { instance: gizmoManager } = await import('../gizmos/GizmoManager');
     gizmoManager.processPointerUp();
+    
+    const { instance: areaSelectionManager } = await import('../managers/AreaSelectionManager');
+    areaSelectionManager.endDrag();
 };
 
 const onDrop = (e: DragEvent) => {

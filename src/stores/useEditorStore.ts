@@ -9,6 +9,7 @@ import { instance as engine } from '../engine/core/Engine';
 export const useEditorStore = defineStore('editor', () => {
     // Selection
     const selectedEntityId = ref<string | null>(null);
+    const selectedEntityIds = ref<string[]>([]); // Multi-selection support
 
     // Command System
     const commandManager = new CommandManager();
@@ -16,6 +17,14 @@ export const useEditorStore = defineStore('editor', () => {
     // Actions
     const selectEntity = (id: string | null) => {
         selectedEntityId.value = id;
+        selectedEntityIds.value = id ? [id] : [];
+    };
+
+    const selectEntities = (ids: string[]) => {
+        selectedEntityIds.value = ids;
+        // Primary selection is the first one (or last one? Usually last selected is active).
+        // Let's say first one for now.
+        selectedEntityId.value = (ids.length > 0 && ids[0]) ? ids[0] : null; 
     };
 
     const executeCommand = (command: ICommand) => {
@@ -152,7 +161,9 @@ export const useEditorStore = defineStore('editor', () => {
 
     return {
         selectedEntityId,
+        selectedEntityIds,
         selectEntity,
+        selectEntities,
         activeLayerId,
         selectLayer,
         commandManager,

@@ -139,12 +139,7 @@ export class RenderSystem {
                 this.layerTileContainers.delete(id);
                 this.tileSpriteCache.delete(id);
             }
-        }
-        
-        // Remove dead camera icons
-        // (Handled in cleanupZombies, but ensure layers don't strand them if layer deleted)
-        // Camera icons live in layers too.
-        
+        }        
         // Sort Stage (Layers)
         this.app.stage.sortChildren();
     }
@@ -697,8 +692,7 @@ export class RenderSystem {
         }
         this.prepareVisual(container, entity.id!);
         
-        // FORCE CLEANUP: Remove any Graphics (Cyan Box) from previous versions
-        // If user didn't reload, the old Graphics is still there.
+        // Remove legacy graphics if any (Cyan box cleanup)
         for (let i = container.children.length - 1; i >= 0; i--) {
             const child = container.children[i];
             if (child instanceof Graphics) {

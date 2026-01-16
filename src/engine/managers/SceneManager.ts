@@ -293,14 +293,7 @@ export class SceneManager {
             gridSize: { x: 32, y: 32 },
             _entityIds: new Set() 
         }];
-        
-        // createEntity adds it to the world automatically
-        const camera = createEntity('Main Camera');
-        camera.transform = { x: 0, y: 0, rotation: 0, scale: { x: 1, y: 1 }, zIndex: 0 };
-        camera.camera = { zoom: 1, isPrimary: true, backgroundColor: '#333333' };
-        
-        this.registerEntity(camera.id!, 'Base Layer');
-        
+                
         this._isDirty = false;
     }
 }
