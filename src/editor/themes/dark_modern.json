@@ -16,6 +16,7 @@
         "--scrollbar-bg": "#1e1e1e",
         "--scrollbar-thumb": "#424242",
         "--grid-line": "#333333",
-        "--grid-axis": "#666666"
+        "--grid-axis": "#666666",
+        "--base-layer-color": "#333333"
     }
 }

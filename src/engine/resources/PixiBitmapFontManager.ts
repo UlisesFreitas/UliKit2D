@@ -17,7 +17,7 @@ export class PixiBitmapFontManager {
     public async loadBitmapFont(path: string, texturePathOverride?: string): Promise<string | null> {
         // Return existing if cached
         const existingFontName = this.cache.getFont(path + (texturePathOverride || ''));
-        if (existingFontName && (BitmapFont as any).available[existingFontName]) {
+        if (existingFontName && Assets.cache.has(`${existingFontName}-bitmap`)) {
             return existingFontName;
         }
 

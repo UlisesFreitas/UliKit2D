@@ -60,7 +60,7 @@ const onUpdate = () => {
                  <input 
                     type="color" 
                     class="u-input h-6 w-full p-0 border border-border rounded cursor-pointer bg-transparent" 
-                    :value="camera.backgroundColor || '#000000'"
+                    :value="camera.backgroundColor || '#ffffff'"
                     @input="(e: any) => { camera.backgroundColor = e.target.value; onUpdate(); }"
                  />
              </div>

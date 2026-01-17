@@ -21,11 +21,12 @@ const update = (key: string, val: number) => {
         <div class="flex items-center">
              <div class="w-16 text-xs text-text-secondary">Position</div>
              <div class="flex-1 grid grid-cols-2 gap-1">
-                <div class="flex items-center bg-bg-input border border-border rounded overflow-hidden group">
+                <div class="flex items-center border border-border rounded overflow-hidden group focus-within:border-accent-color transition-colors">
                     <div class="px-2 text-xs font-bold text-red-500 cursor-ew-resize border-r border-border hover:bg-bg-hover">X</div>
                     <input 
                         type="number" 
-                        class="w-full bg-transparent text-xs p-1 px-2 outline-none text-text-primary"
+                        class="w-full u-input bg-bg-input text-xs p-1 px-2 outline-none text-text-primary"
+                        name="transform-x"
                         :value="transform.x"
                         @input="(e) => {
                             const val = parseFloat((e.target as HTMLInputElement).value);
@@ -34,11 +35,12 @@ const update = (key: string, val: number) => {
                         }"
                     />
                 </div>
-                <div class="flex items-center bg-bg-input border border-border rounded overflow-hidden group">
+                <div class="flex items-center border border-border rounded overflow-hidden group focus-within:border-accent-color transition-colors">
                     <div class="px-2 text-xs font-bold text-green-500 cursor-ns-resize border-r border-border hover:bg-bg-hover">Y</div>
                     <input 
                         type="number" 
-                        class="w-full bg-transparent text-xs p-1 px-2 outline-none text-text-primary"
+                        class="w-full u-input bg-bg-input text-xs p-1 px-2 outline-none text-text-primary"
+                        name="transform-y"
                         :value="transform.y"
                         @input="(e) => {
                             const val = parseFloat((e.target as HTMLInputElement).value);
@@ -54,11 +56,12 @@ const update = (key: string, val: number) => {
          <div class="flex items-center">
              <div class="w-16 text-xs text-text-secondary">Rotation</div>
              <div class="flex-1">
-                 <div class="flex items-center bg-bg-input border border-border rounded overflow-hidden group">
+                 <div class="flex items-center border border-border rounded overflow-hidden group focus-within:border-accent-color transition-colors">
                     <div class="px-2 text-xs font-bold text-blue-400 cursor-ew-resize border-r border-border hover:bg-bg-hover">Z</div>
                     <input 
                         type="number" 
-                        class="w-full bg-transparent text-xs p-1 px-2 outline-none text-text-primary"
+                        class="w-full u-input bg-bg-input text-xs p-1 px-2 outline-none text-text-primary"
+                        name="transform-rotation"
                         :value="Math.round(transform.rotation * (180 / Math.PI) * 100) / 100"
                         @input="(e) => {
                             const val = parseFloat((e.target as HTMLInputElement).value);
@@ -74,11 +77,12 @@ const update = (key: string, val: number) => {
          <div class="flex items-center">
              <div class="w-16 text-xs text-text-secondary">Layer</div>
              <div class="flex-1">
-                 <div class="flex items-center bg-bg-input border border-border rounded overflow-hidden group">
+                 <div class="flex items-center border border-border rounded overflow-hidden group focus-within:border-accent-color transition-colors">
                     <div class="px-2 text-xs font-bold text-yellow-500 cursor-ew-resize border-r border-border hover:bg-bg-hover">#</div>
                     <input 
                         type="number" 
-                        class="w-full bg-transparent text-xs p-1 px-2 outline-none text-text-primary"
+                        class="w-full u-input bg-bg-input text-xs p-1 px-2 outline-none text-text-primary"
+                        name="transform-layer"
                         :value="transform.zIndex || 0"
                         @input="(e) => {
                             const val = parseFloat((e.target as HTMLInputElement).value);
@@ -95,12 +99,13 @@ const update = (key: string, val: number) => {
         <div class="flex items-center">
             <div class="w-16 text-xs text-text-secondary">Scale</div>
             <div class="flex-1 grid grid-cols-2 gap-1">
-                <div class="flex items-center bg-bg-input border border-border rounded overflow-hidden group">
+                <div class="flex items-center border border-border rounded overflow-hidden group focus-within:border-accent-color transition-colors">
                     <div class="px-2 text-xs font-bold text-text-secondary border-r border-border hover:bg-bg-hover">X</div>
                     <input 
                         type="number" 
                         step="0.1"
-                        class="w-full bg-transparent text-xs p-1 px-2 outline-none text-text-primary"
+                        class="w-full u-input bg-bg-input text-xs p-1 px-2 outline-none text-text-primary placeholder-text-secondary"
+                        name="transform-scale-x"
                         :value="transform.scale.x"
                         @input="(e) => {
                             const val = parseFloat((e.target as HTMLInputElement).value);
@@ -109,12 +114,13 @@ const update = (key: string, val: number) => {
                         }"
                     />
                 </div>
-                <div class="flex items-center bg-bg-input border border-border rounded overflow-hidden group">
+                <div class="flex items-center border border-border rounded overflow-hidden group focus-within:border-accent-color transition-colors">
                     <div class="px-2 text-xs font-bold text-text-secondary border-r border-border hover:bg-bg-hover">Y</div>
                     <input 
                         type="number" 
                         step="0.1"
-                        class="w-full bg-transparent text-xs p-1 px-2 outline-none text-text-primary"
+                        class="w-full u-input bg-bg-input text-xs p-1 px-2 outline-none text-text-primary"
+                        name="transform-scale-y"
                         :value="transform.scale.y"
                         @input="(e) => {
                             const val = parseFloat((e.target as HTMLInputElement).value);

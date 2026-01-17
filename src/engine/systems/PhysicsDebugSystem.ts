@@ -73,7 +73,7 @@ export class PhysicsDebugSystem {
 
             const t = entity.transform;
             
-            if (entity.boxCollider) {
+            if (entity.boxCollider && (entity.boxCollider.show !== false)) {
                  const w = entity.boxCollider.width * t.scale.x;
                  const h = entity.boxCollider.height * t.scale.y; 
                  
@@ -107,10 +107,10 @@ export class PhysicsDebugSystem {
                  }
                  if (p0) this.graphics.lineTo(p0.x, p0.y);
                  
-                 this.graphics.stroke({ width: lineWidth, color: 0x00FFFF, alpha: 0.5 });
+                 this.graphics.stroke({ width: lineWidth, color: 0xFF00FF, alpha: 0.8 });
             }
 
-            if (entity.circleCollider) {
+            if (entity.circleCollider && (entity.circleCollider.show !== false)) {
                 const r = entity.circleCollider.radius * Math.max(t.scale.x, t.scale.y);
                 
                 const w = r * 2;
@@ -118,7 +118,57 @@ export class PhysicsDebugSystem {
 
                 this.graphics.beginPath();
                 this.graphics.circle(t.x + offset.x, t.y + offset.y, r);
-                this.graphics.stroke({ width: lineWidth, color: 0x00FFFF, alpha: 0.5 });
+                this.graphics.stroke({ width: lineWidth, color: 0xFF00FF, alpha: 0.8 });
+            }
+
+            if (entity.polygonCollider && entity.polygonCollider.show) {
+                let vertices = entity.polygonCollider.vertices;
+                
+                // Frame-Specific Visuals
+                if (entity.animator && entity.animator.isPlaying && entity.animator.currentAnim) {
+                    const animName = entity.animator.currentAnim;
+                    const animData = entity.animator.animations[animName];
+                    if (animData && animData.frames.length > 0) {
+                         const frameDuration = 1 / (animData.speed || 10);
+                         const currentFrameIndex = Math.floor(entity.animator.elapsedTime / frameDuration) % animData.frames.length;
+                         
+                         if (entity.polygonCollider.frames?.[animName]?.[currentFrameIndex]) {
+                             vertices = entity.polygonCollider.frames[animName][currentFrameIndex];
+                         }
+                    }
+                }
+
+                if (vertices.length > 0) {
+                     // Helper to transform a point
+                     const transformPoint = (p: {x: number, y: number}) => {
+                         const sx = p.x * t.scale.x;
+                         const sy = p.y * t.scale.y;
+                         const cos = Math.cos(t.rotation);
+                         const sin = Math.sin(t.rotation);
+                         return {
+                             x: (sx * cos - sy * sin) + t.x,
+                             y: (sx * sin + sy * cos) + t.y
+                         };
+                     };
+
+                    this.graphics.beginPath();
+                    // Safe access if vertices[0] exists (checked length > 0)
+                    const v0 = vertices[0];
+                    if (v0) {
+                        const p0 = transformPoint(v0);
+                        this.graphics.moveTo(p0.x, p0.y);
+
+                        for (let i = 1; i < vertices.length; i++) {
+                            const v = vertices[i];
+                            if (v) {
+                                const p = transformPoint(v);
+                                this.graphics.lineTo(p.x, p.y);
+                            }
+                        }
+                        this.graphics.lineTo(p0.x, p0.y); // Close loop
+                        this.graphics.stroke({ width: lineWidth, color: 0xFF00FF, alpha: 0.8 }); // Purple for Polygon
+                    }
+                }
             }
         }
     }

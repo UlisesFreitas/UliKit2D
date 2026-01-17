@@ -19,14 +19,17 @@ import ScriptInspector from '../components/inspectors/ScriptInspector.vue';
 import BitmapTextEditor from '../components/inspectors/BitmapTextEditor.vue';
 import CircleColliderEditor from '../components/inspectors/CircleColliderEditor.vue';
 import NineSliceEditor from '../components/inspectors/NineSliceEditor.vue';
+import PolygonColliderEditor from '../components/inspectors/PolygonColliderEditor.vue';
 
 import AddComponentModal from '../components/modals/AddComponentModal.vue';
+import CollisionModal from '../components/modals/CollisionModal.vue';
 import defaultSprite from '../../resources/internal_default_assets/default_sprite.png';
 
 const editorStore = useEditorStore();
 
 const revision = ref(0);
 const isAddModalOpen = ref(false);
+
 
 const handleEntityUpdate = (id: string) => {
     if (editorStore.selectedEntityId === id) {
@@ -265,6 +268,47 @@ const toggleCollapse = (key: string) => {
     collapsedState[key] = !collapsedState[key];
 };
 
+// --- Modals ---
+const isCollisionModalOpen = ref(false);
+
+const handleOpenCollisionModal = () => {
+    isCollisionModalOpen.value = true;
+};
+
+// Updated signature: payload contains vertices AND context (mode, anim, frame)
+const handleSaveCollisionMask = (payload: { vertices: { x: number, y: number }[], context: any }) => {
+    if (selectedEntity.value) {
+        const ent = selectedEntity.value;
+        const { vertices, context } = payload; // Deconstruct payload
+
+        if (!ent.polygonCollider) {
+             // Init with defaults
+             world.addComponent(ent, 'polygonCollider', { show: true, vertices });
+        }
+        
+        // Check Context from Save Event
+        if (context && context.mode === 'animation' && context.anim && typeof context.frame === 'number') {
+             // Ensure nested structure exists
+             if (!ent.polygonCollider!.frames) ent.polygonCollider!.frames = {};
+             if (!ent.polygonCollider!.frames![context.anim]) ent.polygonCollider!.frames![context.anim] = {};
+             
+             ent.polygonCollider!.frames![context.anim]![context.frame] = vertices;
+             console.log(`[Inspector] Saved Frame Mask: ${context.anim} [${context.frame}]`, vertices);
+        } else {
+             // Global Save
+             ent.polygonCollider!.vertices = vertices;
+             console.log('[Inspector] Saved Global Mask', vertices);
+        }
+        
+        // Trigger manual update
+        onComponentUpdate();
+        
+        // Remove Box/Circle if they exist to avoid conflict
+        if (ent.boxCollider) world.removeComponent(ent, 'boxCollider');
+        if (ent.circleCollider) world.removeComponent(ent, 'circleCollider');
+    }
+};
+
 </script>
 
 <template>
@@ -334,7 +378,7 @@ const toggleCollapse = (key: string) => {
                         <div class="font-bold text-sm capitalize">{{ item.key }}</div>
                     </div>
                     <button 
-                        v-if="item.key !== 'transform' && !(item.key === 'sprite' && (selectedEntity as any).animator)" 
+                        v-if="item.key !== 'transform' && item.key !== 'sprite'" 
                         @click.stop="removeComponent(item.key)"
                         class="text-xs text-text-secondary hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
                         title="Remove Component"
@@ -372,12 +416,14 @@ const toggleCollapse = (key: string) => {
                     <BoxColliderEditor 
                         v-else-if="item.key === 'boxCollider'" 
                         :collider="item.data" 
+                        :revision="revision"
                         @update="onComponentUpdate" 
                     />
 
                     <CircleColliderEditor 
                         v-else-if="item.key === 'circleCollider'" 
                         :circleCollider="item.data" 
+                        :revision="revision"
                         @update="onComponentUpdate" 
                     />
 
@@ -414,6 +460,15 @@ const toggleCollapse = (key: string) => {
                         @update="onComponentUpdate" 
                     />
 
+                    <PolygonColliderEditor 
+                        v-else-if="item.key === 'polygonCollider'" 
+                        :polygonCollider="item.data" 
+                        :animator="(selectedEntity as any).animator"
+                        :revision="revision"
+                        @update="onComponentUpdate" 
+                        @open-modal="handleOpenCollisionModal"
+                    />
+
                     <!-- Fallback -->
                     <div v-else class="text-xs text-text-secondary">
                         Generic Component ({{ item.key }})
@@ -435,13 +490,21 @@ const toggleCollapse = (key: string) => {
         No entity selected
     </div>
 
-    <!-- Modal -->
+
     <Teleport to="body">
         <AddComponentModal 
             :isOpen="isAddModalOpen" 
             :existingComponents="existingComponentKeys"
             @close="isAddModalOpen = false"
             @add="handleAddComponent"
+        />
+
+        <CollisionModal
+            :isOpen="isCollisionModalOpen"
+            :entity="selectedEntity"
+            :animator="(selectedEntity as any)?.animator"
+             @close="isCollisionModalOpen = false"
+             @save="handleSaveCollisionMask"
         />
     </Teleport>
 

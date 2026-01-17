@@ -111,7 +111,7 @@ const onDropTexture = async (event: DragEvent) => {
             <div class="flex items-center justify-between">
                  <label class="text-xs text-text-secondary">Anchor / Pivot</label>
                  <select 
-                     class="bg-bg-dark border border-border-dim rounded text-[10px] text-text-primary px-1 py-0.5 outline-none"
+                     class="u-input text-[10px] px-1 py-0.5"
                      @change="(e:any) => {
                         const [x, y] = e.target.value.split(',').map(Number);
                         // We need a helper or direct update. Let's do direct for now since we have updateComponent
@@ -141,7 +141,7 @@ const onDropTexture = async (event: DragEvent) => {
                     <input 
                         type="number" 
                         step="0.1"
-                        class="w-full bg-bg-dark border border-border-dim rounded px-1 text-xs text-text-primary outline-none"
+                        class="u-input px-1"
                         :value="component.anchor?.x ?? 0.5"
                         @input="(e:any) => {
                              const val = parseFloat(e.target.value);
@@ -156,7 +156,7 @@ const onDropTexture = async (event: DragEvent) => {
                      <input 
                         type="number" 
                         step="0.1"
-                        class="w-full bg-bg-dark border border-border-dim rounded px-1 text-xs text-text-primary outline-none"
+                        class="u-input px-1"
                         :value="component.anchor?.y ?? 0.5"
                         @input="(e:any) => {
                              const val = parseFloat(e.target.value);
@@ -180,7 +180,7 @@ const onDropTexture = async (event: DragEvent) => {
                         type="number" 
                         :value="component.top" 
                         @input="e => updateComponent('top', Number((e.target as HTMLInputElement).value))"
-                        class="flex-1 bg-bg-dark border border-border-dim rounded px-2 py-1 text-xs text-text-primary focus:border-primary outline-none"
+                        class="u-input flex-1 px-2 py-1"
                     />
                 </div>
                 <div class="flex items-center gap-2">
@@ -189,7 +189,7 @@ const onDropTexture = async (event: DragEvent) => {
                         type="number" 
                         :value="component.bottom" 
                         @input="e => updateComponent('bottom', Number((e.target as HTMLInputElement).value))"
-                        class="flex-1 bg-bg-dark border border-border-dim rounded px-2 py-1 text-xs text-text-primary focus:border-primary outline-none"
+                        class="u-input flex-1 px-2 py-1"
                     />
                 </div>
                 
@@ -200,7 +200,7 @@ const onDropTexture = async (event: DragEvent) => {
                         type="number" 
                         :value="component.left" 
                         @input="e => updateComponent('left', Number((e.target as HTMLInputElement).value))"
-                        class="flex-1 bg-bg-dark border border-border-dim rounded px-2 py-1 text-xs text-text-primary focus:border-primary outline-none"
+                        class="u-input flex-1 px-2 py-1"
                     />
                 </div>
                 <div class="flex items-center gap-2">
@@ -209,7 +209,7 @@ const onDropTexture = async (event: DragEvent) => {
                         type="number" 
                         :value="component.right" 
                         @input="e => updateComponent('right', Number((e.target as HTMLInputElement).value))"
-                        class="flex-1 bg-bg-dark border border-border-dim rounded px-2 py-1 text-xs text-text-primary focus:border-primary outline-none"
+                        class="u-input flex-1 px-2 py-1"
                     />
                 </div>
             </div>

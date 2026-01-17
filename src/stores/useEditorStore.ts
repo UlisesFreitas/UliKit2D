@@ -116,10 +116,13 @@ export const useEditorStore = defineStore('editor', () => {
                  sprite: entity.sprite ? { ...entity.sprite } : undefined,
                  rigidBody: entity.rigidBody ? { ...entity.rigidBody } : undefined,
                  boxCollider: entity.boxCollider ? { ...entity.boxCollider } : undefined,
+                 circleCollider: entity.circleCollider ? { ...entity.circleCollider } : undefined,
+                 camera: entity.camera ? { ...entity.camera } : undefined,
                  audioSource: entity.audioSource ? { ...entity.audioSource } : undefined,
                  label: entity.label ? { ...entity.label } : undefined,
                  bitmapText: entity.bitmapText ? { ...entity.bitmapText } : undefined,
                  nineSliceSprite: entity.nineSliceSprite ? { ...entity.nineSliceSprite } : undefined,
+                 polygonCollider: entity.polygonCollider ? { ...entity.polygonCollider } : undefined,
                  animator: entity.animator ? JSON.parse(JSON.stringify(entity.animator)) : undefined,
                  script: entity.script && Array.isArray(entity.script) ? entity.script.map(s => ({...s})) : undefined
              };

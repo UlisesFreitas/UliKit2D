@@ -71,16 +71,17 @@ interface PolygonColliderComponent {
     - Current System: `boxCollider`, `circleCollider` are optional props. Add `polygonCollider`.
 
 ### 2. Editor UI (Collision Editor)
-This is the complex part (similar to GDevelop's screenshot).
-- **Edit Mode**:
-    - A button "Edit Collision Mask" in Inspector.
-    - Opens a Modal or switches Scene View to "Collider Edit Mode".
-    - **Points Editor**:
-        - Click to add points.
-        - Drag points to move.
-        - Double click to remove.
-        - Visual lines connecting points.
-    - **Origin Visualization**: Show the Origin Point relative to the polygon.
+- **Edit Mode (Modal)**:
+    -   User clicks "Edit Collision Mask" in Inspector (Box/Polygon Collider section).
+    -   Opens a **Modal Overlay** (similar to GDevelop/Godot style).
+    -   **Modal Content**:
+        -   Canvas showing the Sprite + Current Collider Polygon.
+        -   **Tools**:
+            -   **Move Point**: Drag existing vertices.
+            -   **Add Point**: Click on edge to subdivide.
+            -   **Remove Point**: Double-click or Right-click vertex to remove (allows creating Triangles from Quads).
+        -   **Presets**: Button to "Reset to Box" or "Reset to Mesh (Auto)".
+    -   **Live Preview**: Changes apply to the `PolygonColliderComponent` logic immediately or on "Apply".
 
 ### 3. Engine Integration (PhysicsSystem)
 - **PhysicsSystem**:

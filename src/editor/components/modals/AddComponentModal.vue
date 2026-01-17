@@ -24,6 +24,7 @@ const CORE_COMPONENTS = [
     { type: 'audioSource', name: 'Audio Source', icon: '🔊', description: 'Plays sound clips' },
     { type: 'label', name: 'Text Label', icon: '📝', description: 'Displays text' },
     { type: 'bitmapText', name: 'Bitmap Text', icon: '🔤', description: 'High-performance styled text' },
+    { type: 'polygonCollider', name: 'Polygon Collider 2D', icon: '📐', description: 'Custom shape collision' },
     { type: 'nineSliceSprite', name: 'Nine Slice Sprite', icon: '🍱', description: 'Scalable UI panel/frame' }
 ];
 
@@ -74,7 +75,15 @@ const filteredScripts = computed(() => {
 });
 
 const selectCore = (type: string) => {
-    emit('add', { type, data: {} });
+    let data: any = {};
+    if (type === 'polygonCollider') {
+        // Init empty to trigger auto-fit logic in Editor
+        data = { 
+            show: true, 
+            vertices: [] 
+        };
+    }
+    emit('add', { type, data });
     emit('close');
 };
 

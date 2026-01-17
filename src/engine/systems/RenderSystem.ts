@@ -59,6 +59,19 @@ export class RenderSystem {
         this.editorOverlay.label = 'Editor Overlay';
         this.editorOverlay.zIndex = 9999; 
         this.app.stage.addChild(this.editorOverlay);
+        this.app.stage.addChild(this.editorOverlay);
+    }
+    
+    private resolveColor(color: string): string {
+        if (color.startsWith('var(')) {
+            const varName = color.match(/var\(([^)]+)\)/)?.[1];
+            if (varName) {
+                // We need to get the value from the root
+                const val = getComputedStyle(document.documentElement).getPropertyValue(varName).trim();
+                return val || '#000000';
+            }
+        }
+        return color;
     }
     
     private tileSpriteCache: Map<string, Map<string, Sprite>> = new Map(); // LayerID -> "x,y" -> Sprite
@@ -92,7 +105,7 @@ export class RenderSystem {
                 if (layer.color) {
                      const bg = new Graphics();
                      bg.rect(-10000, -10000, 20000, 20000);
-                     bg.fill({ color: layer.color });
+                     bg.fill({ color: this.resolveColor(layer.color) });
                      bg.eventMode = 'none'; // Background should NOT block selection
                      container.addChildAt(bg, 0); // Always at bottom
                      this.layerBackgrounds.set(layer.id, bg);
@@ -117,7 +130,7 @@ export class RenderSystem {
                  if (bg) {
                      bg.clear();
                      bg.rect(-10000, -10000, 20000, 20000);
-                     bg.fill({ color: layer.color });
+                     bg.fill({ color: this.resolveColor(layer.color) });
                  }
              }
 

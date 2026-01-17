@@ -11,7 +11,10 @@ const props = defineProps<{
 }>();
 
 const text = computed({
-    get: () => props.entity.bitmapText?.text || '',
+    get: () => {
+        props.revision;
+        return props.entity.bitmapText?.text || '';
+    },
     set: (val) => {
         if (props.entity.bitmapText) {
             props.entity.bitmapText.text = val;
@@ -21,7 +24,10 @@ const text = computed({
 });
 
 const fontName = computed({
-    get: () => props.entity.bitmapText?.fontName || '',
+    get: () => {
+        props.revision;
+        return props.entity.bitmapText?.fontName || '';
+    },
     set: (val) => {
         if (props.entity.bitmapText) {
             props.entity.bitmapText.fontName = val;
@@ -31,7 +37,10 @@ const fontName = computed({
 });
 
 const fontTexture = computed({
-    get: () => props.entity.bitmapText?.fontTexture || '',
+    get: () => {
+        props.revision;
+        return props.entity.bitmapText?.fontTexture || '';
+    },
     set: (val) => {
         if (props.entity.bitmapText) {
             props.entity.bitmapText.fontTexture = val;
@@ -41,7 +50,10 @@ const fontTexture = computed({
 });
 
 const fontSize = computed({
-    get: () => props.entity.bitmapText?.fontSize || 32,
+    get: () => {
+        props.revision;
+        return props.entity.bitmapText?.fontSize || 32;
+    },
     set: (val) => {
         if (props.entity.bitmapText) {
             props.entity.bitmapText.fontSize = val;
@@ -51,7 +63,10 @@ const fontSize = computed({
 });
 
 const align = computed({
-    get: () => props.entity.bitmapText?.align || 'left',
+    get: () => {
+        props.revision;
+        return props.entity.bitmapText?.align || 'left';
+    },
     set: (val) => {
         if (props.entity.bitmapText) {
             props.entity.bitmapText.align = val as any;
@@ -61,7 +76,10 @@ const align = computed({
 });
 
 const tint = computed({
-    get: () => '#' + (props.entity.bitmapText?.tint || 0xffffff).toString(16).padStart(6, '0'),
+    get: () => {
+        props.revision;
+        return '#' + (props.entity.bitmapText?.tint || 0xffffff).toString(16).padStart(6, '0');
+    },
     set: (val) => {
         if (props.entity.bitmapText) {
             props.entity.bitmapText.tint = parseInt(val.replace('#', ''), 16);
@@ -70,8 +88,11 @@ const tint = computed({
     }
 });
 
+const emit = defineEmits(['update']);
+
 const emitUpdate = () => {
     eventBus.emit('component-updated', props.entity.id);
+    emit('update');
 };
 
 const activeFileMode = ref<'fnt' | 'img'>('fnt');
@@ -167,7 +188,7 @@ const onDropTexture = async (e: DragEvent) => {
             <label class="text-xs text-text-secondary mb-1">Text Content</label>
             <textarea 
                 v-model="text" 
-                class="bg-bg-input border border-border rounded p-2 text-sm text-text-primary resize-y min-h-[60px] focus:border-accent-color outline-none"
+                class="u-input resize-y min-h-[60px]"
                 placeholder="Enter text..."
             ></textarea>
         </div>
@@ -177,20 +198,20 @@ const onDropTexture = async (e: DragEvent) => {
             <label class="text-xs text-text-secondary w-16">Font File</label>
             <div class="flex gap-1">
                 <div 
-                    class="flex-1 flex items-center gap-2 bg-bg-input border border-border rounded p-1 overflow-hidden"
+                    class="flex-1 flex items-center gap-2 bg-bg-input border border-border rounded p-1 overflow-hidden focus-within:border-accent-color"
                     @dragover.prevent
                     @drop.prevent="onDropFont"
                 >
                     <input 
                         v-model="fontName" 
-                        class="bg-transparent text-xs w-full outline-none px-1 text-text-primary"
+                        class="u-input bg-bg-input text-xs w-full outline-none px-1 text-text-primary"
                         placeholder="Drag .fnt file"
                         readonly
                     />
                 </div>
                 <button 
                     @click="triggerFileSelect('fnt')"
-                    class="bg-bg-input hover:bg-bg-hover border border-border rounded px-2 py-1 text-xs"
+                    class="u-button"
                     title="Select from Assets"
                 >
                     📂
@@ -203,20 +224,20 @@ const onDropTexture = async (e: DragEvent) => {
             <label class="text-xs text-text-secondary w-16" title="Optional texture override">Texture</label>
             <div class="flex gap-1">
                 <div 
-                    class="flex-1 flex items-center gap-2 bg-bg-input border border-border rounded p-1 overflow-hidden"
+                    class="flex-1 flex items-center gap-2 bg-bg-input border border-border rounded p-1 overflow-hidden focus-within:border-accent-color"
                     @dragover.prevent
                     @drop.prevent="onDropTexture"
                 >
                     <input 
                         v-model="fontTexture" 
-                        class="bg-transparent text-xs w-full outline-none px-1 text-text-primary"
+                        class="u-input bg-bg-input text-xs w-full outline-none px-1 text-text-primary"
                         placeholder="Default (from .fnt)"
                         readonly
                     />
                 </div>
                 <button 
                     @click="triggerFileSelect('img')"
-                    class="bg-bg-input hover:bg-bg-hover border border-border rounded px-2 py-1 text-xs"
+                    class="u-button"
                     title="Select from Assets"
                 >
                     📂
@@ -239,16 +260,16 @@ const onDropTexture = async (e: DragEvent) => {
                  <input 
                     type="number" 
                     v-model.number="fontSize" 
-                    class="flex-1 bg-bg-input border border-border rounded px-2 py-1 text-sm focus:border-accent-color outline-none min-w-0" 
+                    class="u-input flex-1 min-w-0" 
                 />
             </div>
             <div class="flex items-center gap-2">
                 <label class="text-xs text-text-secondary w-16">Color</label>
-                <div class="flex-1 flex items-center bg-bg-input border border-border rounded px-1">
+                <div class="flex-1 flex items-center bg-bg-input border border-border rounded px-1 focus-within:border-accent-color">
                     <input 
                         type="color" 
                         v-model="tint" 
-                        class="w-6 h-6 bg-transparent cursor-pointer border-none p-0" 
+                        class="w-6 h-6 bg-bg-input cursor-pointer border-none p-0" 
                     />
                     <span class="text-[10px] font-mono ml-1 text-text-secondary truncate">{{ tint.toUpperCase() }}</span>
                 </div>

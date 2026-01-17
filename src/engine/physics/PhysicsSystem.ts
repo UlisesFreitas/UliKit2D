@@ -87,7 +87,7 @@ export class PhysicsSystem {
     }
 
     private syncBodies() {
-        // 1. Initialize bodies for new entities (Box or Circle)
+        // 1. Initialize bodies for new entities
         const entitiesWithBody = world.with('transform', 'rigidBody');
         
         for (const entity of entitiesWithBody) {
@@ -100,55 +100,199 @@ export class PhysicsSystem {
                 h = w; 
             }
 
+            const sx = Math.abs(entity.transform.scale.x) || 0.001;
+            const sy = Math.abs(entity.transform.scale.y) || 0.001;
+
             if (!entity.physicsBody) {
                 const { x, y, rotation } = entity.transform;
                 const { isStatic, friction, restitution } = entity.rigidBody;
                 
-                // Calculate Offset Position
-                const offset = this.getBodyOffset(entity, w, h, rotation);
-                const bx = x + offset.x;
-                const by = y + offset.y;
-
                 let body: Matter.Body | null = null;
 
                 if (entity.boxCollider) {
-                    body = Matter.Bodies.rectangle(bx, by, w, h, {
-                        isStatic,
-                        angle: rotation,
-                        friction,
-                        restitution
+                    const scaledW = w * sx;
+                    const scaledH = h * sy;
+                    const offset = this.getBodyOffset(entity, scaledW, scaledH, rotation);
+                    
+                    body = Matter.Bodies.rectangle(x + offset.x, y + offset.y, scaledW, scaledH, {
+                        isStatic, angle: rotation, friction, restitution
                     });
                 } else if (entity.circleCollider) {
-                     const { radius } = entity.circleCollider;
-                     body = Matter.Bodies.circle(bx, by, radius, {
-                        isStatic,
-                        angle: rotation,
-                        friction,
-                        restitution
+                     const radius = (entity.circleCollider.radius) * Math.max(sx, sy);
+                     const offset = this.getBodyOffset(entity, radius * 2, radius * 2, rotation); // Circle offset
+
+                     body = Matter.Bodies.circle(x + offset.x, y + offset.y, radius, {
+                        isStatic, angle: rotation, friction, restitution
                     });
+                } else if (entity.polygonCollider) {
+                    let activeVertices = entity.polygonCollider.vertices;
+
+                    // Frame-Specific Override
+                    if (entity.animator && entity.animator.isPlaying && entity.animator.currentAnim) {
+                        const animName = entity.animator.currentAnim;
+                        const animData = entity.animator.animations[animName];
+                        if (animData && animData.frames.length > 0) {
+                            const frameDuration = 1 / (animData.speed || 10);
+                            const currentFrameIndex = Math.floor(entity.animator.elapsedTime / frameDuration) % animData.frames.length;
+                            if (entity.polygonCollider.frames?.[animName]?.[currentFrameIndex]) {
+                                activeVertices = entity.polygonCollider.frames[animName][currentFrameIndex];
+                            }
+                        }
+                    }
+
+                    if (activeVertices.length >= 3) {
+                         // Matter.Bodies.fromVertices centers the body at CoM.
+                         // Vertices are relative to (0,0).
+                         // We assume vertices are ALREADY scaled/designed in editor relative to usage.
+                         // If we want to support entity.scale on top of vertices, we'd scale them here.
+                         // For now, let's treat vertices as absolute relative to entity anchor.
+                         
+                         const cloneVerts = activeVertices.map(v => ({ x: v.x, y: v.y })); // No extra scaling applied yet?
+                         // If users expect resizing entity to resize polygon, we should apply scale.
+                         // Let's apply Scale!
+                         const scaledVerts = cloneVerts.map(v => ({ x: v.x * sx, y: v.y * sy }));
+
+                         body = Matter.Bodies.fromVertices(x, y, [scaledVerts], {
+                            isStatic, angle: rotation, friction, restitution
+                         }, true);
+
+                         if (body) {
+                            // Fix Offset: fromVertices centers body at new CoM.
+                            // We want body p to align with entity p (Anchor).
+                            // But usually users draw polygon relative to anchor.
+                            // So if vertices are around (0,0), CoM is near (0,0).
+                            // Matter moves body so CoM is at x,y.
+                            
+                            // Let's assume standard behavior for now.
+                            (body as any)._lastVertices = activeVertices; 
+                         }
+                    }
                 }
 
                 if (body) {
+                    (body as any)._lastScale = { x: sx, y: sy };
+                    (body as any)._lastDims = { w, h };
+                    
                     entity.physicsBody = body;
                     Matter.World.add(this.engine.world, body);
                 }
             } else {
-                // 2. Sync Physics -> ECS (for dynamic bodies)
+                const body = entity.physicsBody as Matter.Body;
+                
+                // 2. Sync Physics -> ECS (Dynamic)
                 if (!entity.rigidBody.isStatic) {
-                   const rotation = entity.physicsBody.angle;
-                   // Calculate reverse offset based on NEW rotation
-                   const offset = this.getBodyOffset(entity, w, h, rotation);
-
-                   entity.transform.x = entity.physicsBody.position.x - offset.x;
-                   entity.transform.y = entity.physicsBody.position.y - offset.y;
+                   const rotation = body.angle;
+                   // Sync Transform from Body
+                   // Note: We might need to handle offset reverse logic if we used offset
+                   // For Polygon, simple sync is usually enough if CoM is reasonable.
+                   // For Box/Circle, we have offset logic.
+                   
+                   if (entity.boxCollider || entity.circleCollider) {
+                       // Reverse offset logic (approximate or stored)
+                       // Simpler: Just sync?
+                       // If we used offset to Create, Body Pos != Entity Pos.
+                       // Entity Pos = Body Pos - Offset
+                       
+                       // We need current scaled dims
+                       const currentSx = Math.abs(entity.transform.scale.x) || 0.001;
+                       const currentSy = Math.abs(entity.transform.scale.y) || 0.001;
+                       let curW = 0, curH = 0;
+                       if (entity.boxCollider) { curW = entity.boxCollider.width * currentSx; curH = entity.boxCollider.height * currentSy; }
+                       if (entity.circleCollider) { const r = entity.circleCollider.radius * Math.max(currentSx, currentSy); curW = r*2; curH = r*2; }
+                       
+                       const offset = this.getBodyOffset(entity, curW, curH, rotation);
+                       entity.transform.x = body.position.x - offset.x;
+                       entity.transform.y = body.position.y - offset.y;
+                   } else {
+                       entity.transform.x = body.position.x;
+                       entity.transform.y = body.position.y;
+                   }
                    entity.transform.rotation = rotation;
-                } else {
-                    // 3. Sync ECS -> Physics (for static bodies moved in editor)
-                    const { x, y, rotation } = entity.transform;
-                    const offset = this.getBodyOffset(entity, w, h, rotation);
 
-                    Matter.Body.setPosition(entity.physicsBody, { x: x + offset.x, y: y + offset.y });
-                    Matter.Body.setAngle(entity.physicsBody, rotation);
+                } else {
+                    // 3. Sync ECS -> Physics (Static / Editor Updates)
+                    const { x, y, rotation } = entity.transform;
+
+                    // Handling Polygon Updates (Frame Swap)
+                    if (entity.polygonCollider) {
+                         let targetVertices = entity.polygonCollider.vertices;
+                         
+                         if (entity.animator && entity.animator.isPlaying && entity.animator.currentAnim) {
+                            const animName = entity.animator.currentAnim;
+                            const animData = entity.animator.animations[animName];
+                            if (animData && animData.frames.length > 0) {
+                                const frameDuration = 1 / (animData.speed || 10);
+                                const currentFrameIndex = Math.floor(entity.animator.elapsedTime / frameDuration) % animData.frames.length;
+                                
+                                if (entity.polygonCollider.frames?.[animName]?.[currentFrameIndex]) {
+                                    targetVertices = entity.polygonCollider.frames[animName][currentFrameIndex];
+                                }
+                            }
+                         }
+
+                         const lastVerts = (body as any)._lastVertices;
+                         if (lastVerts !== targetVertices) {
+                             // Update Vertices (keep current position)
+                             // Apply Scale
+                             const scaledVerts = targetVertices.map(v => ({ x: v.x * sx, y: v.y * sy }));
+                             Matter.Body.setVertices(body, scaledVerts);
+                             (body as any)._lastVertices = targetVertices;
+                         }
+                         
+                         Matter.Body.setAngle(body, rotation);
+                         // Matter.Body.setPosition(body, { x, y }); // Polygon offset handling needed?
+                         // If we assume CoM doesn't shift wildly, x/y is roughly center.
+                         Matter.Body.setPosition(body, { x: x, y: y });
+                    }
+                    
+                    // Box/Circle Scale Logic
+                    const lastScale = (body as any)._lastScale || { x: 1, y: 1 };
+                    const lastDims = (body as any)._lastDims || { w, h };
+                    
+                    let reScaleX = 1;
+                    let reScaleY = 1;
+                    let needsRescale = false;
+
+                    // A. Check for Transform Scale Change
+                    if (Math.abs(sx - lastScale.x) > 0.001 || Math.abs(sy - lastScale.y) > 0.001) {
+                         reScaleX = sx / lastScale.x;
+                         reScaleY = sy / lastScale.y;
+                         needsRescale = true;
+                    }
+
+                    // B. Check for Dimension Change (Inspector Input)
+                    if (Math.abs(w - lastDims.w) > 0.001 || Math.abs(h - lastDims.h) > 0.001) {
+                        const dimScaleX = w / lastDims.w;
+                        const dimScaleY = h / lastDims.h;
+                        reScaleX *= dimScaleX;
+                        reScaleY *= dimScaleY;
+                        needsRescale = true;
+                    }
+
+                    if (needsRescale) {
+                        if (entity.circleCollider) {
+                             const oldRadius = (lastDims.w / 2) * Math.max(lastScale.x, lastScale.y);
+                             const newRadius = (w / 2) * Math.max(sx, sy);
+                             const factor = newRadius / oldRadius;
+                             Matter.Body.scale(body, factor, factor);
+                        } else if (entity.boxCollider) {
+                             Matter.Body.scale(body, reScaleX, reScaleY);
+                        }
+                        // Polygon scaling usually handled by setVertices or explicit scale?
+                        // If we use setVertices above, we shouldn't scale here. Only for Box/Circle.
+
+                        (body as any)._lastScale = { x: sx, y: sy };
+                        (body as any)._lastDims = { w, h };
+                    }
+
+                    // Position Sync
+                    if (entity.boxCollider || entity.circleCollider) {
+                         const scaledW = w * sx;
+                         const scaledH = h * sy;
+                         const offset = this.getBodyOffset(entity, scaledW, scaledH, rotation);
+                         Matter.Body.setPosition(body, { x: x + offset.x, y: y + offset.y });
+                         Matter.Body.setAngle(body, rotation);
+                    }
                 }
             }
         }

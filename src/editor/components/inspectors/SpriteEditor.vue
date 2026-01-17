@@ -45,10 +45,14 @@ const applyPreset = (val: string) => {
     onUpdate();
 };
 
-const onSelectAsset = (path: string) => {
+const onSelectAsset = (path: string | string[]) => {
+    // Handle array
+    const singlePath = Array.isArray(path) ? path[0] : path;
+    if (!singlePath) return;
+
     // 1. Mutate
     // Normalize path to forward slashes
-    const normPath = path.replace(/\\/g, '/');
+    const normPath = singlePath.replace(/\\/g, '/');
     
     stopAnimation();
     
@@ -194,7 +198,7 @@ onMounted(async () => {
                     <div class="flex items-center justify-between">
                          <label class="text-xs text-text-secondary">Anchor / Pivot</label>
                          <select 
-                             class="bg-bg-input border border-border rounded text-[10px] text-text-primary px-1 py-0.5"
+                             class="u-input text-[10px] px-1 py-0.5"
                              @change="(e:any) => applyPreset(e.target.value)"
                          >
                             <option value="" disabled selected>Presets</option>
@@ -217,7 +221,7 @@ onMounted(async () => {
                             <input 
                                 type="number" 
                                 step="0.1"
-                                class="w-full bg-bg-input border border-border rounded px-1 text-xs text-text-primary"
+                                class="u-input px-1"
                                 :value="sprite.anchor?.x ?? 0.5"
                                 @input="(e:any) => updateAnchor('x', parseFloat(e.target.value))"
                             />
@@ -228,7 +232,7 @@ onMounted(async () => {
                              <input 
                                 type="number" 
                                 step="0.1"
-                                class="w-full bg-bg-input border border-border rounded px-1 text-xs text-text-primary"
+                                class="u-input px-1"
                                 :value="sprite.anchor?.y ?? 0.5"
                                 @input="(e:any) => updateAnchor('y', parseFloat(e.target.value))"
                             />

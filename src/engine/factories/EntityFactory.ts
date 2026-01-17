@@ -7,7 +7,6 @@ import defaultCircle from '../../resources/internal_default_assets/default_circl
 import defaultBox from '../../resources/internal_default_assets/default_box.png';   
 import defaultAudio from '../../resources/internal_default_assets/default_audio.png';
 import defaultScript from '../../resources/internal_default_assets/default_script.png';
-import defaultCamera from '../../resources/internal_default_assets/default_camera.png';
 
 export type EntityType = 
     | 'Empty' 
@@ -51,8 +50,6 @@ export class EntityFactory {
                 break;
             case 'Camera':
                 data.camera = { zoom: 1, isPrimary: false, backgroundColor: '#000000' };
-                // Visual Representation
-                data.sprite = { texture: defaultCamera };
                 break;
             case 'Text':
                 data.label = { 

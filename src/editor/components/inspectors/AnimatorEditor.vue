@@ -58,7 +58,7 @@ watch(() => props.entity, () => {
                 <select 
                     v-model="animator.currentAnim" 
                     @change="emit('update')"
-                    class="flex-1 bg-bg-input border border-border rounded px-1 py-0.5 text-xs text-text-primary outline-none focus:border-accent-color"
+                    class="u-input flex-1 py-0.5"
                 >
                     <option value="">(None)</option>
                     <option v-for="name in animationNames" :key="name" :value="name">{{ name }}</option>
@@ -73,7 +73,7 @@ watch(() => props.entity, () => {
                     v-model.number="animator.speed" 
                     @input="emit('update')"
                     step="0.1"
-                    class="w-16 bg-bg-input border border-border rounded px-1 py-0.5 text-xs text-text-primary text-right outline-none focus:border-accent-color"
+                    class="u-input w-16 text-right py-0.5"
                 />
             </div>
 

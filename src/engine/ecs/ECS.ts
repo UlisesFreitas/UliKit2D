@@ -30,9 +30,11 @@ export type Entity = {
   boxCollider?: {
       width: number;
       height: number;
+      show?: boolean;
   };
   circleCollider?: {
       radius: number;
+      show?: boolean;
   };
   script?: {
       path: string;
@@ -77,6 +79,12 @@ export type Entity = {
       top: number; // Top slice height
       bottom: number; // Bottom slice height
       anchor?: { x: number, y: number };
+  };
+  polygonCollider?: {
+      show: boolean; // Visual debug toggle
+      vertices: { x: number, y: number }[]; // Points relative to anchor (Global Fallback)
+      // Map: AnimationName -> FrameIndex -> Vertices
+      frames?: Record<string, Record<number, { x: number, y: number }[]>>; 
   };
   animator?: {
       currentAnim: string;

@@ -31,7 +31,7 @@ export class SceneManager {
             name: 'Base Layer', 
             visible: true, 
             locked: false, 
-            color: '#333333',
+            color: '#',
             type: 'default',
             tileData: {},
             gridSize: { x: 32, y: 32 },
@@ -143,10 +143,12 @@ export class SceneManager {
                  camera: entity.camera ? { ...entity.camera } : undefined,
                  rigidBody: entity.rigidBody ? { ...entity.rigidBody } : undefined,
                  boxCollider: entity.boxCollider ? { ...entity.boxCollider } : undefined,
+                 circleCollider: entity.circleCollider ? { ...entity.circleCollider } : undefined,
                  audioSource: entity.audioSource ? { ...entity.audioSource } : undefined,
                  label: entity.label ? { ...entity.label } : undefined,
                  bitmapText: entity.bitmapText ? { ...entity.bitmapText } : undefined,
                  nineSliceSprite: entity.nineSliceSprite ? { ...entity.nineSliceSprite } : undefined,
+                 polygonCollider: entity.polygonCollider ? { ...entity.polygonCollider } : undefined,
                  animator: entity.animator ? JSON.parse(JSON.stringify(entity.animator)) : undefined,
                  script: entity.script ? (Array.isArray(entity.script) ? entity.script.map(s => ({...s})) : []) : undefined
             };
@@ -192,7 +194,7 @@ export class SceneManager {
                      name: 'Base Layer', 
                      visible: true, 
                      locked: false, 
-                     color: '#333333', 
+                     color: 'var(--base-layer-color)', 
                      tileData: {},
                      gridSize: { x: 32, y: 32 },
                      _entityIds: new Set() 
@@ -254,7 +256,7 @@ export class SceneManager {
                      name: 'Base Layer', 
                      visible: true, 
                      locked: false, 
-                     color: '#333333', 
+                     color: 'var(--base-layer-color)', 
                      tileData: {},
                      gridSize: { x: 32, y: 32 },
                      _entityIds: new Set() 
@@ -287,7 +289,7 @@ export class SceneManager {
             name: 'Base Layer', 
             visible: true, 
             locked: false, 
-            color: '#333333', 
+            color: 'var(--base-layer-color)', 
             type: 'default',
             tileData: {},
             gridSize: { x: 32, y: 32 },

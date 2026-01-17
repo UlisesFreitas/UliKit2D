@@ -87,7 +87,7 @@
              <div v-if="layer.id === 'Base Layer'" class="mr-2" title="Background Color">
                  <input 
                     type="color" 
-                    :value="layer.color || '#333333'"
+                    :value="resolveColor(layer.color)"
                     @input="(e) => updateBaseLayerColor(e, layer)"
                     class="w-4 h-4 p-0 border border-bg-border rounded cursor-pointer bg-transparent block"
                 />
@@ -234,6 +234,20 @@ const toggleCollision = (layer: SceneLayer) => {
 
 const onNameChange = (_layer: SceneLayer) => { // Fixed unused param issue with underscore
     SceneManager.setDirty(true);
+};
+
+const resolveColor = (color: string | undefined): string => {
+    if (!color) return '#333333';
+    
+    if (color.startsWith('var(')) {
+        // Extract variable name: var(--name) -> --name
+        const varName = color.match(/var\(([^)]+)\)/)?.[1];
+        if (varName) {
+            const resolved = getComputedStyle(document.documentElement).getPropertyValue(varName).trim();
+            if (resolved) return resolved;
+        }
+    }
+    return color;
 };
 
 const updateBaseLayerColor = (e: Event, layer: SceneLayer) => {
