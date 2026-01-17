@@ -40,4 +40,18 @@ Implement a hybrid editing mode in `TransformEditor.vue` that allows modifying a
     -   Change Scale to 0.5. Verify Width becomes 32.
 - [ ] **Test with Empty Object**:
     -   Select Camera or empty node.
-    -   Verify Size inputs are disabled or hidden.
+
+## 5. Text Box Implementation (Bounded Text)
+- [ ] **Logic**: Implement "Bounded Text" where `width` constrains the text wrapping instead of scaling same as NineSlice.
+    -   **TextLabel**:
+        -   Add `width` property to `label` component in ECS.
+        -   In `RenderSystem`: If `width > 0`, set `style.wordWrap = true` and `style.wordWrapWidth = width`.
+        -   Force `scale` to `1,1`.
+    -   **BitmapText**:
+        -   Add `width` property to `bitmapText` component.
+        -   In `RenderSystem`: Valid `maxWidth` or similar property? (Pixi BitmapText supports `maxWidth`).
+        -   Force `scale` to `1,1`.
+- [ ] **UI (`TransformEditor`)**:
+    -   Detect if entity is a Text type.
+    -   If Text, binding Width input changes the `width` property directly (NOT Scale).
+    -   Disable/Hide Scale inputs? Or lock them to 1.

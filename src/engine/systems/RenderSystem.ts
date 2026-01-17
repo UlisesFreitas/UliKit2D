@@ -347,18 +347,28 @@ export class RenderSystem {
         // Option A: Use scale as multiplier for width/height.
         // Option B: Set width/height strictly, and let Scale be 1.
         // Standard in Game Engines: NineSlice uses Width/Height property for sizing, Transform Scale applies on top.
-        nSlice.scale.set(entity.transform.scale.x, entity.transform.scale.y); 
+        // NineSlice Logic:
+        // We want the Gizmo (which changes Transform.Scale) to drive the visual size,
+        // BUT we must apply it to the NineSlice 'width'/'height' properties to preserve the 9-slice corners.
+        // We Force Scale to 1,1 so the container doesn't stretch.
+        nSlice.scale.set(1, 1);
         
-        // Sync Anchor
-        const ax = entity.nineSliceSprite.anchor?.x ?? 0.5;
-        const ay = entity.nineSliceSprite.anchor?.y ?? 0.5;
-        if (nSlice.anchor.x !== ax || nSlice.anchor.y !== ay) {
-             nSlice.anchor.set(ax, ay);
-        }
+        // Dynamic Sizing: RenderSize = TextureSize * TransformScale
+        // Ensure texture is valid to prevent collapsing to 0
+        const isTextureValid = nSlice.texture && nSlice.texture !== Texture.EMPTY;
+        const baseW = isTextureValid ? nSlice.texture.width : 100;
+        const baseH = isTextureValid ? nSlice.texture.height : 100;
+        
+        nSlice.width = baseW * Math.abs(entity.transform.scale.x); // Use Abs to support negative scale flipping? 
+        // Actually, Pixi NineSlice doesn't support negative width well usually (flip via scale).
+        // If scale is negative, we might need to apply -1 to scale and pos width?
+        // Let's stick to Abs width for now and assume standard sizing.
+        nSlice.height = baseH * Math.abs(entity.transform.scale.y);
 
-        // Sync Dimensions & Slices
-        if (nSlice.width !== entity.nineSliceSprite.width) nSlice.width = entity.nineSliceSprite.width;
-        if (nSlice.height !== entity.nineSliceSprite.height) nSlice.height = entity.nineSliceSprite.height;
+        // Handle flipping if scale is negative
+        if (entity.transform.scale.x < 0) nSlice.scale.x = -1;
+        if (entity.transform.scale.y < 0) nSlice.scale.y = -1;
+
         
         if (nSlice.leftWidth !== entity.nineSliceSprite.left) nSlice.leftWidth = entity.nineSliceSprite.left;
         if (nSlice.rightWidth !== entity.nineSliceSprite.right) nSlice.rightWidth = entity.nineSliceSprite.right;

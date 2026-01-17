@@ -44,9 +44,13 @@ onMounted(() => {
     updateThumbnail();
 });
 
-const onSelectAsset = (path: string) => {
+const onSelectAsset = (path: string | string[]) => {
+    // Handle array case
+    const singlePath = Array.isArray(path) ? path[0] : path;
+    if (!singlePath) return;
+
     // Normalize path
-    const normPath = path.replace(/\\/g, '/');
+    const normPath = singlePath.replace(/\\/g, '/');
     updateComponent('texture', normPath);
     isPickerOpen.value = false;
 };
@@ -100,31 +104,6 @@ const onDropTexture = async (event: DragEvent) => {
                 </button>
             </div>
         </div>
-
-        <!-- Dimensions -->
-        <div class="grid grid-cols-2 gap-2">
-            <div class="flex items-center gap-2">
-                <span class="text-xs text-text-secondary w-16">Width</span>
-                <input 
-                    type="number" 
-                    :value="component.width" 
-                    @input="e => updateComponent('width', Number((e.target as HTMLInputElement).value))"
-                    class="flex-1 bg-bg-dark border border-border-dim rounded px-2 py-1 text-xs text-text-primary focus:border-primary outline-none"
-                    step="1"
-                />
-            </div>
-            <div class="flex items-center gap-2">
-                <span class="text-xs text-text-secondary w-12">Height</span>
-                <input 
-                    type="number" 
-                    :value="component.height" 
-                    @input="e => updateComponent('height', Number((e.target as HTMLInputElement).value))"
-                    class="flex-1 bg-bg-dark border border-border-dim rounded px-2 py-1 text-xs text-text-primary focus:border-primary outline-none"
-                    step="1"
-                />
-            </div>
-        </div>
-
 
 
          <!-- Anchor -->
@@ -189,30 +168,14 @@ const onDropTexture = async (event: DragEvent) => {
             </div>
          </div>
 
-        <!-- Slices (Grid Layout) -->
-        <div class="space-y-2">
-            <span class="text-xs text-text-secondary block">Slices (L / R / T / B)</span>
+        <!-- Margins (Borders) -->
+        <div class="space-y-2 border-t border-border-dim pt-2">
+            <span class="text-xs text-text-secondary font-bold">Borders (Margins)</span>
+            
             <div class="grid grid-cols-2 gap-2">
-                 <div class="flex items-center gap-2">
-                    <span class="text-xs text-text-muted w-8">Left</span>
-                    <input 
-                        type="number" 
-                        :value="component.left" 
-                        @input="e => updateComponent('left', Number((e.target as HTMLInputElement).value))"
-                        class="flex-1 bg-bg-dark border border-border-dim rounded px-2 py-1 text-xs text-text-primary focus:border-primary outline-none"
-                    />
-                </div>
+                <!-- Top / Bottom -->
                 <div class="flex items-center gap-2">
-                    <span class="text-xs text-text-muted w-8">Right</span>
-                    <input 
-                        type="number" 
-                        :value="component.right" 
-                        @input="e => updateComponent('right', Number((e.target as HTMLInputElement).value))"
-                        class="flex-1 bg-bg-dark border border-border-dim rounded px-2 py-1 text-xs text-text-primary focus:border-primary outline-none"
-                    />
-                </div>
-                <div class="flex items-center gap-2">
-                    <span class="text-xs text-text-muted w-8">Top</span>
+                    <span class="text-xs text-text-muted w-10">Top</span>
                     <input 
                         type="number" 
                         :value="component.top" 
@@ -221,11 +184,31 @@ const onDropTexture = async (event: DragEvent) => {
                     />
                 </div>
                 <div class="flex items-center gap-2">
-                    <span class="text-xs text-text-muted w-8">Bott</span>
+                    <span class="text-xs text-text-muted w-10">Bottom</span>
                     <input 
                         type="number" 
                         :value="component.bottom" 
                         @input="e => updateComponent('bottom', Number((e.target as HTMLInputElement).value))"
+                        class="flex-1 bg-bg-dark border border-border-dim rounded px-2 py-1 text-xs text-text-primary focus:border-primary outline-none"
+                    />
+                </div>
+                
+                <!-- Left / Right -->
+                 <div class="flex items-center gap-2">
+                    <span class="text-xs text-text-muted w-10">Left</span>
+                    <input 
+                        type="number" 
+                        :value="component.left" 
+                        @input="e => updateComponent('left', Number((e.target as HTMLInputElement).value))"
+                        class="flex-1 bg-bg-dark border border-border-dim rounded px-2 py-1 text-xs text-text-primary focus:border-primary outline-none"
+                    />
+                </div>
+                <div class="flex items-center gap-2">
+                    <span class="text-xs text-text-muted w-10">Right</span>
+                    <input 
+                        type="number" 
+                        :value="component.right" 
+                        @input="e => updateComponent('right', Number((e.target as HTMLInputElement).value))"
                         class="flex-1 bg-bg-dark border border-border-dim rounded px-2 py-1 text-xs text-text-primary focus:border-primary outline-none"
                     />
                 </div>
