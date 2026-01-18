@@ -1,7 +1,8 @@
 import { Application, Container, Graphics, Text, TextStyle } from 'pixi.js';
 import { world } from '../ecs/ECS';
 import { instance as selectionManager } from '../../editor/managers/SelectionManager';
-import { useEditorStore } from '../../stores/useEditorStore';
+
+
 
 export class EditorDebugSystem {
     private app: Application;
@@ -73,51 +74,88 @@ export class EditorDebugSystem {
 
     private updateLabel(id: string, entity: any) {
         // VISIBILITY LOGIC:
-        // Show if Hovered OR Selected
         const isHovered = selectionManager.hoveredEntityId === id;
-        
-        // Access store (should be optimal enough)
-        const store = useEditorStore();
-        const isSelected = store.selectedEntityIds.includes(id);
-
-        if (!isHovered && !isSelected) {
+    
+        if (!isHovered) {
             this.removeLabel(id);
             return;
         }
 
-        let text = this.debugLabels.get(id);
-        if (!text) {
+        // 1. Calculate Inverse Scale (Essential for Fixed Screen Size)
+        let inverseScale = 1;
+        if (this.container.parent && Math.abs(this.container.parent.scale.x) > 0.001) {
+             inverseScale = 1 / Math.abs(this.container.parent.scale.x);
+        }
+
+        // 2. Manage Container (Stored in debugLabels, cast as any)
+        let labelContainer = this.debugLabels.get(id) as any;
+        
+        // Ensure we have a proper Container (not just a Text or Graphics from previous iterations)
+        if (!labelContainer || !labelContainer.addChild || !labelContainer.label) {
+            if (labelContainer) (labelContainer as any).destroy();
+
+            labelContainer = new Container();
+            labelContainer.eventMode = 'none';
+            labelContainer.label = 'DebugLabelContainer';
+
+            // Background (Graphics)
+            const bg = new Graphics();
+            bg.label = 'bg';
+            
+            // Text
             const style = new TextStyle({
-                fontFamily: 'monospace',
+                fontFamily: 'Inter, sans-serif',
                 fontSize: 12,
                 fill: '#ffffff',
-                stroke: { color: '#000000', width: 2, join: 'round' },
-                align: 'center',
-                dropShadow: {
-                    color: '#000000',
-                    blur: 1,
-                    distance: 1,
-                    alpha: 1,
-                    angle: Math.PI / 6
-                },
+                align: 'left',
             });
-            text = new Text({ text: '', style });
-            text.anchor.set(0.5, 1); // Bottom Center anchor (grows up)
-            text.eventMode = 'none'; // Ensure clicks pass through to entity
-            this.container.addChild(text);
-            this.debugLabels.set(id, text);
+            const text = new Text({ text: '', style });
+            text.label = 'text';
+            text.resolution = 2; // Sharpness
+            
+            labelContainer.addChild(bg);
+            labelContainer.addChild(text);
+            
+            this.container.addChild(labelContainer);
+            this.debugLabels.set(id, labelContainer);
         }
+
+        // 3. Update Content & Layout
+        const textObj = labelContainer.children.find((c: any) => c.label === 'text') as Text;
+        const bgObj = labelContainer.children.find((c: any) => c.label === 'bg') as Graphics;
+
+        if (!textObj || !bgObj) return;
+
+        const layerName = entity.layer || 'Base Layer';
+        const zIndex = entity.transform.zIndex || 0;
+        const txtContent = `${entity.name || 'Entity'}\nX: ${Math.round(entity.transform.x)} Y: ${Math.round(entity.transform.y)}\nL: ${layerName} Z: ${zIndex}`;
         
-        const { x, y } = entity.transform;
+        if (textObj.text !== txtContent) textObj.text = txtContent;
+
+        // Resize Background to fit Text
+        const padding = 6;
+        const width = textObj.width + padding * 2;
+        const height = textObj.height + padding * 2;
         
-        // Offset based on generic size assumption
-        // Ideally we check bounds, but transform only has pos
-        // Let's float it 40px above
-        text.x = x;
-        text.y = y - 40; 
+        bgObj.clear();
+        bgObj.roundRect(0, 0, width, height, 4);
+        bgObj.fill({ color: 0x000000, alpha: 0.75 });
+        bgObj.stroke({ width: 1, color: 0x444444 });
+
+        textObj.position.set(padding, padding);
         
-        text.text = `${entity.name || 'Entity'}\nX: ${Math.round(x)} Y: ${Math.round(y)}\nL: ${entity.layer || 'Base'} Z: ${entity.transform.zIndex || 0}`;
-        text.zIndex = 1000;
+        // 4. Transform & Positioning
+        labelContainer.scale.set(inverseScale);
+        
+        // Pivot: Bottom-Center (so it floats ABOVE the anchor)
+        labelContainer.pivot.set(width / 2, height + 10); 
+        
+        // Position: At Entity Center minus vertical offset for Icon Radius
+        // 32px world offset ensures it clears the Camera Icon even at high zoom
+        labelContainer.position.set(entity.transform.x, entity.transform.y - 12);
+        
+        // Ensure on top
+        labelContainer.zIndex = 99999;
     }
 
     private removeLabel(id: string) {

@@ -182,10 +182,10 @@ const importAssets = async () => {
               />
               <button 
                   @click="importAssets" 
-                  class="px-3 py-1 bg-primary text-text-accent text-xs rounded hover:bg-primary-hover flex items-center gap-1"
+                  class="px-3 py-1 bg-zinc-700 hover:bg-zinc-600 text-text-accent text-xs rounded hover:bg-primary-hover flex items-center gap-1"
                   title="Import external files to assets folder"
               >
-                  <span>📥</span> Import
+                Import
               </button>
           </div>
 
@@ -230,7 +230,7 @@ const importAssets = async () => {
                  <button 
                     v-if="multiSelect" 
                     @click="confirmSelection"
-                    class="px-3 py-1 bg-accent-color text-text-accent rounded hover:bg-opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
+                    class="px-3 py-1 bg-zinc-700 hover:bg-zinc-600 text-text-accent rounded hover:bg-opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
                     :disabled="selectedAssets.size === 0"
                  >
                     Confirm

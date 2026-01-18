@@ -3,6 +3,7 @@ import { usePreferencesStore } from '../../../stores/usePreferencesStore';
 import BaseDialog from '../ui/BaseDialog.vue';
 import { useEditorStore } from '../../../stores/useEditorStore';
 import { SceneManager } from '../../../engine/managers/SceneManager';
+import { useUIStore } from '../../../stores/useUIStore';
 import { watch } from 'vue';
 
 const props = defineProps<{
@@ -15,6 +16,13 @@ const emit = defineEmits<{
 
 const prefs = usePreferencesStore();
 const store = useEditorStore();
+const ui = useUIStore();
+
+const onSave = () => {
+    // Logic is reactive, so just notify and close
+    ui.showToast({ title: 'Grid Settings Saved', description: 'Preferences updated successfully.', type: 'success' });
+    emit('update:open', false);
+};
 
 // Sync Prefs -> SceneManager (Logic)
 watch(() => [prefs.grid.width, prefs.grid.height], ([w, h]) => {
@@ -91,8 +99,9 @@ watch(() => [props.open, store.activeLayerId], () => {
 
         </div>
         
-        <div class="flex justify-end p-4 border-t border-border">
-            <button class="btn-primary" @click="emit('update:open', false)">Close</button>
+        <div class="flex justify-end gap-3 p-4 border-t border-border rounded-b-lg">
+            <button class="px-4 py-2 text-sm font-medium rounded shadow-sm text-white bg-zinc-700 hover:bg-zinc-600 transition-colors border border-transparent" @click="emit('update:open', false)">Close</button>
+            <button class="px-4 py-2 text-sm font-medium rounded shadow-sm text-white bg-zinc-700 hover:bg-zinc-600 transition-colors border border-transparent" @click="onSave">Save</button>
         </div>
     </BaseDialog>
 </template>
@@ -110,15 +119,5 @@ watch(() => [props.open, store.activeLayerId], () => {
 .input-base:focus {
     border-color: var(--primary-color);
 }
-.btn-primary {
-    background-color: var(--primary-color);
-    color: var(--text-accent);
-    padding: 6px 12px;
-    border-radius: 4px;
-    font-size: 13px;
-    font-weight: 500;
-}
-.btn-primary:hover {
-    opacity: 0.9;
-}
+
 </style>

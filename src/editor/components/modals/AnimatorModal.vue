@@ -309,8 +309,8 @@ const resolveFrame = (path: string) => {
 
 const handleWheel = (e: WheelEvent) => {
     if (!showPreview.value) return;
-    const delta = e.deltaY > 0 ? -0.1 : 0.1;
-    zoomLevel.value = Math.max(0.1, Math.min(5, zoomLevel.value + delta));
+    const delta = e.deltaY > 0 ? -0.5 : 0.5; // Steeper steps
+    zoomLevel.value = Math.max(0.1, Math.min(100, zoomLevel.value + delta));
 };
 
 const openPreview = (name: string) => {
@@ -321,7 +321,7 @@ const openPreview = (name: string) => {
     }
     previewAnimName.value = name;
     previewIndex.value = 0;
-    zoomLevel.value = 1; // Reset zoom
+    zoomLevel.value = 1; // Reset zoom to 1 (which is 5x visual)
     showPreview.value = true;
     startPreviewLoop();
 };
@@ -392,12 +392,12 @@ onUnmounted(() => {
                             <img 
                                 :src="resolveFrame(props.entity.animator?.animations?.[previewAnimName]?.frames?.[previewIndex] || '')" 
                                 class="object-contain pixelated relative z-10 transition-transform duration-75"
-                                :style="{ transform: `scale(${zoomLevel})` }"
+                                :style="{ transform: `scale(${zoomLevel * 5})` }"
                             />
                             
                             <!-- Zoom Overlay Info -->
                             <div class="absolute top-2 right-2 px-2 py-1 bg-black/50 text-white text-xs rounded z-20 font-mono">
-                                {{ Math.round(zoomLevel * 100) }}%
+                                {{ zoomLevel.toFixed(1) }}x
                             </div>
 
                             <div class="absolute bottom-2 right-2 px-2 py-1 bg-black/50 text-white text-xs rounded z-20 font-mono">
@@ -406,9 +406,9 @@ onUnmounted(() => {
 
                             <!-- Zoom Controls (Bottom Left) -->
                             <div class="absolute bottom-2 left-2 flex gap-1 z-20">
-                                <button @click="zoomLevel = Math.max(0.1, zoomLevel - 0.5)" class="bg-black/50 text-white w-6 h-6 rounded hover:bg-black/70">-</button>
+                                <button @click="zoomLevel = Math.max(0.1, zoomLevel - 1)" class="bg-black/50 text-white w-6 h-6 rounded hover:bg-black/70">-</button>
                                 <button @click="zoomLevel = 1" class="bg-black/50 text-white px-2 h-6 rounded hover:bg-black/70 text-xs">Reset</button>
-                                <button @click="zoomLevel = Math.min(5, zoomLevel + 0.5)" class="bg-black/50 text-white w-6 h-6 rounded hover:bg-black/70">+</button>
+                                <button @click="zoomLevel = Math.min(100, zoomLevel + 1)" class="bg-black/50 text-white w-6 h-6 rounded hover:bg-black/70">+</button>
                             </div>
 
                         </template>

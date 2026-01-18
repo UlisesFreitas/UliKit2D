@@ -439,7 +439,7 @@ export class GizmoManager {
             s: new Point(lb.x + lb.width / 2, lb.y + lb.height),
             w: new Point(lb.x, lb.y + lb.height / 2),
             e: new Point(lb.x + lb.width, lb.y + lb.height / 2),
-            rotate: new Point(lb.x + lb.width / 2, lb.y - 10) // -10px Local Up
+            rotate: new Point(lb.x + lb.width / 2, lb.y - 6) // -10px Local Up
         };
         
         return {

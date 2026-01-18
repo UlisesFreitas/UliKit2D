@@ -225,9 +225,9 @@ const onApply = () => {
 
                 <!-- Footer -->
                 <div class="h-14 border-t border-border bg-bg-header px-6 flex items-center justify-end gap-3 rounded-b-lg">
-                    <button @click="onClose" class="px-4 py-2 text-sm font-medium rounded shadow-sm text-white bg-zinc-800 hover:bg-zinc-700 transition-colors border border-transparent">Cancel</button>
-                    <button @click="onApply" class="px-4 py-2 text-sm font-medium rounded shadow-sm text-white bg-zinc-800 hover:bg-zinc-700 transition-colors border border-transparent">Apply</button>
-                    <button @click="onSave" class="px-6 py-2 text-sm font-bold rounded shadow-sm text-white bg-zinc-800 hover:bg-zinc-700 transition-colors border border-transparent">
+                    <button @click="onClose" class="px-4 py-2 text-sm font-medium rounded shadow-sm text-white bg-zinc-700 hover:bg-zinc-600 transition-colors border border-transparent">Cancel</button>
+                    <button @click="onApply" class="px-4 py-2 text-sm font-medium rounded shadow-sm text-white bg-zinc-700 hover:bg-zinc-600 transition-colors border border-transparent">Apply</button>
+                    <button @click="onSave" class="px-6 py-2 text-sm font-bold rounded shadow-sm text-white bg-zinc-700 hover:bg-zinc-600 transition-colors border border-transparent">
                         Save Project
                     </button>
                 </div>
