@@ -170,7 +170,7 @@ const onApply = () => {
                                     <button @click="store.settings.tags.push('NewTag')" class="text-xs bg-bg-hover hover:bg-accent-color hover:text-text-accent px-2 py-1 rounded transition">+</button>
                                 </div>
                                 <div class="flex flex-wrap gap-2">
-                                    <div v-for="(tag, index) in store.settings.tags" :key="index" class="flex items-center bg-bg-panel border border-border rounded px-2 py-1 text-xs">
+                                    <div v-for="(_tag, index) in store.settings.tags" :key="index" class="flex items-center bg-bg-panel border border-border rounded px-2 py-1 text-xs">
                                         <input v-model="store.settings.tags[index]" class="bg-transparent outline-none w-20" />
                                         <button @click="store.settings.tags.splice(index, 1)" class="ml-2 text-red-500 hover:text-red-400">×</button>
                                     </div>
@@ -184,7 +184,7 @@ const onApply = () => {
                                      <button @click="store.settings.layers.push('NewLayer')" class="text-xs bg-bg-hover hover:bg-accent hover:text-white px-2 py-1 rounded transition">+</button>
                                 </div>
                                  <div class="flex flex-col gap-2">
-                                    <div v-for="(layer, index) in store.settings.layers" :key="index" class="flex items-center bg-bg-panel border border-border rounded px-2 py-1 text-xs">
+                                    <div v-for="(_layer, index) in store.settings.layers" :key="index" class="flex items-center bg-bg-panel border border-border rounded px-2 py-1 text-xs">
                                         <span class="mr-2 text-text-disabled">{{ index }}:</span>
                                         <input v-model="store.settings.layers[index]" class="bg-transparent outline-none flex-1" />
                                          <button @click="store.settings.layers.splice(index, 1)" class="ml-2 text-red-500 hover:text-red-400">×</button>
@@ -202,7 +202,7 @@ const onApply = () => {
                              </div>
 
                              <div class="flex flex-col gap-2">
-                                <div v-for="(json, name) in store.settings.layouts" :key="name" class="flex items-center justify-between bg-bg-panel border border-border rounded px-4 py-3">
+                                <div v-for="(_json, name) in store.settings.layouts" :key="name" class="flex items-center justify-between bg-bg-panel border border-border rounded px-4 py-3">
                                     <div class="flex items-center gap-3">
                                          <div class="w-8 h-8 rounded bg-bg-base flex items-center justify-center text-accent">
                                             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/></svg>

@@ -286,11 +286,14 @@ function markDirty() {
     SceneManager.setDirty(true);
 }
 
-const onSelectAsset = (path: string) => {
+const onSelectAsset = (path: string | string[]) => {
     if (!activeLayer.value) return;
     
+    const selectedPath = Array.isArray(path) ? path[0] : path;
+    if (!selectedPath) return;
+    
     // Normalize and Store
-    const normPath = path.replace(/\\/g, '/');
+    const normPath = selectedPath.replace(/\\/g, '/');
     activeLayer.value.tileset = normPath;
     
     markDirty();

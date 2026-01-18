@@ -35,7 +35,7 @@ import { useLayoutStore } from '../../stores/useLayoutStore';
 
 const resetLayout = () => {
     if (confirm('Reset editor layout to default? This will reload the editor.')) {
-        useLayoutStore().resetLayout();
+        useLayoutStore().resetToDefault();
     }
 };
 

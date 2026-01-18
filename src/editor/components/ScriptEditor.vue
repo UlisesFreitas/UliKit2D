@@ -144,11 +144,14 @@ const openPicker = (id: string) => {
     isPickerOpen.value = true;
 };
 
-const onSelectAsset = (path: string) => {
+const onSelectAsset = (path: string | string[]) => {
+    const selectedPath = Array.isArray(path) ? path[0] : path;
+    if (!selectedPath) return;
+
     const script = scriptsUI.value.find(s => s._id === activeScriptId.value);
     if (script) {
-        script.path = path;
-        loadScriptProperties(path, script._id);
+        script.path = selectedPath;
+        loadScriptProperties(selectedPath, script._id);
         syncToEntity();
     }
 };
