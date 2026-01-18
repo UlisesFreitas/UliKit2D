@@ -60,7 +60,7 @@ onUnmounted(() => {
 const select = (id: string | undefined) => {
     // console.log(`[Hierarchy] Selecting: ${id}`);
     if (!id) return;
-    // editorStore.selectEntity(id);
+    editorStore.selectEntity(id);
 };
 
 // Deprecated in favor of Create Asset Menu for direct usage, but kept for logic reference
@@ -208,6 +208,7 @@ const duplicateEntity = () => {
                     v-for="entity in entities" 
                     :key="entity.id"
                     :id="`hierarchy-item-${entity.id}`"
+                    @click.stop="select(entity.id)"
                     @dblclick="focus(entity.id)"
                     @contextmenu.stop.prevent="showContextMenu($event, entity.id || '')"
                     :class="[
