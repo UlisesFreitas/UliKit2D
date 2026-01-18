@@ -107,7 +107,7 @@ const updateHighlight = (screenX: number, screenY: number) => {
 
 
 
-const paintTile = (e: MouseEvent, erase = false) => {
+const paintTile = (e: MouseEvent | PointerEvent, erase = false) => {
     if (!isTilemapMode.value || !activeLayer.value || !container.value) return;
 
     // Use Global Screen Coords
@@ -182,7 +182,7 @@ const onWheel = (e: WheelEvent) => {
     updateView();
 };
 
-const onMouseDown = async (e: MouseEvent) => {
+const onPointerDown = async (e: PointerEvent) => {
     (document.activeElement as HTMLElement)?.blur();
 
     const rect = (engine.app.canvas as HTMLCanvasElement).getBoundingClientRect();
@@ -190,7 +190,7 @@ const onMouseDown = async (e: MouseEvent) => {
     const mouseY = e.clientY - rect.top;
 
     // 1. Gizmo Interaction (Proxy)
-    if (e.button === 0 && !e.altKey && !isPainting.value) {
+    if (e.buttons === 1 && !e.altKey && !isPainting.value) { // Use e.buttons for PointerEvent
         // Import dynamically
         const { instance: gizmoManager } = await import('../gizmos/GizmoManager');
         const { instance: areaSelectionManager } = await import('../managers/AreaSelectionManager');
@@ -200,6 +200,7 @@ const onMouseDown = async (e: MouseEvent) => {
         
         if (gizmoRes) {
             // Gizmo handled the click (e.g. started drag)
+            (e.target as Element).setPointerCapture(e.pointerId); // CAPTURE POINTER
             return;
         }
         
@@ -210,37 +211,37 @@ const onMouseDown = async (e: MouseEvent) => {
             store.selectEntity(hitId);
         } else {
             // CLICKED EMPTY SPACE -> PREPARE AREA SELECT
-            // FIX: Only clear selection if NOT using modifiers (Shift/Ctrl)
-            // If using modifiers, we want to keep current selection to Add/Toggle against it.
             if (!e.shiftKey && !e.ctrlKey) {
                 store.selectEntity(null);
             }
             
             areaSelectionManager.startDrag(mouseX, mouseY);
+            (e.target as Element).setPointerCapture(e.pointerId); // CAPTURE POINTER
         }
     }
     
     // 2. Painting
-    // Note: Painting likely uses global coordinate mapping too, but let's verify map function logic later.
-    // For now, painting uses paintTile logic which likely uses raw events or maps internally.
-    // Leaving raw event passing for paintTile as it might handle it or need refactor separately.
-    if (isTilemapMode.value && (e.button === 0 || e.button === 2) && !e.altKey) {
+    if (isTilemapMode.value && (e.buttons === 1 || e.buttons === 2) && !e.altKey) {
         isPainting.value = true;
-        const isErase = e.button === 2 || tilemapStore.currentTool === 'eraser';
+        const isErase = e.buttons === 2 || tilemapStore.currentTool === 'eraser';
+        // Casting MouseEvent compatibility or verifying paintTile accepts generic Event properties
+        // paintTile uses clientX/Y so PointerEvent is fine.
         paintTile(e, isErase);
+        (e.target as Element).setPointerCapture(e.pointerId); // CAPTURE POINTER
         return; 
     }
 
     // 3. Panning (Middle or Alt+Left)
-    if (e.button === 1 || (e.button === 0 && e.altKey)) {
+    if (e.buttons === 4 || (e.buttons === 1 && e.altKey)) { // 4 is Middle Mouse in PointerEvent buttons
         isPanning.value = true;
-        lastMouseX.value = e.clientX; // Panning uses deltas, so clientX is fine if consistent
+        lastMouseX.value = e.clientX; 
         lastMouseY.value = e.clientY;
         container.value!.style.cursor = 'grabbing';
+        (e.target as Element).setPointerCapture(e.pointerId); // CAPTURE POINTER
     }
 };
 
-const onMouseMove = async (e: MouseEvent) => {
+const onPointerMove = async (e: PointerEvent) => {
     const rect = (engine.app.canvas as HTMLCanvasElement).getBoundingClientRect();
     const sx = e.clientX - rect.left;
     const sy = e.clientY - rect.top;
@@ -267,7 +268,8 @@ const onMouseMove = async (e: MouseEvent) => {
     };
     
     if (isPainting.value) {
-        const isErase = (e.buttons & 2) === 2 || tilemapStore.currentTool === 'eraser';
+        const isErase = (e.buttons === 2) || tilemapStore.currentTool === 'eraser'; // buttons bitmask 2 is Right Mouse
+        // paintTile expects MouseEvent but consumes clientX/Y, compatible with PointerEvent
         paintTile(e, isErase);
         return;
     }
@@ -287,10 +289,13 @@ const onMouseMove = async (e: MouseEvent) => {
     }
 };
 
-const onMouseUp = async (e: MouseEvent) => {
+const onPointerUp = async (e: PointerEvent) => {
     isPainting.value = false;
     isPanning.value = false;
     if (container.value) container.value.style.cursor = 'default';
+
+    // RELEASE POINTER CAPTURE
+    (e.target as Element).releasePointerCapture(e.pointerId);
     
     // Release Gizmo
     const { instance: gizmoManager } = await import('../gizmos/GizmoManager');
@@ -396,10 +401,10 @@ watch(() => preferencesStore.grid, () => updateView(), { deep: true });
     @dragover.prevent 
     @drop.prevent="onDrop"
     @wheel="onWheel"
-    @mousedown="onMouseDown"
-    @mousemove="onMouseMove"
-    @mouseup="onMouseUp"
-    @mouseleave="onMouseUp"
+    @pointerdown="onPointerDown"
+    @pointermove="onPointerMove"
+    @pointerup="onPointerUp"
+    @pointerleave="onPointerUp"
     @contextmenu.prevent
   >
     <!-- Overlay UI Only - No Canvas -->
