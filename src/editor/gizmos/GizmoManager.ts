@@ -4,13 +4,15 @@ import { world, type Entity } from '../../engine/ecs/ECS';
 import { instance as engine } from '../../engine/core/Engine';
 import { eventBus } from '../../engine/core/EventBus';
 
-type HandleType = 'center' | 'rotate' | 'nw' | 'ne' | 'sw' | 'se' | null;
+type HandleType = 'center' | 'rotate' | 'nw' | 'ne' | 'sw' | 'se' | 'n' | 's' | 'w' | 'e' | null;
 
 interface EntityStartState {
     id: string;
     x: number; y: number;
     scaleX: number; scaleY: number;
     rotation: number;
+    // Bounds relative to (0,0) (Pivot)
+    lbX: number; lbY: number; 
     width: number; height: number;
 }
 
@@ -118,7 +120,7 @@ export class GizmoManager {
 
                  const t = entity.transform;
                  const displayObject = engine.renderSystem.getDisplayObject(entity.id);
-                 const localBounds = displayObject ? displayObject.getLocalBounds() : { width: 1, height: 1 };
+                 const localBounds = displayObject ? displayObject.getLocalBounds() : { x: 0, y: 0, width: 1, height: 1 };
                  
                  this.startStates.set(entity.id, {
                     id: entity.id,
@@ -127,6 +129,8 @@ export class GizmoManager {
                     scaleX: t.scale.x,
                     scaleY: t.scale.y,
                     rotation: t.rotation,
+                    lbX: localBounds.x,
+                    lbY: localBounds.y,
                     width: localBounds.width,
                     height: localBounds.height
                  });
@@ -249,18 +253,28 @@ export class GizmoManager {
             // But width is 'bounds width'.
             // Let's assume handles are at bounds edges.
             
+            // Calculate nominal distance from Pivot (0,0) to Edge
+            // If dragging 'E', nominal X is lbX + width
+            // If dragging 'W', nominal X is lbX
+            
             // X-Axis
             if (this.dragHandle.includes('e')) {
-                 newScaleX = curUx / (start.width / 2) * start.scaleX; // Approximate logic based on bounds
+                 const nominal = start.lbX + start.width;
+                 if (Math.abs(nominal) > 0.1) newScaleX = curUx / nominal;
+                 
             } else if (this.dragHandle.includes('w')) {
-                 newScaleX = curUx / (-start.width / 2) * start.scaleX;
+                 const nominal = start.lbX;
+                 if (Math.abs(nominal) > 0.1) newScaleX = curUx / nominal;
             }
             
             // Y-Axis
             if (this.dragHandle.includes('s')) {
-                newScaleY = curUy / (start.height / 2) * start.scaleY;
+                const nominal = start.lbY + start.height;
+                if (Math.abs(nominal) > 0.1) newScaleY = curUy / nominal;
+
             } else if (this.dragHandle.includes('n')) {
-                newScaleY = curUy / (-start.height / 2) * start.scaleY;
+                const nominal = start.lbY;
+                if (Math.abs(nominal) > 0.1) newScaleY = curUy / nominal;
             }
             
             // Proportional Scaling (SHIFT)
@@ -279,6 +293,11 @@ export class GizmoManager {
                 }
             }
             
+            // Apply scale (prevent zero scale issues)
+            // Use 0.001 as min scale
+            if (Math.abs(newScaleX) < 0.001) newScaleX = 0.001 * Math.sign(newScaleX || 1);
+            if (Math.abs(newScaleY) < 0.001) newScaleY = 0.001 * Math.sign(newScaleY || 1);
+
             entity.transform.scale.x = newScaleX;
             entity.transform.scale.y = newScaleY;
         }
@@ -297,11 +316,29 @@ export class GizmoManager {
          
          const mouse = new Point(screenX, screenY);
          
-         if (dist(mouse, points.rotate) < tolerance) return 'rotate';
-         if (dist(mouse, points.nw) < tolerance) return 'nw';
-         if (dist(mouse, points.ne) < tolerance) return 'ne';
-         if (dist(mouse, points.sw) < tolerance) return 'sw';
-         if (dist(mouse, points.se) < tolerance) return 'se';
+         // Find closest handle within tolerance
+         let bestHandle: HandleType = null;
+         let minDiv = tolerance;
+         
+         const check = (p: Point, type: HandleType) => {
+             const d = dist(mouse, p);
+             if (d < minDiv) {
+                 minDiv = d;
+                 bestHandle = type;
+             }
+         };
+         
+         check(points.rotate, 'rotate');
+         check(points.nw, 'nw');
+         check(points.ne, 'ne');
+         check(points.sw, 'sw');
+         check(points.se, 'se');
+         check(points.n, 'n');
+         check(points.s, 's');
+         check(points.w, 'w');
+         check(points.e, 'e');
+         
+         if (bestHandle) return bestHandle;
          
          const poly = [points.nw, points.ne, points.se, points.sw];
          let inside = false;
@@ -335,6 +372,10 @@ export class GizmoManager {
             ne: new Point(lb.x + lb.width, lb.y),
             sw: new Point(lb.x, lb.y + lb.height),
             se: new Point(lb.x + lb.width, lb.y + lb.height),
+            n: new Point(lb.x + lb.width / 2, lb.y),
+            s: new Point(lb.x + lb.width / 2, lb.y + lb.height),
+            w: new Point(lb.x, lb.y + lb.height / 2),
+            e: new Point(lb.x + lb.width, lb.y + lb.height / 2),
             rotate: new Point(lb.x + lb.width / 2, lb.y - 10) // -10px Local Up
         };
         
@@ -343,6 +384,10 @@ export class GizmoManager {
             ne: displayObject.toGlobal(localPts.ne),
             sw: displayObject.toGlobal(localPts.sw),
             se: displayObject.toGlobal(localPts.se),
+            n: displayObject.toGlobal(localPts.n),
+            s: displayObject.toGlobal(localPts.s),
+            w: displayObject.toGlobal(localPts.w),
+            e: displayObject.toGlobal(localPts.e),
             rotate: displayObject.toGlobal(localPts.rotate)
         };
     }
@@ -378,8 +423,12 @@ export class GizmoManager {
                 const ne = this.container.toLocal(pts.ne);
                 const sw = this.container.toLocal(pts.sw);
                 const se = this.container.toLocal(pts.se);
+                const n = this.container.toLocal(pts.n);
+                const s = this.container.toLocal(pts.s);
+                const w = this.container.toLocal(pts.w);
+                const e = this.container.toLocal(pts.e);
                 const rot = this.container.toLocal(pts.rotate);
-                const centerTop = new Point((nw.x + ne.x)/2, (nw.y + ne.y)/2);
+                const centerTop = n;
 
                 // Box
                 const path = [nw, ne, se, sw, nw];
@@ -407,6 +456,10 @@ export class GizmoManager {
                 drawHandle(ne, 'ne');
                 drawHandle(sw, 'sw');
                 drawHandle(se, 'se');
+                drawHandle(n, 'n');
+                drawHandle(s, 's');
+                drawHandle(w, 'w');
+                drawHandle(e, 'e');
                 
                 const rotSize = this.HANDLE_SIZE / Math.abs(this.container.parent?.scale.x ?? 1);
                 this.gizmoGraphics.circle(rot.x, rot.y, rotSize/2);
