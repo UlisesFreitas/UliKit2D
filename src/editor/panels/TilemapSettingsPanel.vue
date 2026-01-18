@@ -152,12 +152,11 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onMounted } from 'vue';
+import { ref, computed, watch } from 'vue';
 import { useResizeObserver } from '@vueuse/core';
 import { SceneManager } from '../../engine/managers/SceneManager';
 import { useEditorStore } from '../../stores/useEditorStore';
 import { useTilemapStore } from '../stores/useTilemapStore';
-import { getFileSystem } from '../../api/FileSystem';
 import { resourceManager } from '../../engine/resources/ResourceManager'; // Import RM
 import AssetPickerModal from '../components/modals/AssetPickerModal.vue';
 import { 
@@ -216,8 +215,8 @@ useResizeObserver(paletteCanvas, (entries) => {
 // Selection Logic
 const selectedTileRect = computed(() => {
     // Access dependency to force update
-    const _v = configVersion.value; 
-    const _s = paletteScale.value;
+    if (configVersion.value < 0) return null; 
+    const s = paletteScale.value;
 
     if (!activeLayer.value || !activeLayer.value.gridSize || tilemapStore.selectedTileId === -1 || !tilesetImage.value) return null;
     
@@ -237,10 +236,10 @@ const selectedTileRect = computed(() => {
     // If gw is 96 (Z=3) but showed as 32 (Scale=0.33), then W should be 32.
     // Apply scale.
     return { 
-        x: tx * paletteScale.value.x, 
-        y: ty * paletteScale.value.y, 
-        w: gw * paletteScale.value.x, 
-        h: gh * paletteScale.value.y 
+        x: tx * s.x, 
+        y: ty * s.y, 
+        w: gw * s.x, 
+        h: gh * s.y 
     };
 });
 
