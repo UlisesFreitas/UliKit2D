@@ -394,6 +394,13 @@ export class GizmoManager {
 
     private render() {
         this.gizmoGraphics.clear();
+
+        // Calculate Scale Factor (Inverse of Stage Scale)
+        // Default to 1 if no parent or scale is 0 to avoid Infinity
+        let inverseScale = 1;
+        if (this.container.parent && Math.abs(this.container.parent.scale.x) > 0.001) {
+             inverseScale = 1 / Math.abs(this.container.parent.scale.x);
+        }
         
         // 1. Render Secondary Selections (Simple Outline)
         this.selectedEntities.forEach(entity => {
@@ -412,7 +419,8 @@ export class GizmoManager {
             this.gizmoGraphics.beginPath();
             if (path[0]) this.gizmoGraphics.moveTo(path[0].x, path[0].y);
             path.forEach(p => { if(p) this.gizmoGraphics.lineTo(p.x, p.y); });
-            this.gizmoGraphics.stroke({ width: 1, color: 0x00A3FF, alpha: 0.5 });
+            // Scale stroke width
+            this.gizmoGraphics.stroke({ width: 1 * inverseScale, color: 0x00A3FF, alpha: 0.5 });
         });
 
         // 2. Render Primary Selection (Full Gizmo)
@@ -435,21 +443,23 @@ export class GizmoManager {
                 this.gizmoGraphics.beginPath();
                 if (path[0]) this.gizmoGraphics.moveTo(path[0].x, path[0].y);
                 path.forEach(p => { if(p) this.gizmoGraphics.lineTo(p.x, p.y); });
-                this.gizmoGraphics.stroke({ width: 1, color: 0x00A3FF });
+                // Scale stroke width
+                this.gizmoGraphics.stroke({ width: 1 * inverseScale, color: 0x00A3FF });
 
                 // Rotate Handle Line
                 this.gizmoGraphics.moveTo(centerTop.x, centerTop.y);
                 this.gizmoGraphics.lineTo(rot.x, rot.y);
-                this.gizmoGraphics.stroke({ width: 1, color: 0x00A3FF });
+                this.gizmoGraphics.stroke({ width: 1 * inverseScale, color: 0x00A3FF });
 
                 // Handles
                 const drawHandle = (p: Point, type: HandleType) => {
                     const color = (this.hoverHandle === type || this.dragHandle === type) ? 0xFF0000 : 0xFFFFFF; 
-                    const size = this.HANDLE_SIZE / Math.abs(this.container.parent?.scale.x ?? 1); 
+                    // Use calculated inverseScale directly for handle size as well
+                    const size = this.HANDLE_SIZE * inverseScale;
                     
                     this.gizmoGraphics.rect(p.x - size/2, p.y - size/2, size, size);
                     this.gizmoGraphics.fill({ color });
-                    this.gizmoGraphics.stroke({ width: 1, color: 0x000000 });
+                    this.gizmoGraphics.stroke({ width: 1 * inverseScale, color: 0x000000 });
                 };
 
                 drawHandle(nw, 'nw');
@@ -461,10 +471,10 @@ export class GizmoManager {
                 drawHandle(w, 'w');
                 drawHandle(e, 'e');
                 
-                const rotSize = this.HANDLE_SIZE / Math.abs(this.container.parent?.scale.x ?? 1);
+                const rotSize = this.HANDLE_SIZE * inverseScale;
                 this.gizmoGraphics.circle(rot.x, rot.y, rotSize/2);
                 this.gizmoGraphics.fill({ color: (this.hoverHandle === 'rotate' || this.dragHandle === 'rotate') ? 0xFF0000 : 0xFFFFFF });
-                this.gizmoGraphics.stroke({ width: 1, color: 0x000000 });
+                this.gizmoGraphics.stroke({ width: 1 * inverseScale, color: 0x000000 });
             }
         }
     }
