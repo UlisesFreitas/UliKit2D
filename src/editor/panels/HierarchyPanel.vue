@@ -214,7 +214,7 @@ const duplicateEntity = () => {
                     :class="[
                         'cursor-pointer px-2 py-0.5 rounded text-xs transition-colors flex items-center border',
                         editorStore.selectedEntityId === entity.id 
-                            ? 'bg-accent-color text-white border-accent-color font-bold shadow-sm' 
+                            ? 'bg-accent-color text-text-accent border-accent-color font-bold shadow-sm' 
                             : 'border-transparent hover:bg-bg-hover text-text-primary'
                     ]"
                 >

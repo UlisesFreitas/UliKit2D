@@ -64,7 +64,7 @@ const onSave = async () => {
 
                 <div class="flex justify-end gap-2 mt-2">
                     <button @click="$emit('update:open', false)" class="px-4 py-2 text-sm text-text-secondary hover:text-text-primary transition">Cancel</button>
-                    <button @click="onSave" class="px-4 py-2 text-sm bg-accent text-white font-bold rounded shadow hover:bg-accent-hover transition">Save</button>
+                    <button @click="onSave" class="px-4 py-2 text-sm bg-accent-color text-text-accent font-bold rounded shadow hover:bg-accent-hover transition">Save</button>
                 </div>
 
                  <DialogClose class="absolute top-4 right-4 text-text-secondary hover:text-text-primary">✕</DialogClose>

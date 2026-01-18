@@ -112,7 +112,7 @@ watch(() => [props.open, store.activeLayerId], () => {
 }
 .btn-primary {
     background-color: var(--primary-color);
-    color: white;
+    color: var(--text-accent);
     padding: 6px 12px;
     border-radius: 4px;
     font-size: 13px;

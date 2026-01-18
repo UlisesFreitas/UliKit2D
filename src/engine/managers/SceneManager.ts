@@ -43,6 +43,7 @@ export class SceneManager {
 
     static get layers() { return this._layers; }
     static get activeSceneName() { return this._activeSceneName; }
+    static set activeSceneName(value: string) { this._activeSceneName = value; }
     static get isDirty() { return this._isDirty; }
 
     static setDirty(dirty: boolean) {

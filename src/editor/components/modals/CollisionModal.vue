@@ -278,16 +278,14 @@ const onClose = () => emit('close');
                     
                     <div v-if="hasAnimator" class="flex bg-bg-dark rounded p-0.5 text-xs">
                          <button 
-                            @click="mode = 'global'"
                             class="px-3 py-1.5 rounded transition-colors"
-                            :class="mode === 'global' ? 'bg-primary text-white shadow-sm' : 'text-text-muted hover:text-text-primary'"
+                            :class="mode === 'global' ? 'bg-accent-color text-text-accent shadow-sm' : 'text-text-secondary hover:text-text-primary'"
                         >
                             Global
                         </button>
                         <button 
-                            @click="mode = 'animation'"
                             class="px-3 py-1.5 rounded transition-colors"
-                            :class="mode === 'animation' ? 'bg-primary text-white shadow-sm' : 'text-text-muted hover:text-text-primary'"
+                            :class="mode === 'animation' ? 'bg-accent-color text-text-accent shadow-sm' : 'text-text-secondary hover:text-text-primary'"
                         >
                             Animation
                         </button>
@@ -318,7 +316,7 @@ const onClose = () => emit('close');
             <!-- Canvas Area -->
             <div 
                 ref="containerRef"
-                class="flex-1 bg-gray-900 relative overflow-hidden select-none cursor-crosshair"
+                class="flex-1 bg-bg-base relative overflow-hidden select-none cursor-crosshair"
                 @wheel="handleWheel"
                 @mousedown="handleMouseDown"
             >
@@ -393,15 +391,15 @@ const onClose = () => emit('close');
                     <div class="w-px h-4 bg-border mx-1"></div>
                     
                     <!-- Zoom Controls -->
-                     <button @click="zoom = Math.max(1, zoom - 1)" class="w-6 h-6 bg-bg-dark rounded flex items-center justify-center hover:bg-bg-hover">-</button>
+                     <button @click="zoom = Math.max(1, zoom - 1)" class="w-6 h-6 bg-bg-input rounded flex items-center justify-center hover:bg-bg-hover">-</button>
                      <span class="text-xs w-12 text-center font-mono">{{ zoom }}x</span>
-                     <button @click="zoom = Math.min(40, zoom + 1)" class="w-6 h-6 bg-bg-dark rounded flex items-center justify-center hover:bg-bg-hover">+</button>
+                     <button @click="zoom = Math.min(40, zoom + 1)" class="w-6 h-6 bg-bg-input rounded flex items-center justify-center hover:bg-bg-hover">+</button>
                 </div>
                 
                 <div class="flex gap-2">
-                    <button @click="onClose" class="u-button px-4 py-1 bg-bg-dark">Cancel</button>
+                    <button @click="onClose" class="u-button px-4 py-1 bg-bg-input">Cancel</button>
                     <button @click="onApply" class="u-button px-4 py-1">Apply (Keep Open)</button>
-                    <button @click="onSave" class="u-button px-4 py-1 bg-primary text-white">Save & Close</button>
+                    <button @click="onSave" class="u-button px-4 py-1 bg-accent-color text-text-accent">Save & Close</button>
                 </div>
             </div>
         </div>

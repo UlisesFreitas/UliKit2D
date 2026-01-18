@@ -379,7 +379,7 @@ onUnmounted(() => {
             <div v-if="showPreview" class="absolute inset-0 z-50 bg-black/90 flex flex-col items-center justify-center animate-fade-in" @click.self="closePreview">
                 <div class="relative bg-bg-panel border border-border rounded-lg p-6 shadow-2xl flex flex-col items-center max-w-4xl w-full max-h-[90%]">
                     
-                    <button @click="closePreview" class="absolute top-4 right-4 text-text-secondary hover:text-white text-2xl">✕</button>
+                    <button @click="closePreview" class="absolute top-4 right-4 text-text-secondary hover:text-text-primary text-2xl">✕</button>
                     
                     <h3 class="text-xl font-bold mb-4 text-text-primary">{{ previewAnimName }} <span class="text-sm font-normal text-text-secondary">Preview</span></h3>
                     
@@ -429,7 +429,7 @@ onUnmounted(() => {
 
                         <button 
                             @click="previewTimer ? stopPreviewLoop() : startPreviewLoop()"
-                            class="w-12 h-12 rounded-full bg-accent-color hover:bg-opacity-90 flex items-center justify-center text-white text-xl shadow-lg transition-transform hover:scale-105 active:scale-95"
+                            class="w-12 h-12 rounded-full bg-accent-color hover:bg-opacity-90 flex items-center justify-center text-text-accent text-xl shadow-lg transition-transform hover:scale-105 active:scale-95"
                         >
                             {{ previewTimer ? '⏸' : '▶' }}
                         </button>
@@ -465,7 +465,7 @@ onUnmounted(() => {
                 <div v-if="animKeys.length === 0" class="flex flex-col items-center justify-center h-full text-text-secondary opacity-50">
                     <div class="text-4xl mb-2">🎞️</div>
                     <p>No animations created yet.</p>
-                    <button @click="addAnimation" class="mt-4 px-4 py-2 bg-accent-color text-white rounded hover:bg-opacity-90">Create First Animation</button>
+                    <button @click="addAnimation" class="mt-4 px-4 py-2 bg-accent-color text-text-accent rounded hover:bg-opacity-90">Create First Animation</button>
                 </div>
 
                 <!-- Use object iteration to get value directly and avoid undefined checks -->

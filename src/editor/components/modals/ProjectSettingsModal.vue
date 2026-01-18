@@ -167,7 +167,7 @@ const onApply = () => {
                             <div class="mb-6">
                                 <div class="flex justify-between items-center mb-2">
                                     <label class="text-sm font-bold">Tags</label>
-                                    <button @click="store.settings.tags.push('NewTag')" class="text-xs bg-bg-hover hover:bg-accent hover:text-white px-2 py-1 rounded transition">+</button>
+                                    <button @click="store.settings.tags.push('NewTag')" class="text-xs bg-bg-hover hover:bg-accent-color hover:text-text-accent px-2 py-1 rounded transition">+</button>
                                 </div>
                                 <div class="flex flex-wrap gap-2">
                                     <div v-for="(tag, index) in store.settings.tags" :key="index" class="flex items-center bg-bg-panel border border-border rounded px-2 py-1 text-xs">
@@ -227,7 +227,7 @@ const onApply = () => {
                 <div class="h-14 border-t border-border bg-bg-header px-6 flex items-center justify-end gap-3 rounded-b-lg">
                     <button @click="onClose" class="px-4 py-2 text-sm text-text-secondary hover:text-text-primary transition">Cancel</button>
                     <button @click="onApply" class="px-4 py-2 text-sm bg-bg-hover border border-border rounded hover:bg-bg-selection transition">Apply</button>
-                    <button @click="onSave" class="px-6 py-2 text-sm bg-accent text-white font-bold rounded shadow hover:bg-accent-hover transition">
+                    <button @click="onSave" class="px-6 py-2 text-sm bg-accent-color text-text-accent font-bold rounded shadow hover:bg-accent-hover transition">
                         Save Project
                     </button>
                 </div>

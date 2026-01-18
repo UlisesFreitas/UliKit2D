@@ -169,3 +169,17 @@ canvas {
 body {
     background-color: var(--bg-base);
 }
+
+/* Manual Utilities for Custom Theme Colors (Fallback if Tailwind Config is ignored) */
+.bg-bg-base { background-color: var(--bg-base); }
+.bg-bg-panel { background-color: var(--bg-panel); }
+.bg-bg-header { background-color: var(--bg-header); }
+.bg-bg-input { background-color: var(--bg-input); }
+.bg-bg-hover { background-color: var(--bg-hover); }
+.bg-bg-selection { background-color: var(--bg-selection); }
+
+.text-text-primary { color: var(--text-primary); }
+.text-text-secondary { color: var(--text-secondary); }
+.text-text-accent { color: var(--text-accent); }
+.border-border { border-color: var(--border-color); }
+.border-accent { border-color: var(--accent-color); }

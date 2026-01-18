@@ -182,7 +182,7 @@ const importAssets = async () => {
               />
               <button 
                   @click="importAssets" 
-                  class="px-3 py-1 bg-primary text-white text-xs rounded hover:bg-primary-hover flex items-center gap-1"
+                  class="px-3 py-1 bg-primary text-text-accent text-xs rounded hover:bg-primary-hover flex items-center gap-1"
                   title="Import external files to assets folder"
               >
                   <span>📥</span> Import
@@ -203,7 +203,7 @@ const importAssets = async () => {
                       :class="selectedAssets.has(asset.path) ? 'border-accent-color bg-bg-selection' : 'border-transparent'"
                   >
                       <!-- Thumbnail -->
-                      <div class="w-16 h-16 bg-checkerboard rounded overflow-hidden flex items-center justify-center mb-1 bg-gray-800 relative">
+                      <div class="w-16 h-16 bg-checkerboard rounded overflow-hidden flex items-center justify-center mb-1 bg-bg-input relative">
                           <img 
                               v-if="type === 'image' || asset.name.endsWith('.png') || asset.name.endsWith('.jpg')"
                               :src="thumbnails[asset.path]" 
@@ -214,7 +214,7 @@ const importAssets = async () => {
                            
                            <!-- Checkmark overlay -->
                            <div v-if="selectedAssets.has(asset.path)" class="absolute inset-0 bg-accent-color/30 flex items-center justify-center">
-                                <span class="text-xl font-bold text-white drop-shadow-md">✓</span>
+                                <span class="text-xl font-bold text-text-accent drop-shadow-md">✓</span>
                            </div>
                       </div>
                       <span class="text-xs text-text-primary text-center truncate w-full px-1 group-hover:text-text-accent">{{ asset.name }}</span>
@@ -230,7 +230,7 @@ const importAssets = async () => {
                  <button 
                     v-if="multiSelect" 
                     @click="confirmSelection"
-                    class="px-3 py-1 bg-accent-color text-white rounded hover:bg-opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
+                    class="px-3 py-1 bg-accent-color text-text-accent rounded hover:bg-opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
                     :disabled="selectedAssets.size === 0"
                  >
                     Confirm
