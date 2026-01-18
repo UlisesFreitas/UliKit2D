@@ -293,13 +293,52 @@ export class GizmoManager {
                 }
             }
             
-            // Apply scale (prevent zero scale issues)
-            // Use 0.001 as min scale
-            if (Math.abs(newScaleX) < 0.001) newScaleX = 0.001 * Math.sign(newScaleX || 1);
-            if (Math.abs(newScaleY) < 0.001) newScaleY = 0.001 * Math.sign(newScaleY || 1);
+            if (entity.label || entity.bitmapText) {
+                // SPECIAL TEXT RESIZING BEHAVIOR (BOUNDED TEXT)
+                // Instead of scaling, we change the wrapping width
+                
+                // 1. Force Scale to 1 (Prevent distortion)
+                entity.transform.scale.x = 1;
+                entity.transform.scale.y = 1;
+                
+                // 2. Calculate intended new WIDTH based on visual drag
+                // Nominal 'width' is the bounds width.
+                // If dragging right handle, newWidth = currentWidth * scaleRatio
+                // Note: start.scaleX is what the gizmo started with.
+                // newScaleX is the raw gizmo calculation.
+                
+                // Ratio of change
+                const ratioX = Math.abs(newScaleX / start.scaleX);
+                
+                // Apply to component width
+                // For Label/BitmapText, 'width' property controls wrap
+                
+                // Start Width logic
+                const startWidth = start.width; // Visual bounds width at start
+                let newWidth = startWidth * ratioX;
 
-            entity.transform.scale.x = newScaleX;
-            entity.transform.scale.y = newScaleY;
+                if (newWidth < 10) newWidth = 10; // Min width
+
+                if (entity.label) {
+                    entity.label.width = newWidth;
+                } else if (entity.bitmapText) {
+                    entity.bitmapText.width = newWidth;
+                }
+                
+                // We do NOT modify Height for text usually (it flows automatically)
+                // Unless we support clipping or auto-scrolling later.
+                
+            } else {
+                // STANDARD SCALING
+                
+                // Apply scale (prevent zero scale issues)
+                // Use 0.001 as min scale
+                if (Math.abs(newScaleX) < 0.001) newScaleX = 0.001 * Math.sign(newScaleX || 1);
+                if (Math.abs(newScaleY) < 0.001) newScaleY = 0.001 * Math.sign(newScaleY || 1);
+
+                entity.transform.scale.x = newScaleX;
+                entity.transform.scale.y = newScaleY;
+            }
         }
 
         eventBus.emit('entity-change', entity.id);
@@ -367,6 +406,30 @@ export class GizmoManager {
         
         const lb = displayObject.getLocalBounds(); 
         
+        // SPECIAL HANDLING FOR TEXT (BOUNDED BOX)
+        // If the entity has a forced width (Word Wrap Width), we want the Gizmo to show that Frame.
+        // If width is 0, it means "Auto", so we use the text's natural bounds (lb).
+        if (entity.label && entity.label.width && entity.label.width > 0) {
+            const w = entity.label.width;
+            lb.width = w;
+            
+            // Adjust X origin based on Alignment (Anchor)
+            const align = entity.label.align || 'center';
+            if (align === 'left') lb.x = 0;
+            else if (align === 'right') lb.x = -w;
+            else lb.x = -w / 2;
+
+        } else if (entity.bitmapText && entity.bitmapText.width && entity.bitmapText.width > 0) {
+             const w = entity.bitmapText.width;
+             lb.width = w;
+
+             // Adjust X origin based on Alignment
+             const align = entity.bitmapText.align || 'center';
+             if (align === 'left') lb.x = 0;
+             else if (align === 'right') lb.x = -w;
+             else lb.x = -w / 2;
+        }
+
         const localPts = {
             nw: new Point(lb.x, lb.y),
             ne: new Point(lb.x + lb.width, lb.y),

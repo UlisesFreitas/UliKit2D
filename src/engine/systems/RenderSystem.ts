@@ -62,6 +62,13 @@ export class RenderSystem {
         this.app.stage.addChild(this.editorOverlay);
     }
     
+    // Helper for Text Anchors
+    private getAnchorX(align: string): number {
+        if (align === 'left') return 0;
+        if (align === 'right') return 1;
+        return 0.5;
+    }
+
     private resolveColor(color: string): string {
         if (color.startsWith('var(')) {
             const varName = color.match(/var\(([^)]+)\)/)?.[1];
@@ -525,10 +532,15 @@ export class RenderSystem {
                      fontSize: entity.label.fontSize,
                      fontFamily: entity.label.fontFamily,
                      fill: entity.label.color,
-                     align: entity.label.align
+                     align: entity.label.align,
+                     fontWeight: entity.label.fontWeight ?? 'normal',
+                     fontStyle: entity.label.fontStyle ?? 'normal',
+                     stroke: (entity.label.strokeThickness && entity.label.strokeThickness > 0) 
+                         ? { color: entity.label.stroke || '#000000', width: entity.label.strokeThickness } 
+                         : undefined
                  }
              });
-             textFn.anchor.set(0.5);
+             textFn.anchor.set(this.getAnchorX(entity.label.align), 0.5);
              
              // Interaction removed
 
@@ -552,7 +564,67 @@ export class RenderSystem {
         if (textFn.style.fontSize !== entity.label.fontSize) textFn.style.fontSize = entity.label.fontSize;
         if (textFn.style.fontFamily !== entity.label.fontFamily) textFn.style.fontFamily = entity.label.fontFamily;
         if (textFn.style.fill !== entity.label.color) textFn.style.fill = entity.label.color;
-        if (textFn.style.align !== entity.label.align) textFn.style.align = entity.label.align;
+        if (textFn.style.align !== entity.label.align) {
+            textFn.style.align = entity.label.align;
+            textFn.anchor.x = this.getAnchorX(entity.label.align);
+        }
+
+
+
+        // Style Updates
+        const fontWeight = entity.label.fontWeight || 'normal';
+        if (textFn.style.fontWeight !== fontWeight) textFn.style.fontWeight = fontWeight;
+        
+        const fontStyle = entity.label.fontStyle || 'normal';
+        if (textFn.style.fontStyle !== fontStyle) textFn.style.fontStyle = fontStyle;
+        
+        // Outline
+        // PixiJS v8: prefer setting stroke as an object { color, width }
+        // This ensures thickness is applied correctly.
+        const strokeColor = entity.label.stroke || '#000000';
+        const strokeThick = entity.label.strokeThickness || 0;
+        
+        // We create a new stroke object representation
+        // If strokeThick is 0, we could set stroke to null/undefined or width 0. 
+        // But the checkbox logic in UI handles 0.
+        
+        // Optimization: Check if we need to update to avoid object churn?
+        // But style.stroke might be an object, so strict equality check fails.
+        // Let's just set it. It's cleaner.
+        if (strokeThick > 0) {
+             (textFn.style as any).stroke = { color: strokeColor, width: strokeThick };
+        } else {
+             // Disable stroke
+             (textFn.style as any).stroke = undefined; 
+             // Or { width: 0 } ? undefined is safer to remove it.
+        }
+
+        // Shadow
+        if (entity.label.dropShadow && entity.label.dropShadow.enabled) {
+            const ds = entity.label.dropShadow;
+            const newShadow = {
+                color: ds.color,
+                blur: ds.blur,
+                distance: ds.distance,
+                angle: (ds.angle || 0) * (Math.PI / 180),
+                alpha: ds.alpha
+            };
+            // Deep compare or force update? Force update is safer for Object props
+            (textFn.style as any).dropShadow = newShadow;
+        } else {
+             if ((textFn.style as any).dropShadow) (textFn.style as any).dropShadow = null;
+        }
+
+        // Bounded Text (Word Wrap)
+        if (entity.label.width && entity.label.width > 0) {
+            if (!textFn.style.wordWrap) textFn.style.wordWrap = true;
+            if (textFn.style.wordWrapWidth !== entity.label.width) textFn.style.wordWrapWidth = entity.label.width;
+            
+            // Enable breaking words to match GDevelop behavior
+             if (!(textFn.style as any).breakWords) (textFn.style as any).breakWords = true;
+        } else {
+            if (textFn.style.wordWrap) textFn.style.wordWrap = false;
+        }
 
         // Sync Transform
         textFn.x = entity.transform.x;
@@ -567,7 +639,11 @@ export class RenderSystem {
 
         // Sync dimensions back to ECS for Gizmos
         if (entity.label) {
-            entity.label.width = textFn.width;
+            // ONLY sync width if it's in 'Auto' mode (width is 0 or undefined)
+            // If width is set (Bounded), we trust the ECS value as the container size.
+            if (!entity.label.width || entity.label.width === 0) {
+                 entity.label.width = textFn.width;
+            }
             entity.label.height = textFn.height;
         }
     }
@@ -584,7 +660,7 @@ export class RenderSystem {
                     align: entity.bitmapText.align
                 }
             });
-            bText.anchor.set(0.5);
+            bText.anchor.set(this.getAnchorX(entity.bitmapText.align), 0.5);
             bText.tint = entity.bitmapText.tint;
             
             // Interaction removed
@@ -630,8 +706,20 @@ export class RenderSystem {
         // Sync Properties
         if (bText.text !== entity.bitmapText.text) bText.text = entity.bitmapText.text;
         if (bText.style.fontSize !== entity.bitmapText.fontSize) bText.style.fontSize = entity.bitmapText.fontSize;
-        if (bText.style.align !== entity.bitmapText.align) bText.style.align = entity.bitmapText.align;
+        if (bText.style.align !== entity.bitmapText.align) {
+            bText.style.align = entity.bitmapText.align;
+            bText.anchor.x = this.getAnchorX(entity.bitmapText.align);
+        }
         if (bText.tint !== entity.bitmapText.tint) bText.tint = entity.bitmapText.tint;
+        
+        // Bounded Text (Word Wrap)
+        // PixiJS v8 BitmapText uses standard TextStyle properties for wrapping
+        if (entity.bitmapText.width && entity.bitmapText.width > 0) {
+             if (!(bText.style as any).wordWrap) (bText.style as any).wordWrap = true;
+             if ((bText.style as any).wordWrapWidth !== entity.bitmapText.width) (bText.style as any).wordWrapWidth = entity.bitmapText.width;
+        } else {
+             if ((bText.style as any).wordWrap) (bText.style as any).wordWrap = false;
+        }
 
         // Sync Transform
         bText.x = entity.transform.x;
@@ -646,7 +734,9 @@ export class RenderSystem {
 
         // Sync dimensions back to ECS for Gizmos
         if (entity.bitmapText) {
-            entity.bitmapText.width = bText.width;
+             if (!entity.bitmapText.width || entity.bitmapText.width === 0) {
+                entity.bitmapText.width = bText.width;
+             }
             entity.bitmapText.height = bText.height;
         }
     }

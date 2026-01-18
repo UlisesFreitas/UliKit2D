@@ -57,8 +57,26 @@ export type Entity = {
       fontFamily: string;
       color: string;
       align: 'left' | 'center' | 'right';
-      width?: number; // Runtime width for gizmos
+      width?: number; // Word Wrap Width
       height?: number; // Runtime height for gizmos
+      
+      // Style
+      fontWeight?: 'normal' | 'bold';
+      fontStyle?: 'normal' | 'italic';
+      
+      // Outline
+      stroke?: string; // color
+      strokeThickness?: number;
+      
+      // Shadow
+      dropShadow?: {
+          alpha: number;
+          angle: number; // degrees
+          blur: number;
+          color: string;
+          distance: number;
+          enabled: boolean;
+      }
   };
   bitmapText?: {
       text: string;
@@ -67,7 +85,7 @@ export type Entity = {
       fontSize: number;
       tint: number;
       align: 'left' | 'center' | 'right';
-      width?: number; // Runtime width for gizmos
+      width?: number; // Max Width
       height?: number; // Runtime height for gizmos
   };
   nineSliceSprite?: {

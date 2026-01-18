@@ -2,6 +2,7 @@
 
 const props = defineProps<{
     transform: { x: number; y: number; rotation: number; scale: { x: number; y: number }; zIndex?: number };
+    entity?: any;
     revision?: number;
 }>();
 
@@ -127,6 +128,37 @@ const update = (key: string, val: number) => {
                             transform.scale.y = val;
                             update('scale.y', val);
                         }"
+                    />
+                </div>
+            </div>
+        </div>
+
+        <!-- SPECIAL: Dimensions (For Text Wrapping) -->
+        <div v-if="entity && (entity.label || entity.bitmapText)" class="flex items-center pt-2 border-t border-border mt-2">
+            <div class="w-16 text-xs text-text-secondary">Size</div>
+            <div class="flex-1 grid grid-cols-2 gap-1">
+                <div class="flex items-center border border-border rounded overflow-hidden group focus-within:border-accent-color transition-colors">
+                    <div class="px-2 text-xs font-bold text-text-secondary border-r border-border hover:bg-bg-hover">W</div>
+                    <input 
+                        type="number" 
+                        class="w-full u-input bg-bg-input text-xs p-1 px-2 outline-none text-text-primary"
+                        :value="entity.label ? (entity.label.width || 0) : (entity.bitmapText.width || 0)"
+                        @input="(e) => {
+                            const val = parseFloat((e.target as HTMLInputElement).value);
+                            if (entity.label) entity.label.width = val;
+                            else if (entity.bitmapText) entity.bitmapText.width = val;
+                            update('width', val); // Triggers update
+                        }"
+                        placeholder="Auto"
+                    />
+                </div>
+                 <div class="flex items-center border border-border rounded overflow-hidden opacity-50" title="Height is automatic for text">
+                    <div class="px-2 text-xs font-bold text-text-secondary border-r border-border">H</div>
+                    <input 
+                        type="number" 
+                        class="w-full u-input bg-bg-input text-xs p-1 px-2 outline-none text-text-disabled cursor-not-allowed"
+                        disabled
+                        placeholder="Auto"
                     />
                 </div>
             </div>

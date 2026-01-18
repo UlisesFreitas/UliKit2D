@@ -391,6 +391,7 @@ const handleSaveCollisionMask = (payload: { vertices: { x: number, y: number }[]
                     <TransformEditor 
                         v-if="item.key === 'transform'"
                         :transform="item.data" 
+                        :entity="(selectedEntity as any)"
                         :revision="revision" 
                         @update="onComponentUpdate" 
                     />
