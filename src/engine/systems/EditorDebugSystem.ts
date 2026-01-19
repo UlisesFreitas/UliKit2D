@@ -13,7 +13,7 @@ export class EditorDebugSystem {
     constructor(app: Application) {
         this.app = app;
         this.container = new Container();
-        this.container.zIndex = 999; // Below Gizmos (9999) but above content
+        this.container.zIndex = 999999; // Ensure Above Everything
         this.app.stage.addChild(this.container);
         this.app.stage.sortableChildren = true;
     }
