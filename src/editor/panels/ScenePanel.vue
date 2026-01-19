@@ -46,6 +46,7 @@ const lastMouseY = ref(0);
 
 // Debug
 const debugInfo = ref({ screen: {x:0, y:0}, world: {x:0, y:0}, lastClick: 'None' });
+const hoveredEntityDebug = ref<any>(null); // New Entity Info Debug
 const highlightGraphics = ref<any>(null); // For Tilemap highlight
 
 // Computeds
@@ -254,6 +255,26 @@ const onPointerMove = async (e: PointerEvent) => {
     const { instance: selectionManager } = await import('../managers/SelectionManager');
     selectionManager.updateHover(sx, sy);
 
+    // Update Overlay Debug Info
+    if (selectionManager.hoveredEntityId) {
+        const ent = world.with('id', 'transform').where(e => e.id === selectionManager.hoveredEntityId).first;
+        if (ent && ent.transform) {
+             hoveredEntityDebug.value = {
+                 id: ent.id,
+                 name: ent.name || 'Entity',
+                 x: Math.round(ent.transform.x),
+                 y: Math.round(ent.transform.y),
+                 layer: ent.layer || 'Base Layer',
+                 zIndex: ent.transform.zIndex || 0,
+                 scaleX: ent.transform.scale?.x.toFixed(2) || '1.00',
+                 scaleY: ent.transform.scale?.y.toFixed(2) || '1.00',
+                 rotation: Math.round((ent.transform.rotation || 0) * (180/Math.PI))
+             };
+        }
+    } else {
+        hoveredEntityDebug.value = null;
+    }
+
     // Proxy to Area Selection
     const { instance: areaSelectionManager } = await import('../managers/AreaSelectionManager');
     areaSelectionManager.updateDrag(sx, sy);
@@ -409,7 +430,7 @@ watch(() => preferencesStore.grid, () => updateView(), { deep: true });
   >
     <!-- Overlay UI Only - No Canvas -->
     
-<!-- Debug Overlay -->
+<!-- Input Debugger -->
     <div class="absolute top-4 right-4 bg-black/80 text-white p-2 rounded text-xs z-[101] font-mono pointer-events-none select-none">
         <div class="font-bold text-yellow-400 mb-1 border-b border-gray-600">INPUT DEBUGGER</div>
         <div class="grid grid-cols-2 gap-x-4">
@@ -428,6 +449,30 @@ watch(() => preferencesStore.grid, () => updateView(), { deep: true });
              <div class="col-span-2 mt-2 border-t border-gray-700 pt-1 text-[10px] text-gray-500">
                  Last Click: <span class="text-white">{{ debugInfo.lastClick }}</span>
              </div>
+        </div>
+    </div>
+
+    <!-- Entity Hover Info Overlay (New) -->
+    <div v-if="hoveredEntityDebug" class="absolute top-4 left-4 bg-black/90 text-white p-2 rounded text-xs z-[101] font-mono pointer-events-none select-none border border-gray-700 shadow-lg">
+        <div class="font-bold text-blue-400 mb-1 border-b border-gray-600 uppercase">{{ hoveredEntityDebug.name }}</div>
+        <div class="grid grid-cols-2 gap-x-4 gap-y-1">
+             <span class="text-gray-400">ID:</span>
+             <span class="truncate max-w-[120px]" :title="hoveredEntityDebug.id">{{ hoveredEntityDebug.id }}</span>
+
+             <span class="text-gray-400">Pos:</span>
+             <span class="text-green-400">{{ hoveredEntityDebug.x }}, {{ hoveredEntityDebug.y }}</span>
+             
+             <span class="text-gray-400">Layer:</span>
+             <span class="text-yellow-200">{{ hoveredEntityDebug.layer }}</span>
+             
+             <span class="text-gray-400">Z-Index:</span>
+             <span>{{ hoveredEntityDebug.zIndex }}</span>
+
+             <span class="text-gray-400">Scale:</span>
+             <span>{{ hoveredEntityDebug.scaleX }}x, {{ hoveredEntityDebug.scaleY }}x</span>
+
+             <span class="text-gray-400">Rot:</span>
+             <span>{{ hoveredEntityDebug.rotation }}°</span>
         </div>
     </div>
 
