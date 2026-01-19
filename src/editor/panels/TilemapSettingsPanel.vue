@@ -168,13 +168,22 @@ import {
     X as XIcon 
 } from 'lucide-vue-next';
 
+import { eventBus } from '../../engine/core/EventBus'; // Import EventBus
+
 const editorStore = useEditorStore();
 const tilemapStore = useTilemapStore();
 
 // Reactivity Helper: Force updates when deep properties change (like grid size)
 const configVersion = ref(0);
+const sceneVersion = ref(0);
+
+// Force update on Scene Load / Layer Update to avoid stale layer references
+eventBus.on('scene-loaded', () => sceneVersion.value++);
+eventBus.on('layer-update', () => sceneVersion.value++);
 
 const activeLayer = computed(() => {
+    // Dependency on version forces re-fetch when scene/layers change
+    const _v = sceneVersion.value;
     if (!editorStore.activeLayerId) return null;
     return SceneManager.getLayerById(editorStore.activeLayerId);
 });

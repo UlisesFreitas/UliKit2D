@@ -6,7 +6,7 @@ import { projectState } from '../../managers/ProjectManager';
 
 const props = defineProps<{
     isOpen: boolean;
-    type: 'image' | 'script' | 'font' | 'all';
+    type: 'image' | 'script' | 'font' | 'audio' | 'all';
     multiSelect?: boolean;
     onSelect: (path: string | string[]) => void;
     onClose: () => void;
@@ -37,6 +37,9 @@ const filteredAssets = computed(() => {
     } else if (props.type === 'font') {
         const fontExts = ['.fnt', '.xml'];
         result = result.filter(f => fontExts.some(ext => f.name.toLowerCase().endsWith(ext)));
+    } else if (props.type === 'audio') {
+        const audioExts = ['.mp3', '.wav', '.ogg', '.m4a', '.aac', '.flac'];
+        result = result.filter(f => audioExts.some(ext => f.name.toLowerCase().endsWith(ext)));
     }
 
     // 2. Filter by Search
@@ -119,6 +122,7 @@ const importAssets = async () => {
             filters: [
                 { name: 'Images', extensions: ['png', 'jpg', 'jpeg', 'webp', 'svg', 'gif'] },
                 { name: 'Scripts', extensions: ['js', 'ts'] },
+                { name: 'Audio', extensions: ['mp3', 'wav', 'ogg', 'm4a', 'aac', 'flac'] },
                 { name: 'All Files', extensions: ['*'] }
             ]
         });
@@ -135,7 +139,7 @@ const importAssets = async () => {
         const input = document.createElement('input');
         input.type = 'file';
         input.multiple = true;
-        input.accept = '.png,.jpg,.jpeg,.webp,.svg,.gif,.js,.ts';
+        input.accept = '.png,.jpg,.jpeg,.webp,.svg,.gif,.js,.ts,.mp3,.wav,.ogg,.m4a,.aac,.flac';
         
         input.onchange = async (e: any) => {
             const files = e.target.files;
@@ -210,6 +214,7 @@ const importAssets = async () => {
                               class="w-full h-full object-contain"
                               style="image-rendering: pixelated"
                           />
+                           <span v-else-if="asset.name.endsWith('.mp3') || asset.name.endsWith('.wav') || asset.name.endsWith('.ogg')" class="text-2xl opacity-80">🎵</span>
                            <span v-else class="text-2xl opacity-50">📄</span>
                            
                            <!-- Checkmark overlay -->

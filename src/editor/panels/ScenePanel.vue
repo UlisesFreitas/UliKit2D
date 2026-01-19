@@ -50,10 +50,22 @@ const debugInfo = ref({ screen: {x:0, y:0}, world: {x:0, y:0}, lastClick: 'None'
 const hoveredEntityDebug = ref<any>(null); // New Entity Info Debug
 const highlightGraphics = ref<any>(null); // For Tilemap highlight
 
-// Computeds
+const sceneVersion = ref(0); // Force update on scene reload
+
+eventBus.on('scene-loaded', () => {
+    console.log('[ScenePanel] Scene Loaded Event. Version++');
+    sceneVersion.value++;
+});
+eventBus.on('layer-update', () => sceneVersion.value++);
+
 const activeLayer = computed<SceneLayer | null>(() => {
+    // Dependency
+    sceneVersion.value;
     if (!store.activeLayerId) return null;
-    return SceneManager.getLayerById(store.activeLayerId);
+    const l = SceneManager.getLayerById(store.activeLayerId);
+    // Debug Log
+    //console.log(`[ScenePanel] Active Layer Computed: ${store.activeLayerId} -> ${l ? 'Found' : 'Null'}`, l);
+    return l;
 });
 
 const isTilemapMode = computed(() => {
@@ -161,6 +173,7 @@ const paintTile = (e: MouseEvent | PointerEvent, erase = false) => {
              console.log(`[ScenePanel] Deleting Tile at ${gx},${gy}`);
              delete activeLayer.value.tileData[key];
         } else {
+             // console.log(`[ScenePanel] Painting Tile at ${gx},${gy} ID:${targetId} Layer:${activeLayer.value.name}`);
              activeLayer.value.tileData[key] = targetId;
         }
         

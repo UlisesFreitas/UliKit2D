@@ -64,8 +64,18 @@ export class EditorTilemapSystem {
 
         // Process Dirty Layers
         this.dirtyLayers.forEach(layerId => {
-            this.renderLayer(layerId);
+            // console.log(`[EditorTilemapSystem] Rendering Dirty Layer: ${layerId}`);
+            // Fire and Forget (sort of)
+            // If it returns false (container missing), we re-add it to dirty
+            this.renderLayer(layerId).then(success => {
+                if (!success) {
+                    // console.log(`[EditorTilemapSystem] Render Failed (Container Missing) for ${layerId}, monitoring...`);
+                    this.dirtyLayers.add(layerId);
+                }
+            });
         });
+        
+        // Clear immediately. If renderLayer fails, it will re-add itself via callback.
         this.dirtyLayers.clear();
 
         // Prune stale layers (if RenderSystem removed them)
@@ -79,18 +89,17 @@ export class EditorTilemapSystem {
         }
     }
 
-    private async renderLayer(layerId: string) {
+    private async renderLayer(layerId: string): Promise<boolean> {
         const layer = SceneManager.getLayerById(layerId);
-        if (!layer) return;
+        if (!layer) return true; // Layer gone, operation "successful" (no retry needed)
 
         // 1. Get Parent Layer Container from RenderSystem
         const parentContainer = engine.renderSystem.layerContainers.get(layerId);
         
         if (!parentContainer) {
-            // RenderSystem might update next frame, retry later?
-            // Or usually RenderSystem updates first? 
-            // We can assume it exists if layer exists, or wait.
-            return;
+            // RenderSystem hasn't built this layer yet.
+            // Retry later.
+            return false;
         }
 
         // 2. Ensure TileRoot Exists
@@ -126,7 +135,7 @@ export class EditorTilemapSystem {
         if (!layer.tileset) {
             tileRoot.removeChildren();
             chunks.clear();
-            return;
+            return true;
         }
         
         // Get Texture
@@ -142,11 +151,12 @@ export class EditorTilemapSystem {
                 }
             } catch (e) {
                 console.warn(`[EditorTilemapSystem] Failed to load texture ${layer.tileset}`, e);
-                return;
+                // Don't retry per frame if file missing, just stop
+                return true; 
             }
         }
         
-        if (!texture) return;
+        if (!texture) return true;
         
         // Grid Size
         const gw = layer.gridSize?.x || 8;
@@ -200,6 +210,7 @@ export class EditorTilemapSystem {
         // Visibility handled by Parent Layer Container in RenderSystem
         // But we can toggle tileRoot specific visibility if needed (e.g. Hide Tiles Only)
         // For now, it inherits.
+        return true;
     }
     
     public dispose() {
