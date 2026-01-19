@@ -144,6 +144,12 @@ export class TilemapChunk extends Container {
         const invTexW = 1.0 / texW;
         const invTexH = 1.0 / texH;
 
+        // CRITICAL FIX: Clear buffers before rebuilding
+        // If we have fewer tiles than before (or 0), we must erase the old data.
+        this.positions.fill(0);
+        this.uvs.fill(0);
+        this.indices.fill(0);
+
         // Iterate all tiles in data
         for (const [key, tileId] of this.tileData.entries()) {
             const parts = key.split(',');

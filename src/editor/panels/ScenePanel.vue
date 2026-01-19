@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, watch, computed } from 'vue';
+import { Graphics } from 'pixi.js';
 import { instance as engine } from '../../engine/core/Engine';
 import { world } from '../../engine/ecs/ECS';
 import { useEditorStore } from '../../stores/useEditorStore';
@@ -82,9 +83,20 @@ const updateHighlight = (screenX: number, screenY: number) => {
         if (highlightGraphics.value) highlightGraphics.value.clear();
         return;
     }
-    // World Coords
-    const worldX = (screenX - cameraX.value) / zoom.value;
-    const worldY = (screenY - cameraY.value) / zoom.value;
+
+    // Canvas Offset Calculation
+    // screenX/Y are clientX/Y. We need Canvas Space.
+    let canvasOffsetX = 0;
+    let canvasOffsetY = 0;
+    if (engine.app && engine.app.canvas) {
+        const rect = engine.app.canvas.getBoundingClientRect();
+        canvasOffsetX = rect.left;
+        canvasOffsetY = rect.top;
+    }
+
+    // World Coords (Mouse relative to Canvas - Camera)
+    const worldX = ((screenX - canvasOffsetX) - cameraX.value) / zoom.value;
+    const worldY = ((screenY - canvasOffsetY) - cameraY.value) / zoom.value;
     
     // Grid Coords
     const gridSize = activeLayer.value.gridSize || { x: 32, y: 32 };
@@ -111,19 +123,33 @@ const updateHighlight = (screenX: number, screenY: number) => {
 const paintTile = (e: MouseEvent | PointerEvent, erase = false) => {
     if (!isTilemapMode.value || !activeLayer.value || !container.value) return;
 
-    // Use Global Screen Coords
+    // Canvas Offset (Robustness)
+    let canvasOffsetX = 0;
+    let canvasOffsetY = 0;
+    if (engine.app && engine.app.canvas) {
+        const rect = engine.app.canvas.getBoundingClientRect();
+        canvasOffsetX = rect.left;
+        canvasOffsetY = rect.top;
+    }
+
+    // Use Global Screen Coords -> Canvas Coords
     const screenX = e.clientX;
     const screenY = e.clientY;
     
     // World Coords
-    const worldX = (screenX - cameraX.value) / zoom.value;
-    const worldY = (screenY - cameraY.value) / zoom.value;
+    const worldX = ((screenX - canvasOffsetX) - cameraX.value) / zoom.value;
+    const worldY = ((screenY - canvasOffsetY) - cameraY.value) / zoom.value;
     
     // Grid Coords
     const gridSize = activeLayer.value.gridSize || { x: 32, y: 32 };
     const gx = Math.floor(worldX / gridSize.x);
     const gy = Math.floor(worldY / gridSize.y);
     
+    // Debug Log for Eraser
+    if (erase) {
+        console.log(`[ScenePanel] Eraser Input: Screen(${screenX},${screenY}) -> Grid(${gx},${gy})`);
+    }
+
     if (!activeLayer.value.tileData) return;
 
     const key = `${gx},${gy}`;
@@ -132,11 +158,14 @@ const paintTile = (e: MouseEvent | PointerEvent, erase = false) => {
 
     if (currentId !== targetId) {
         if (targetId === undefined) {
+             console.log(`[ScenePanel] Deleting Tile at ${gx},${gy}`);
              delete activeLayer.value.tileData[key];
         } else {
              activeLayer.value.tileData[key] = targetId;
         }
+        
         SceneManager.setDirty(true);
+        // Optimized: Only update THIS layer
         eventBus.emit('layer-update', activeLayer.value.id);
     }
 };
@@ -145,16 +174,38 @@ const paintTile = (e: MouseEvent | PointerEvent, erase = false) => {
 // EVENTS
 // ------------------------------------------------------------------
 
+// Helper for Local-to-World Conversion
+const getMouseWorld = (clientX: number, clientY: number) => {
+    // Robust Canvas Offset Calculation
+    let canvasOffsetX = 0;
+    let canvasOffsetY = 0;
+    if (engine.app && engine.app.canvas) {
+        const rect = engine.app.canvas.getBoundingClientRect();
+        canvasOffsetX = rect.left;
+        canvasOffsetY = rect.top;
+    }
+    
+    // Safety check
+    if (!container.value) return { x: 0, y: 0, screenX: clientX - canvasOffsetX, screenY: clientY - canvasOffsetY };
+
+    const mouseX = clientX - canvasOffsetX;
+    const mouseY = clientY - canvasOffsetY;
+    
+    const worldX = (mouseX - cameraX.value) / zoom.value;
+    const worldY = (mouseY - cameraY.value) / zoom.value;
+    
+    return { x: worldX, y: worldY, screenX: mouseX, screenY: mouseY };
+};
+
 const onWheel = (e: WheelEvent) => {
     e.preventDefault();
-    // Immortal Canvas: Stage is Global (0,0). Mouse is Screen Space.
-    const mouseX = e.clientX;
-    const mouseY = e.clientY;
+    
+    const { x: worldX, y: worldY, screenX: mouseX, screenY: mouseY } = getMouseWorld(e.clientX, e.clientY);
 
     const direction = e.deltaY > 0 ? -1 : 1;
     const zoomFactor = Math.max(0.1, zoom.value * 0.1);
     const minZoom = 0.1;
-    const maxZoom = 64.0; // Increased for Pixel Art (8x8)
+    const maxZoom = 64.0; 
     
     const prevZoom = zoom.value;
     let newZoom = prevZoom + (direction * zoomFactor);
@@ -162,37 +213,40 @@ const onWheel = (e: WheelEvent) => {
 
     if (newZoom === prevZoom) return;
 
-    // Zoom Towards Point
-    const worldX = (mouseX - cameraX.value) / prevZoom;
-    const worldY = (mouseY - cameraY.value) / prevZoom;
-
-    // Set Zoom (Store might clamp it further)
-    zoom.value = newZoom;
+    // Zoom Towards Point logic:
+    // We want the World Point under Mouse to stay at the same Screen Point.
+    // Screen = Camera + World * Zoom
+    // Camera_New = Screen - World * Zoom_New
     
-    // Read back actual zoom from store to ensure Camera Math matches Reality
+    zoom.value = newZoom;
     const actualZoom = zoom.value;
 
-    if (actualZoom === prevZoom) {
-        // Zoom didn't change (e.g. hit store limit), don't move camera
-        return;
-    }
+    if (actualZoom === prevZoom) return;
     
     cameraX.value = mouseX - (worldX * actualZoom);
     cameraY.value = mouseY - (worldY * actualZoom);
     
     updateView();
+    updateHighlight(e.clientX, e.clientY);
 };
 
 const onPointerDown = async (e: PointerEvent) => {
     (document.activeElement as HTMLElement)?.blur();
 
-    const rect = (engine.app.canvas as HTMLCanvasElement).getBoundingClientRect();
-    const mouseX = e.clientX - rect.left;
-    const mouseY = e.clientY - rect.top;
+    // Use Helper for consistency
+    const { screenX: mouseX, screenY: mouseY } = getMouseWorld(e.clientX, e.clientY);
 
-    // 1. Gizmo Interaction (Proxy)
-    if (e.buttons === 1 && !e.altKey && !isPainting.value) { // Use e.buttons for PointerEvent
-        // Import dynamically
+    // 1. Painting (HIGHEST PRIORITY)
+    if (isTilemapMode.value && (e.buttons === 1 || e.buttons === 2) && !e.altKey) {
+        isPainting.value = true;
+        const isErase = e.buttons === 2 || tilemapStore.currentTool === 'eraser';
+        paintTile(e, isErase);
+        (e.target as Element).setPointerCapture(e.pointerId);
+        return; 
+    }
+
+    // 2. Gizmo Interaction
+    if (e.buttons === 1 && !e.altKey) { 
         const { instance: gizmoManager } = await import('../gizmos/GizmoManager');
         const { instance: areaSelectionManager } = await import('../managers/AreaSelectionManager');
         const { instance: selectionManager } = await import('../managers/SelectionManager');
@@ -200,58 +254,42 @@ const onPointerDown = async (e: PointerEvent) => {
         const gizmoRes = gizmoManager.processPointerDown(mouseX, mouseY);
         
         if (gizmoRes) {
-            // Gizmo handled the click (e.g. started drag)
-            (e.target as Element).setPointerCapture(e.pointerId); // CAPTURE POINTER
+            (e.target as Element).setPointerCapture(e.pointerId);
             return;
         }
         
-        // 1.5 Selection Logic (Single Click)
         const hitId = selectionManager.hitTest(mouseX, mouseY);
         
         if (hitId) {
             store.selectEntity(hitId);
         } else {
-            // CLICKED EMPTY SPACE -> PREPARE AREA SELECT
             if (!e.shiftKey && !e.ctrlKey) {
                 store.selectEntity(null);
             }
-            
             areaSelectionManager.startDrag(mouseX, mouseY);
-            (e.target as Element).setPointerCapture(e.pointerId); // CAPTURE POINTER
+            (e.target as Element).setPointerCapture(e.pointerId); 
         }
     }
-    
-    // 2. Painting
-    if (isTilemapMode.value && (e.buttons === 1 || e.buttons === 2) && !e.altKey) {
-        isPainting.value = true;
-        const isErase = e.buttons === 2 || tilemapStore.currentTool === 'eraser';
-        // Casting MouseEvent compatibility or verifying paintTile accepts generic Event properties
-        // paintTile uses clientX/Y so PointerEvent is fine.
-        paintTile(e, isErase);
-        (e.target as Element).setPointerCapture(e.pointerId); // CAPTURE POINTER
-        return; 
-    }
 
-    // 3. Panning (Middle or Alt+Left)
-    if (e.buttons === 4 || (e.buttons === 1 && e.altKey)) { // 4 is Middle Mouse in PointerEvent buttons
+    // 3. Panning
+    if (e.buttons === 4 || (e.buttons === 1 && e.altKey)) { 
         isPanning.value = true;
         lastMouseX.value = e.clientX; 
         lastMouseY.value = e.clientY;
         container.value!.style.cursor = 'grabbing';
-        (e.target as Element).setPointerCapture(e.pointerId); // CAPTURE POINTER
+        (e.target as Element).setPointerCapture(e.pointerId); 
     }
 };
 
 const onPointerMove = async (e: PointerEvent) => {
-    const rect = (engine.app.canvas as HTMLCanvasElement).getBoundingClientRect();
-    const sx = e.clientX - rect.left;
-    const sy = e.clientY - rect.top;
+    // Use Helper
+    const { x: worldX, y: worldY, screenX: sx, screenY: sy } = getMouseWorld(e.clientX, e.clientY);
     
     // Proxy to Gizmo
     const { instance: gizmoManager } = await import('../gizmos/GizmoManager');
     gizmoManager.processPointerMove(sx, sy, e.shiftKey);
     
-    // Update Hover State (for Debug Labels)
+    // Update Hover State
     const { instance: selectionManager } = await import('../managers/SelectionManager');
     selectionManager.updateHover(sx, sy);
 
@@ -279,24 +317,25 @@ const onPointerMove = async (e: PointerEvent) => {
     const { instance: areaSelectionManager } = await import('../managers/AreaSelectionManager');
     areaSelectionManager.updateDrag(sx, sy);
     
-    updateHighlight(sx, sy);
+    updateHighlight(e.clientX, e.clientY);
     
     // Debug Update
     debugInfo.value.screen = { x: Math.round(sx), y: Math.round(sy) };
     debugInfo.value.world = { 
-        x: Math.round((sx - cameraX.value)/zoom.value), 
-        y: Math.round((sy - cameraY.value)/zoom.value) 
+        x: Math.round(worldX), 
+        y: Math.round(worldY) 
     };
     
     if (isPainting.value) {
-        const isErase = (e.buttons === 2) || tilemapStore.currentTool === 'eraser'; // buttons bitmask 2 is Right Mouse
-        // paintTile expects MouseEvent but consumes clientX/Y, compatible with PointerEvent
+        const isErase = (e.buttons === 2) || tilemapStore.currentTool === 'eraser'; 
         paintTile(e, isErase);
         return;
     }
 
     if (isPanning.value) {
-        // Delta matches Window movement
+        // Panning logic: Delta Screen -> Delta Camera
+        // Since getMouseWorld returns Canvas Relative, we can use clientX delta safely
+        // But let's use the stored lastMouseX (Global) to match e.clientX (Global)
         const dx = e.clientX - lastMouseX.value;
         const dy = e.clientY - lastMouseY.value;
         
@@ -401,6 +440,12 @@ onMounted(async () => {
          if (preferencesStore.grid.visible) {
              sceneGrid.draw(cameraX.value, cameraY.value, zoom.value, preferencesStore.grid);
          }
+
+         // Initialize Tilemap Highlight
+         highlightGraphics.value = new Graphics();
+         highlightGraphics.value.zIndex = 99999; // Top
+         highlightGraphics.value.eventMode = 'none';
+         engine.app.stage.addChild(highlightGraphics.value);
     }
 });
 

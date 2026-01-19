@@ -3,12 +3,12 @@ import { SceneManager } from '../../engine/managers/SceneManager';
 import { resourceManager } from '../../engine/resources/ResourceManager';
 import { TilemapChunk } from './tilemap/TilemapChunk';
 import { eventBus } from '../../engine/core/EventBus';
+import { instance as engine } from '../../engine/core/Engine';
 
 export class EditorTilemapSystem {
-    private app: Application;
-    private rootContainer: Container;
+    // app removed as it is unused
     
-    // LayerId -> Root Container
+    // LayerId -> Tile Container (Child of RenderSystem Layer Container)
     private layerRoots: Map<string, Container> = new Map();
     
     // LayerId -> ChunkKey -> Chunk
@@ -18,29 +18,35 @@ export class EditorTilemapSystem {
     
     // Dirty flag mapping layerId -> boolean
     private dirtyLayers: Set<string> = new Set();
-    private lastLayerOrderSignature: string = '';
 
-    constructor(app: Application) {
-        this.app = app;
-        // Ensure Z-Sorting is enabled so layers stack correctly
-        this.app.stage.sortableChildren = true;
-        this.rootContainer = new Container();
-        this.rootContainer.label = 'TilemapSystemRoot';
-        this.rootContainer.zIndex = 1; 
-        
-        this.app.stage.addChild(this.rootContainer);
+    constructor(_app: Application) {
+        // No rootContainer anymore. We inject into RenderSystem's containers.
+        // _app unused but kept in signature if needed for interface compliance or future use.
 
         // Reactivity Fix: Listen to SceneManager changes
-        eventBus.on('layer-update', () => {
-            this.markDirty();
+        // Reactivity Fix: Listen to SceneManager changes
+        eventBus.on('layer-update', (layerId?: string) => {
+            if (typeof layerId === 'string') {
+                this.markDirty(layerId);
+            } else {
+                this.markDirty();
+            }
         });
         eventBus.on('scene-loaded', () => {
-             this.rootContainer.removeChildren();
-             this.layerRoots.clear();
-             this.layerChunks.clear();
-             this.textureCache.clear();
+             this.cleanup();
              this.markDirty();
         });
+    }
+
+    private cleanup() {
+        // Destroy all tile containers
+        for (const [, container] of this.layerRoots) {
+            if (container.parent) container.parent.removeChild(container);
+            container.destroy({ children: true });
+        }
+        this.layerRoots.clear();
+        this.layerChunks.clear();
+        this.textureCache.clear();
     }
 
     public markDirty(layerId?: string) {
@@ -53,31 +59,23 @@ export class EditorTilemapSystem {
     }
     
     public update() {
-        // Check if Layer Order changed
-        const currentOrder = SceneManager.layers.map(l => l.id).join(',');
-        if (currentOrder !== this.lastLayerOrderSignature) {
-            this.rebuildLayerOrder();
-            this.lastLayerOrderSignature = currentOrder;
-        }
+        // We don't control Layer Order anymore (RenderSystem does).
+        // We just ensure we have our TileRoots inside them.
 
         // Process Dirty Layers
         this.dirtyLayers.forEach(layerId => {
             this.renderLayer(layerId);
         });
         this.dirtyLayers.clear();
-    }
 
-    private rebuildLayerOrder() {
-        this.rootContainer.removeChildren();
-        
-        for (const layer of SceneManager.layers) {
-            let container = this.layerRoots.get(layer.id);
-            if (!container) {
-                container = new Container();
-                container.label = `TilemapLayer-${layer.name}`;
-                this.layerRoots.set(layer.id, container);
-            }
-            this.rootContainer.addChild(container);
+        // Prune stale layers (if RenderSystem removed them)
+        for (const [layerId, root] of this.layerRoots) {
+             if (!engine.renderSystem.layerContainers.has(layerId)) {
+                 if (root.parent) root.parent.removeChild(root);
+                 root.destroy({ children: true });
+                 this.layerRoots.delete(layerId);
+                 this.layerChunks.delete(layerId);
+             }
         }
     }
 
@@ -85,16 +83,38 @@ export class EditorTilemapSystem {
         const layer = SceneManager.getLayerById(layerId);
         if (!layer) return;
 
-        // Ensure Root Container Exists
-        let layerRoot = this.layerRoots.get(layerId);
-        if (!layerRoot) {
-            layerRoot = new Container();
-            layerRoot.label = `TilemapLayer-${layer.name}`;
-            this.layerRoots.set(layerId, layerRoot);
-            this.rebuildLayerOrder(); // Force re-add
+        // 1. Get Parent Layer Container from RenderSystem
+        const parentContainer = engine.renderSystem.layerContainers.get(layerId);
+        
+        if (!parentContainer) {
+            // RenderSystem might update next frame, retry later?
+            // Or usually RenderSystem updates first? 
+            // We can assume it exists if layer exists, or wait.
+            return;
         }
 
-        // Ensure Chunks Map Exists
+        // 2. Ensure TileRoot Exists
+        let tileRoot = this.layerRoots.get(layerId);
+        if (!tileRoot || tileRoot.destroyed) {
+            tileRoot = new Container();
+            tileRoot.label = `TilemapLayer-${layer.name}`;
+            tileRoot.zIndex = -1; // FORCE BEHIND ENTITIES
+            tileRoot.eventMode = 'passive'; // Allow click-through to background/grid if empty
+            
+            // Add to Parent
+            parentContainer.addChild(tileRoot);
+            this.layerRoots.set(layerId, tileRoot);
+            
+            // Ensure Parent Sorts
+            parentContainer.sortableChildren = true;
+        }
+        
+        // Re-attach if parent changed (unlikely unless RenderSystem rebuilt it)
+        if (tileRoot.parent !== parentContainer) {
+            parentContainer.addChild(tileRoot);
+        }
+
+        // 3. Render Chunks
         // Ensure Chunks Map Exists
         let chunks = this.layerChunks.get(layerId);
         if (!chunks) {
@@ -104,7 +124,7 @@ export class EditorTilemapSystem {
 
         // Check data availability
         if (!layer.tileset) {
-            layerRoot.removeChildren();
+            tileRoot.removeChildren();
             chunks.clear();
             return;
         }
@@ -121,7 +141,7 @@ export class EditorTilemapSystem {
                     this.textureCache.set(layer.tileset, texture);
                 }
             } catch (e) {
-                console.warn(`TilemapSystem: Failed to load texture ${layer.tileset}`, e);
+                console.warn(`[EditorTilemapSystem] Failed to load texture ${layer.tileset}`, e);
                 return;
             }
         }
@@ -132,11 +152,10 @@ export class EditorTilemapSystem {
         const gw = layer.gridSize?.x || 8;
         const gh = layer.gridSize?.y || 8;
 
-        // Step 1: Reset existing chunks (prepare for rebuild)
-        // We do strictly sparse update from tileData
+        // Reset chunks (Partial update if needed, but here simple reset)
         chunks.forEach(c => c.reset());
 
-        // Step 2: Populate Chunks
+        // Populate Chunks
         if (layer.tileData) {
             for (const [key, tileId] of Object.entries(layer.tileData)) {
                 const parts = key.split(',');
@@ -156,12 +175,10 @@ export class EditorTilemapSystem {
                 if (!chunk) {
                     chunk = new TilemapChunk(cx, cy, { x: gw, y: gh }, texture);
                     chunks.set(chunkKey, chunk);
-                    layerRoot.addChild(chunk);
+                    tileRoot.addChild(chunk);
                 }
                 
                 // Local Coords in Chunk
-                // gx could be negative. cx*16 handles base.
-                // lx = gx - cx*16
                 const lx = gx - (cx * chunkSize);
                 const ly = gy - (cy * chunkSize);
                 
@@ -169,25 +186,23 @@ export class EditorTilemapSystem {
             }
         }
 
-        // Step 3: Refresh or Cull
+        // Refresh or Cull
         for (const [key, chunk] of chunks.entries()) {
             if (chunk.isEmpty) {
-                chunk.destroy({ children: true }); // Pixi destroy
+                chunk.destroy({ children: true }); 
                 chunks.delete(key);
-                layerRoot.removeChild(chunk);
+                tileRoot.removeChild(chunk);
             } else {
                 chunk.refresh();
             }
         }
         
-        // Layer Visibility
-        layerRoot.visible = layer.visible !== false;
+        // Visibility handled by Parent Layer Container in RenderSystem
+        // But we can toggle tileRoot specific visibility if needed (e.g. Hide Tiles Only)
+        // For now, it inherits.
     }
     
     public dispose() {
-        this.rootContainer.destroy({ children: true });
-        this.layerRoots.clear();
-        this.layerChunks.clear();
-        this.textureCache.clear();
+        this.cleanup();
     }
 }

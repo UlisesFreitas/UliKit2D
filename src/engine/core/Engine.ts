@@ -5,6 +5,7 @@ import { AudioSystem } from '../audio/AudioSystem';
 import { AnimationSystem } from '../systems/AnimationSystem';
 import { RenderSystem } from '../systems/RenderSystem';
 import { EditorDebugSystem } from '../systems/EditorDebugSystem';
+import { EditorTilemapSystem } from '../../editor/systems/EditorTilemapSystem';
 import { Input } from '../input/InputManager';
 import { Application } from 'pixi.js';
 
@@ -20,6 +21,7 @@ export class Engine {
     public renderSystem: RenderSystem;
     public editorDebugSystem: EditorDebugSystem;
     public physicsDebugSystem: PhysicsDebugSystem;
+    public editorTilemapSystem: EditorTilemapSystem; // Added
 
     public onUpdate: ((deltaTime: number) => void) | null = null;
     public onRender: (() => void) | null = null;
@@ -36,6 +38,7 @@ export class Engine {
         this.renderSystem = new RenderSystem(this.app);
         this.editorDebugSystem = new EditorDebugSystem(this.app);
         this.physicsDebugSystem = new PhysicsDebugSystem(this.app);
+        this.editorTilemapSystem = new EditorTilemapSystem(this.app); // Added
     }
 
     public async init(container: HTMLElement) {
@@ -101,6 +104,9 @@ export class Engine {
 
         // Render Update (Syncs ECS to Pixi)
         this.renderSystem.update();
+        if (this.editorTilemapSystem) {
+             this.editorTilemapSystem.update(); // Added
+        }
         this.physicsDebugSystem.update();
         if (this.editorDebugSystem) {
              this.editorDebugSystem.update();
