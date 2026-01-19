@@ -153,23 +153,29 @@ onMounted(async () => {
                                 { type: 'leaf', data: { views: ['hierarchy'], id: 'group-hierarchy' }, size: 500 },
                                 { type: 'leaf', data: { views: ['assets'], id: 'group-assets' }, size: 200 }
                             ],
-                            size: 365
+                            size: 305
                         },
                         {
                             type: 'branch',
                             data: [
                                 { type: 'leaf', data: { views: ['scene'], id: 'group-scene' }, size: 600 },
-                                { type: 'leaf', data: { views: ['console'], id: 'group-console' }, size: 200 }
+                                {
+                                    type: 'branch',
+                                    data: [
+                                        { type: 'leaf', data: { views: ['console'], id: 'group-console' }, size: 50 },
+                                        { type: 'leaf', data: { views: ['layers'], id: 'group-layers' }, size: 50 }
+                                    ],
+                                    size: 200
+                                }
                             ],
-                            size: 730
+                            size: 850
                         },
                         {
                             type: 'branch',
                             data: [
-                                { type: 'leaf', data: { views: ['inspector'], id: 'group-inspector' }, size: 500 },
-                                { type: 'leaf', data: { views: ['layers'], id: 'group-layers' }, size: 300 }
+                                { type: 'leaf', data: { views: ['inspector'], id: 'group-inspector' }, size: 500 } 
                             ],
-                            size: 365
+                            size: 305
                         }
                     ],
                     size: 800
