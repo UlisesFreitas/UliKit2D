@@ -453,25 +453,25 @@ watch(() => preferencesStore.grid, () => updateView(), { deep: true });
     </div>
 
     <!-- Entity Hover Info Overlay (New) -->
-    <div v-if="hoveredEntityDebug" class="absolute top-4 left-4 bg-black/90 text-white p-2 rounded text-xs z-[101] font-mono pointer-events-none select-none border border-gray-700 shadow-lg">
-        <div class="font-bold text-blue-400 mb-1 border-b border-gray-600 uppercase">{{ hoveredEntityDebug.name }}</div>
+    <div v-if="hoveredEntityDebug" class="absolute top-4 left-4 bg-black/70 text-white p-2 rounded text-xs z-[101] font-mono pointer-events-none select-none border border-gray-700 shadow-lg">
+        <div class="font-bold text-white-400 mb-1 border-b border-gray-600 uppercase">{{ hoveredEntityDebug.name }}</div>
         <div class="grid grid-cols-2 gap-x-4 gap-y-1">
-             <span class="text-gray-400">ID:</span>
+             <span class="text-white-400">ID:</span>
              <span class="truncate max-w-[120px]" :title="hoveredEntityDebug.id">{{ hoveredEntityDebug.id }}</span>
 
-             <span class="text-gray-400">Pos:</span>
-             <span class="text-green-400">{{ hoveredEntityDebug.x }}, {{ hoveredEntityDebug.y }}</span>
+             <span class="text-white-400">Pos:</span>
+             <span class="text-white-400">{{ hoveredEntityDebug.x }}, {{ hoveredEntityDebug.y }}</span>
              
-             <span class="text-gray-400">Layer:</span>
-             <span class="text-yellow-200">{{ hoveredEntityDebug.layer }}</span>
+             <span class="text-white-400">Layer:</span>
+             <span class="text-white-200">{{ hoveredEntityDebug.layer }}</span>
              
-             <span class="text-gray-400">Z-Index:</span>
+             <span class="text-white-400">Z-Index:</span>
              <span>{{ hoveredEntityDebug.zIndex }}</span>
 
-             <span class="text-gray-400">Scale:</span>
+             <span class="text-white-400">Scale:</span>
              <span>{{ hoveredEntityDebug.scaleX }}x, {{ hoveredEntityDebug.scaleY }}x</span>
 
-             <span class="text-gray-400">Rot:</span>
+             <span class="text-white-400">Rot:</span>
              <span>{{ hoveredEntityDebug.rotation }}°</span>
         </div>
     </div>

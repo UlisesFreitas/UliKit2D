@@ -1,14 +1,12 @@
-import { Application, Container, Graphics, Text, TextStyle } from 'pixi.js';
+import { Application, Container, Graphics } from 'pixi.js';
 import { world } from '../ecs/ECS';
-import { instance as selectionManager } from '../../editor/managers/SelectionManager';
-
-
+// Removed Check: selectionManager no longer needed here
 
 export class EditorDebugSystem {
     private app: Application;
     private container: Container;
     private debugGraphics: Map<string, Graphics> = new Map();
-    private debugLabels: Map<string, Text> = new Map();
+    // Removed: debugLabels
 
     constructor(app: Application) {
         this.app = app;
@@ -53,8 +51,7 @@ export class EditorDebugSystem {
                 this.removeGraphics(id);
             }
 
-            // UPDATE DEBUG LABEL
-            this.updateLabel(id, entity);
+            // REMOVED: this.updateLabel(id, entity);
         }
 
         // Cleanup stale graphics
@@ -63,109 +60,9 @@ export class EditorDebugSystem {
                 this.removeGraphics(id);
             }
         }
-        
-        // Cleanup stale labels
-        for (const [id] of this.debugLabels) {
-            if (!activeIds.has(id)) {
-                this.removeLabel(id);
-            }
-        }
     }
 
-    private updateLabel(id: string, entity: any) {
-        // VISIBILITY LOGIC:
-        const isHovered = selectionManager.hoveredEntityId === id;
-    
-        if (!isHovered) {
-            this.removeLabel(id);
-            return;
-        }
-
-        // 1. Calculate Inverse Scale (Essential for Fixed Screen Size)
-        let inverseScale = 1;
-        if (this.container.parent && Math.abs(this.container.parent.scale.x) > 0.001) {
-             inverseScale = 1 / Math.abs(this.container.parent.scale.x);
-        }
-
-        // 2. Manage Container (Stored in debugLabels, cast as any)
-        let labelContainer = this.debugLabels.get(id) as any;
-        
-        // Ensure we have a proper Container (not just a Text or Graphics from previous iterations)
-        if (!labelContainer || !labelContainer.addChild || !labelContainer.label) {
-            if (labelContainer) (labelContainer as any).destroy();
-
-            labelContainer = new Container();
-            labelContainer.eventMode = 'none';
-            labelContainer.label = 'DebugLabelContainer';
-
-            // Background (Graphics)
-            const bg = new Graphics();
-            bg.label = 'bg';
-            
-            // Text
-            const style = new TextStyle({
-                fontFamily: 'Inter, sans-serif',
-                fontSize: 12,
-                fill: '#ffffff',
-                align: 'left',
-            });
-            const text = new Text({ text: '', style });
-            text.label = 'text';
-            text.resolution = 2; // Sharpness
-            
-            labelContainer.addChild(bg);
-            labelContainer.addChild(text);
-            
-            this.container.addChild(labelContainer);
-            this.debugLabels.set(id, labelContainer);
-        }
-
-        // 3. Update Content & Layout
-        const textObj = labelContainer.children.find((c: any) => c.label === 'text') as Text;
-        const bgObj = labelContainer.children.find((c: any) => c.label === 'bg') as Graphics;
-
-        if (!textObj || !bgObj) return;
-
-        const layerName = entity.layer || 'Base Layer';
-        const zIndex = entity.transform.zIndex || 0;
-        const txtContent = `${entity.name || 'Entity'}\nX: ${Math.round(entity.transform.x)} Y: ${Math.round(entity.transform.y)}\nL: ${layerName} Z: ${zIndex}`;
-        
-        if (textObj.text !== txtContent) textObj.text = txtContent;
-
-        // Resize Background to fit Text
-        const padding = 6;
-        const width = textObj.width + padding * 2;
-        const height = textObj.height + padding * 2;
-        
-        bgObj.clear();
-        bgObj.roundRect(0, 0, width, height, 4);
-        bgObj.fill({ color: 0x000000, alpha: 0.75 });
-        bgObj.stroke({ width: 1, color: 0x444444 });
-
-        textObj.position.set(padding, padding);
-        
-        // 4. Transform & Positioning
-        labelContainer.scale.set(inverseScale);
-        
-        // Pivot: Bottom-Center (so it floats ABOVE the anchor)
-        labelContainer.pivot.set(width / 2, height + 10); 
-        
-        // Position: At Entity Center minus vertical offset for Icon Radius * Scale
-        // 32px world offset * scale ensures it clears the Camera Icon
-        const scaleY = entity.transform.scale ? Math.abs(entity.transform.scale.y) : 1;
-        labelContainer.position.set(entity.transform.x, entity.transform.y - (20 * scaleY));
-        
-        // Ensure on top
-        labelContainer.zIndex = 99999;
-    }
-
-    private removeLabel(id: string) {
-        const text = this.debugLabels.get(id);
-        if (text) {
-            text.destroy();
-            this.debugLabels.delete(id);
-        }
-    }
+    // Removed updateLabel / removeLabel
 
     public onEntityClicked: ((id: string) => void) | null = null;
     
