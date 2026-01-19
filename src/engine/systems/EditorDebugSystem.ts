@@ -150,9 +150,10 @@ export class EditorDebugSystem {
         // Pivot: Bottom-Center (so it floats ABOVE the anchor)
         labelContainer.pivot.set(width / 2, height + 10); 
         
-        // Position: At Entity Center minus vertical offset for Icon Radius
-        // 32px world offset ensures it clears the Camera Icon even at high zoom
-        labelContainer.position.set(entity.transform.x, entity.transform.y - 12);
+        // Position: At Entity Center minus vertical offset for Icon Radius * Scale
+        // 32px world offset * scale ensures it clears the Camera Icon
+        const scaleY = entity.transform.scale ? Math.abs(entity.transform.scale.y) : 1;
+        labelContainer.position.set(entity.transform.x, entity.transform.y - (20 * scaleY));
         
         // Ensure on top
         labelContainer.zIndex = 99999;
