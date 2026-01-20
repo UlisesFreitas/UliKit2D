@@ -116,10 +116,9 @@ export const useLayoutStore = defineStore('layout', () => {
     };
 
     const resetToDefault = () => {
-        if (confirm('Reset to Default Layout? This will reload the editor.')) {
-            localStorage.removeItem(LAYOUT_KEY);
-            window.location.reload();
-        }
+        localStorage.removeItem(LAYOUT_KEY);
+        // Reload to apply
+        window.location.reload();
     };
 
     const togglePanel = (id: string, title?: string) => {

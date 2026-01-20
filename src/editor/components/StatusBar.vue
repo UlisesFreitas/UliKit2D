@@ -17,10 +17,6 @@
 
     <!-- Right: Editor Info -->
     <div class="flex items-center gap-4">
-      <button @click="resetLayout" class="hover:text-accent-color transition-colors" title="Reset UI Layout">
-          Reset Layout
-      </button>
-      <span class="text-border">|</span>
       <span>UTF-8</span>
       <span>TypeScript</span>
       <span class="text-blue-400">Ver 0.0.1</span>
@@ -31,14 +27,6 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import { projectState } from '../managers/ProjectManager';
-import { useLayoutStore } from '../../stores/useLayoutStore';
-
-const resetLayout = () => {
-    if (confirm('Reset editor layout to default? This will reload the editor.')) {
-        useLayoutStore().resetToDefault();
-    }
-};
-
 const displayPath = computed(() => {
     const p = projectState.currentProjectPath;
     if (!p) return '';

@@ -16,10 +16,9 @@
       <div 
         v-for="(layer, index) in reversedLayers" 
         :key="layer.id"
-        class="layer-item flex items-center justify-between p-2 rounded cursor-pointer group select-none transition-colors border border-transparent"
+        class="layer-item flex items-center justify-between p-2 rounded cursor-pointer group select-none transition-colors border border-transparent bg-bg-hover"
         :class="{ 
-            'bg-bg-hover border-accent-primary': selectedLayerId === layer.id,
-            'hover:bg-bg-hover': selectedLayerId !== layer.id,
+            'border-accent-primary': selectedLayerId === layer.id,
             'opacity-50 dashed-border': draggingIndex === index
         }"
         @click="selectLayer(layer.id)"
@@ -46,7 +45,7 @@
                 @click.stop="selectLayer(layer.id)"
                 title="Active Layer"
              >
-                <div class="w-3 h-3 rounded-full border border-text-disabled flex items-center justify-center transition-colors"
+                <div class="w-3 h-3 rounded-full border border-text-secondary bg-bg-input flex items-center justify-center transition-colors"
                      :class="{'bg-accent-color border-accent-color': selectedLayerId === layer.id}">
                      <div v-if="selectedLayerId === layer.id" class="w-1.5 h-1.5 bg-white rounded-full"></div>
                 </div>

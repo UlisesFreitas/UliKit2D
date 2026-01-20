@@ -43,6 +43,14 @@ const onNewProject = async () => {
 const onOpenProject = () => ProjectManager.openProject();
 const onSaveProject = () => ProjectManager.saveProject();
 const onExit = () => window.close(); // Simple mock
+const onResetLayout = async () => {
+    if (await ui.confirm({
+        title: 'Reset Layout',
+        message: 'Do you really want to reset the current layout?\nThe project will reload and unsaved changes may be lost.\nPlease ensure you save your changes first.'
+    })) {
+        layoutStore.resetToDefault();
+    }
+};
 
 import { EntityFactory, type EntityType } from '../../engine/factories/EntityFactory';
 import { instance as engine } from '../../engine/core/Engine';
@@ -267,7 +275,7 @@ const createAsset = (type: EntityType) => {
                              </MenubarSub>
 
                              <MenubarSeparator class="menu-separator" />
-                             <MenubarItem class="menu-item" @select="layoutStore.resetToDefault()">Default Layout</MenubarItem>
+                             <MenubarItem class="menu-item" @select="onResetLayout">Default Layout</MenubarItem>
                          </MenubarContent>
                     </MenubarPortal>
                 </MenubarMenu>
