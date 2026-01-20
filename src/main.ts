@@ -13,7 +13,8 @@ if ((window as any).electronAPI) {
 } else {
     setFileSystem(new WebFileSystem());
 }
-
+import './editor/managers/ClipboardManager';
+import './editor/managers/ShortcutManager';
 const app = createApp(App);
 const pinia = createPinia();
 app.use(pinia);

@@ -23,6 +23,10 @@ export interface IProjectSettings {
     tags: string[];
     layers: string[];
     layouts: Record<string, any>;
+    editor: {
+        historyMaxSteps: number;
+        historyMaxBytes: number; // 0 = unlimited? or standard 10MB
+    };
 }
 
 const DEFAULT_SETTINGS: IProjectSettings = {
@@ -44,7 +48,11 @@ const DEFAULT_SETTINGS: IProjectSettings = {
     },
     tags: ['Player', 'Enemy', 'Ground'],
     layers: ['Default', 'UI', 'Player', 'Background'],
-    layouts: {}
+    layouts: {},
+    editor: {
+        historyMaxSteps: 50,
+        historyMaxBytes: 10485760 // 10MB
+    }
 };
 
 export const useProjectSettingsStore = defineStore('projectSettings', () => {

@@ -12,6 +12,7 @@ const entities = ref<Entity[]>([]);
 const collapsedScene = ref(false);
 
 const updateList = () => {
+    console.log('[HierarchyPanel] updateList called. World Count:', world.entities.length);
     // Create shallow copies to force Vue reactivity update since entity objects are not reactive
     entities.value = world.entities.map(e => ({ ...e }));
 };
@@ -49,12 +50,15 @@ onMounted(() => {
     
     // Listen for manual updates (from Inspector)
     eventBus.on('entity-updated', updateList);
+    // Also listen for selection changes as they might accompany deletions
+    eventBus.on('selection-changed', updateList);
 });
 
 onUnmounted(() => {
     if (unsubAdd) unsubAdd();
     if (unsubRemove) unsubRemove();
     eventBus.off('entity-updated', updateList);
+    eventBus.off('selection-changed', updateList);
 });
 
 const select = (id: string | undefined) => {

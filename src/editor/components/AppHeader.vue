@@ -16,6 +16,7 @@ import {
 import { ProjectManager, projectState } from '../managers/ProjectManager';
 import { useEditorStore } from '../../stores/useEditorStore';
 import { ThemeManager } from '../managers/ThemeManager';
+import { instance as clipboard } from '../managers/ClipboardManager';
 import { useUIStore } from '../../stores/useUIStore';
 import { useLayoutStore } from '../../stores/useLayoutStore';
 import GridSettingsModal from './modals/GridSettingsModal.vue';
@@ -212,10 +213,10 @@ const createAsset = (type: EntityType) => {
                                 Redo <div class="ml-auto text-xs text-gray-500">Ctrl+Y</div>
                             </MenubarItem>
                             <MenubarSeparator class="menu-separator" />
-                            <MenubarItem class="menu-item" @select="editorStore.copy">
+                            <MenubarItem class="menu-item" @select="clipboard.copy()">
                                 Copy <div class="ml-auto text-xs text-gray-500">Ctrl+C</div>
                             </MenubarItem>
-                             <MenubarItem class="menu-item" @select="editorStore.paste">
+                             <MenubarItem class="menu-item" @select="clipboard.paste()">
                                 Paste <div class="ml-auto text-xs text-gray-500">Ctrl+V</div>
                             </MenubarItem>
                         </MenubarContent>
@@ -246,6 +247,7 @@ const createAsset = (type: EntityType) => {
                              <MenubarItem class="menu-item" @select="layoutStore.togglePanel('console', 'Console')">Console</MenubarItem>
                              <MenubarItem class="menu-item" @select="layoutStore.togglePanel('inspector', 'Inspector')">Inspector</MenubarItem>
                              <MenubarItem class="menu-item" @select="layoutStore.togglePanel('layers', 'Layers')">Layers</MenubarItem>
+                             <MenubarItem class="menu-item" @select="layoutStore.togglePanel('history', 'History')">History</MenubarItem>
                              <MenubarSeparator class="menu-separator" />
                              <MenubarItem class="menu-item" @select="layoutStore.openPanel('tilemap-settings', 'Tilemap Settings')">
                                 Tilemap Settings
@@ -353,6 +355,15 @@ const createAsset = (type: EntityType) => {
                     title="Toggle Layers"
                 >
                      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 2 7 12 12 22 7 12 2"></polygon><polyline points="2 17 12 22 22 17"></polyline><polyline points="2 12 12 17 22 12"></polyline></svg>
+                </button>
+                <!-- History -->
+                <button 
+                    class="p-1 rounded transition-colors"
+                    :class="layoutStore.isPanelOpen('history') ? 'text-accent-color bg-bg-selection' : 'text-text-disabled hover:text-text-primary'"
+                    @click="layoutStore.togglePanel('history', 'History')" 
+                    title="Toggle History"
+                >
+                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 8v4l3 3m6-3a9 9 0 1 1-18 0 9 9 0 0 1 18 0z" /></svg>
                 </button>
             </div>
 

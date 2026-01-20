@@ -124,9 +124,9 @@ export const useLayoutStore = defineStore('layout', () => {
     const togglePanel = (id: string, title?: string) => {
         if (!dockApi.value) return;
         
-        const panel = dockApi.value.panels.find((p: any) => p.id === id);
+        const panel = dockApi.value.getPanel(id);
         
-        if (panel && panel.api) {
+        if (panel) {
             panel.api.close();
         } else {
             openPanel(id, title || id);
@@ -136,7 +136,7 @@ export const useLayoutStore = defineStore('layout', () => {
     const openPanel = (id: string, title: string = 'Panel') => {
         if (!dockApi.value) return;
         
-        const panel = dockApi.value.panels.find((p: any) => p.id === id);
+        const panel = dockApi.value.getPanel(id);
         if (panel) {
             panel.focus();
             return;
@@ -173,6 +173,14 @@ export const useLayoutStore = defineStore('layout', () => {
             case 'layers':
                 position = { referencePanel: 'inspector', direction: 'below' };
                  if (!dockApi.value.getPanel('inspector')) position = { direction: 'right' };
+                break;
+            case 'history':
+                position = { referencePanel: 'layers', direction: 'within' };
+                if (!dockApi.value.getPanel('layers')) {
+                     const inspector = dockApi.value.getPanel('inspector');
+                     if (inspector) position = { referencePanel: 'inspector', direction: 'below' };
+                     else position = { direction: 'right' };
+                }
                 break;
         }
 

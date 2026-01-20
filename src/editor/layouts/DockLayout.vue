@@ -11,6 +11,7 @@ import InspectorPanel from '../panels/InspectorPanel.vue';
 import ConsolePanel from '../panels/ConsolePanel.vue';
 import AssetsPanel from '../panels/AssetsPanel.vue';
 import HierarchyPanel from '../panels/HierarchyPanel.vue';
+import HistoryPanel from '../panels/HistoryPanel.vue';
 import TilemapSettingsPanel from '../panels/TilemapSettingsPanel.vue';
 import StatusBar from '../components/StatusBar.vue';
 
@@ -126,6 +127,7 @@ onMounted(async () => {
                 case 'console': return new VuePanelRenderer(ConsolePanel);
                 case 'assets': return new VuePanelRenderer(AssetsPanel);
                 case 'hierarchy': return new VuePanelRenderer(HierarchyPanel);
+                case 'history': return new VuePanelRenderer(HistoryPanel);
                 case 'tilemap-settings': return new VuePanelRenderer(TilemapSettingsPanel);
                 default: 
                     return new VuePanelRenderer(GenericPanel, { text: `Panel: ${options.id}` });
@@ -162,7 +164,7 @@ onMounted(async () => {
                                 {
                                     type: 'branch',
                                     data: [
-                                        { type: 'leaf', data: { views: ['console'], id: 'group-console' }, size: 50 },
+                                        { type: 'leaf', data: { views: ['console', 'history'], id: 'group-console' }, size: 50 },
                                         { type: 'leaf', data: { views: ['layers'], id: 'group-layers' }, size: 50 }
                                     ],
                                     size: 200
@@ -191,7 +193,8 @@ onMounted(async () => {
                 'scene': { id: 'scene', title: 'Scene View', component: 'scene', contentComponent: 'scene', params: { closable: false, locked: true } },
                 'console': { id: 'console', title: 'Console', component: 'console', contentComponent: 'console' },
                 'inspector': { id: 'inspector', title: 'Inspector', component: 'inspector', contentComponent: 'inspector' },
-                'layers': { id: 'layers', title: 'Layers', component: 'layers', contentComponent: 'layers' }
+                'layers': { id: 'layers', title: 'Layers', component: 'layers', contentComponent: 'layers' },
+                'history': { id: 'history', title: 'History', component: 'history', contentComponent: 'history' }
             },
             activeGroup: 'group-scene'
         } as any);

@@ -23,7 +23,7 @@ const emit = defineEmits<{
 
 const store = useProjectSettingsStore();
 const ui = useUIStore();
-const activeTab = ref<'general' | 'display' | 'physics' | 'tags' | 'layouts'>('general');
+const activeTab = ref<'general' | 'display' | 'physics' | 'editor' | 'tags' | 'layouts'>('general');
 
 const onClose = () => {
     if (store.isDirty) {
@@ -66,7 +66,7 @@ const onApply = () => {
                     <!-- Sidebar Tabs -->
                     <div class="w-48 border-r border-border bg-bg-base/50 flex flex-col py-2">
                         <button 
-                            v-for="tab in ['General', 'Display', 'Physics', 'Tags & Layers', 'Layouts']"
+                            v-for="tab in ['General', 'Display', 'Physics', 'Editor', 'Tags & Layers', 'Layouts']"
                             :key="tab"
                             @click="activeTab = (tab.split(' ')[0] || '').toLowerCase() as any"
                             class="px-4 py-2 text-left text-sm transition-colors border-l-2"
@@ -158,6 +158,28 @@ const onApply = () => {
                                 <label for="debugDraw" class="text-sm">Enable Debug Draw (Colliders)</label>
                             </div>
                         </div>
+
+                        <!-- EDITOR TAB -->
+                         <div v-if="activeTab === 'editor'" class="space-y-4 animate-fade-in">
+                             <h3 class="text-lg font-bold text-accent mb-4">Editor Configuration</h3>
+                             
+                             <div class="flex flex-col gap-4 p-4 bg-bg-panel rounded border border-border">
+                                <h4 class="text-sm font-bold text-text-primary border-b border-border pb-2 mb-2">Command History (Undo/Redo)</h4>
+                                
+                                <div class="grid grid-cols-2 gap-4">
+                                    <div class="flex flex-col gap-1">
+                                        <label class="text-xs text-text-secondary">Max Steps</label>
+                                        <input v-model.number="store.settings.editor.historyMaxSteps" type="number" min="1" max="1000" class="bg-bg-input border border-border rounded px-3 py-1.5 text-sm text-text-primary outline-none focus:border-accent transition-colors" />
+                                        <p class="text-[10px] text-text-secondary opacity-70">Maximum number of undo steps stored.</p>
+                                    </div>
+                                    <div class="flex flex-col gap-1">
+                                        <label class="text-xs text-text-secondary">Max Bytes (Approx)</label>
+                                        <input v-model.number="store.settings.editor.historyMaxBytes" type="number" min="0" class="bg-bg-input border border-border rounded px-3 py-1.5 text-sm text-text-primary outline-none focus:border-accent transition-colors" />
+                                         <p class="text-[10px] text-text-secondary opacity-70">Soft limit in bytes (0 = Unlimited). Currently unused.</p>
+                                    </div>
+                                </div>
+                             </div>
+                         </div>
 
                         <!-- TAGS TAB -->
                         <div v-if="activeTab === 'tags'" class="space-y-4 animate-fade-in">

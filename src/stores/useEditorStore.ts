@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia';
 import { ref } from 'vue';
-import { CommandManager } from '../editor/commands/CommandManager';
+import { instance as commandManager } from '../editor/commands/CommandManager';
 import type { ICommand } from '../editor/commands/ICommand';
 import { world } from '../engine/ecs/ECS';
 import { SceneManager } from '../engine/managers/SceneManager';
@@ -12,7 +12,7 @@ export const useEditorStore = defineStore('editor', () => {
     const selectedEntityIds = ref<string[]>([]); // Multi-selection support
 
     // Command System
-    const commandManager = new CommandManager();
+    // Used singleton imported above
 
     // Actions
     const selectEntity = (id: string | null) => {
@@ -104,56 +104,14 @@ export const useEditorStore = defineStore('editor', () => {
          }
     };
 
-    const copy = () => {
-        if (!selectedEntityId.value) return;
-        
-        const entity = world.where(e => e.id === selectedEntityId.value).first;
-        if (entity) {
-             // Deep Clone & strip runtime data
-             const data = {
-                 name: entity.name,
-                 transform: { ...entity.transform }, // Clone transform
-                 sprite: entity.sprite ? { ...entity.sprite } : undefined,
-                 rigidBody: entity.rigidBody ? { ...entity.rigidBody } : undefined,
-                 boxCollider: entity.boxCollider ? { ...entity.boxCollider } : undefined,
-                 circleCollider: entity.circleCollider ? { ...entity.circleCollider } : undefined,
-                 camera: entity.camera ? { ...entity.camera } : undefined,
-                 audioSource: entity.audioSource ? { ...entity.audioSource } : undefined,
-                 label: entity.label ? { ...entity.label } : undefined,
-                 bitmapText: entity.bitmapText ? { ...entity.bitmapText } : undefined,
-                 nineSliceSprite: entity.nineSliceSprite ? { ...entity.nineSliceSprite } : undefined,
-                 polygonCollider: entity.polygonCollider ? { ...entity.polygonCollider } : undefined,
-                 animator: entity.animator ? JSON.parse(JSON.stringify(entity.animator)) : undefined,
-                 script: entity.script && Array.isArray(entity.script) ? entity.script.map(s => ({...s})) : undefined
-             };
-             clipboardData.value = data;
-             console.log('Copied Entity', data);
-        }
+    const clearSelection = () => {
+        selectedEntityId.value = null;
+        selectedEntityIds.value = [];
     };
 
-    const paste = () => {
-        if (!clipboardData.value) return;
-        
-        const data = clipboardData.value;
-        // Create new ID
-        const newId = crypto.randomUUID();
-        
-        // Offset position slightly
-        const newTransform = { ...data.transform };
-        if (newTransform) {
-            newTransform.x += 20;
-            newTransform.y += 20;
-        }
-
-        world.add({
-            id: newId,
-            ...data,
-            name: `${data.name} (Copy)`,
-            transform: newTransform
-        });
-        
-        // Select the new entity
-        // selectEntity(newId);
+    const selectAll = () => {
+        const ids = world.entities.map(e => e.id).filter((id): id is string => !!id);
+        selectEntities(ids);
     };
 
     // Layer Selection
@@ -175,9 +133,9 @@ export const useEditorStore = defineStore('editor', () => {
         redo,
         canUndo: commandManager.canUndo,
         canRedo: commandManager.canRedo,
-        copy,
-        paste,
         clipboardData,
+        clearSelection,
+        selectAll,
         playGame,
         stopGame,
         isPlaying,

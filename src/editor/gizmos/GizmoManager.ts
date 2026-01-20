@@ -3,6 +3,8 @@ import { useEditorStore } from '../../stores/useEditorStore';
 import { world, type Entity } from '../../engine/ecs/ECS';
 import { instance as engine } from '../../engine/core/Engine';
 import { eventBus } from '../../engine/core/EventBus';
+import { instance as commandManager } from '../commands/CommandManager';
+import { TransformCommand } from '../commands/TransformCommand';
 
 type HandleType = 'center' | 'rotate' | 'nw' | 'ne' | 'sw' | 'se' | 'n' | 's' | 'w' | 'e' | null;
 
@@ -162,8 +164,32 @@ export class GizmoManager {
         if (this.isDragging) {
             this.isDragging = false;
             this.dragHandle = null;
-            // Emit change end for all
-            if (this.primaryEntity && this.primaryEntity.id) {
+
+            // Check for changes and Create Command
+            if (this.primaryEntity && this.primaryEntity.id && this.primaryEntity.transform) {
+                const start = this.startStates.get(this.primaryEntity.id);
+                if (start) {
+                    const t = this.primaryEntity.transform;
+                    // Check if anything actually changed
+                    if (Math.abs(t.x - start.x) > 0.001 || 
+                        Math.abs(t.y - start.y) > 0.001 || 
+                        Math.abs(t.scale.x - start.scaleX) > 0.001 || 
+                        Math.abs(t.scale.y - start.scaleY) > 0.001 || 
+                        Math.abs(t.rotation - start.rotation) > 0.001) {
+                        
+                        // Create Command
+                        const cmd = new TransformCommand(
+                            this.primaryEntity.id,
+                            { x: start.x, y: start.y, scaleX: start.scaleX, scaleY: start.scaleY, rotation: start.rotation },
+                            { x: t.x, y: t.y, scaleX: t.scale.x, scaleY: t.scale.y, rotation: t.rotation },
+                            'Transform Entity'
+                        );
+                        
+                        console.log('[GizmoManager] Transform Changed. Recording Command:', cmd);
+                        commandManager.execute(cmd);
+                    }
+                }
+
                 eventBus.emit('entity-change-end', this.primaryEntity.id);
             }
         }
