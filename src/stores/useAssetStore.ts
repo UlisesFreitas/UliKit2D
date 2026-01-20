@@ -86,16 +86,47 @@ export const useAssetStore = defineStore('assets', () => {
         }
     };
 
+    const normalizedCurrentPath = computed(() => {
+        return normalizePath(currentPath.value);
+    });
+
     const currentPath = ref<string>('');
+
+    // State for View Options
+    const zoomLevel = ref<number>(1); // 0=List, 1=Small, 2=Medium, 3=Large
+    const searchQuery = ref<string>('');
+    const sortOrder = ref<'asc' | 'desc'>('asc');
+    const expandedFolders = ref<Set<string>>(new Set());
+
+    const toggleFolder = (path: string) => {
+        if (expandedFolders.value.has(path)) {
+            expandedFolders.value.delete(path);
+        } else {
+            expandedFolders.value.add(path);
+        }
+    }
+
+    const setZoom = (level: number) => {
+        zoomLevel.value = Math.max(0, Math.min(3, level));
+    }
 
     // Computed: visibleFiles
     // We filter `files` to show only those in `currentPath`
     // We assume paths use '/' or '\' separators. We normalize to '/'.
     const visibleFiles = computed(() => {
         const normCurrent = normalizePath(currentPath.value);
+        const query = searchQuery.value.toLowerCase().trim();
         
-        return files.value.filter(file => {
+        let result = files.value.filter(file => {
             const normPath = normalizePath(file.path);
+            
+            // SEARCH MODE
+            if (query) {
+                // In search mode, match filename against query regardless of folder
+                return file.type === 'file' && file.name.toLowerCase().includes(query);
+            }
+
+            // NORMAL NAVIGATION MODE
             
             // Filter 1: Must start with current path (if current is not empty)
             if (normCurrent && !normPath.startsWith(normCurrent + '/')) {
@@ -120,12 +151,30 @@ export const useAssetStore = defineStore('assets', () => {
 
             return true;
         });
+
+        // SORTING
+        result.sort((a, b) => {
+            // Folders always first
+            if (a.type !== b.type) {
+                return a.type === 'directory' ? -1 : 1;
+            }
+            // Then Sort by Name
+            const nameA = a.name.toLowerCase();
+            const nameB = b.name.toLowerCase();
+            if (nameA < nameB) return sortOrder.value === 'asc' ? -1 : 1;
+            if (nameA > nameB) return sortOrder.value === 'asc' ? 1 : -1;
+            return 0;
+        });
+
+        return result;
     });
 
     const normalizePath = (p: string) => p.replace(/\\/g, '/');
 
     const changeDirectory = (path: string) => {
         currentPath.value = path;
+        searchQuery.value = ''; // Clear search on navigation
+        expandedFolders.value.add(path); // Auto-expand current
     };
 
     const goUp = () => {
@@ -133,14 +182,21 @@ export const useAssetStore = defineStore('assets', () => {
         const parts = normalizePath(currentPath.value).split('/');
         parts.pop();
         currentPath.value = parts.join('/');
+        searchQuery.value = ''; // Clear search on navigation
     };
 
     return {
         files,
         currentPath,
         visibleFiles,
+        zoomLevel,
+        searchQuery,
+        sortOrder,
+        expandedFolders,
         initWatcher,
         changeDirectory,
-        goUp
+        goUp,
+        setZoom,
+        toggleFolder
     };
 });
