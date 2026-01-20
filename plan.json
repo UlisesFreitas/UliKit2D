@@ -1,6 +1,6 @@
 {
   "name": "UliKit2D Game Engine Roadmap",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "phases": [
     {
       "id": "1",
@@ -37,104 +37,65 @@
     },
     {
       "id": "4",
-      "name": "Editor Logic & Interactivity",
-      "status": "completed",
+      "name": "Interaction & History System (Critical)",
+      "status": "in_progress",
+      "description": "Robust Undo/Redo, Clipboard, and Gizmo interaction.",
       "tasks": [
-        "Implement Selection Manager",
-        "Implement Transform Gizmos (Translate, Rotate, Scale)",
-        "Implement Command System (Undo/Redo)",
-        "Implement Clipboard (Cut/Copy/Paste)"
+        "Implement HistoryPanel UI",
+        "Refactor CommandManager for History Visualization",
+        "Integrate TransformCommand in GizmoManager",
+        "Implement ClipboardManager (Cut/Copy/Paste Entities)",
+        "Ensure Global Keyboard Shortcuts (Ctrl+Z, Ctrl+Y, Ctrl+C, Ctrl+V, Delete)",
+        "Fix Gizmo Scaling (Negative Scales/Flipping & Center Scaling)"
       ]
     },
     {
       "id": "5",
-      "name": "Asset & Project Management",
-      "status": "completed",
+      "name": "Editor Debug System 2.0",
+      "status": "pending",
+      "description": "Centralized control for all visual debugging tools.",
       "tasks": [
-        "Implement File Watcher (Chokidar)",
-        "Create Asset Loader/Parser map",
-        "Implement Drag & Drop Import"
+        "Refactor EditorDebugSystem to use Layers/Channels",
+        "Implement Collider Visualization (Box, Circle, Polygon)",
+        "Implement Physics Body Visualization (Velocity Vectors, Centers)",
+        "Implement Camera Frustum Visualization",
+        "Implement Origin/Pivot Point Visualization",
+        "Create Debug Toolbar (Toggle Visibility of each layer)"
       ]
     },
     {
       "id": "6",
-      "name": "Game Logic & Scripting",
-      "status": "completed",
+      "name": "Project Settings & Architecture",
+      "status": "pending",
+      "description": "Essential configuration for a shipping game.",
       "tasks": [
-        "Implement Script Component",
-        "Setup Hot Reload for User Scripts",
-        "Play/Stop/Pause Simulation Stats"
+        "Implement Input Manager Editor (Map Keys to Actions)",
+        "Implement Audio Manager Editor (Channels, Buses)",
+        "Implement Physics Settings (Gravity, Layers/Masks Matrix)",
+        "Asset Management 2.0 (Meta files, Import Settings)"
       ]
     },
     {
       "id": "7",
-      "name": "UI Overhaul & Project Structure",
-      "status": "completed",
+      "name": "Inspector Overhaul (Live Mode)",
+      "status": "pending",
+      "description": "Make the editor feel alive and reactive.",
       "tasks": [
-        "Implement Application Menu (File, Edit, etc.)",
-        "Move Toolbar to Scene Panel",
-        "Implement Status Bar",
-        "Project Management (Open/New Project)"
+        "Implement 'Live Mode' for Inspectors (Poll values if Game Running)",
+        "Add Script Parameter Parsing (AST based properties in Inspector)",
+        "Standardize all Inspectors to emit Commands (Undoable)",
+        "Refactor Color Pickers and Input Fields for UX"
       ]
     },
     {
       "id": "8",
-      "name": "Asset Management 2.0",
-      "status": "completed",
-      "tasks": [
-        "Implement Folder Navigation (Enter/Up)",
-        "Breadcrumbs Navigation",
-        "Create Folder / Rename Asset",
-        "Context Menu (Right-click actions)",
-        "Drag & Drop into specific folders"
-      ]
-    },
-    {
-      "id": "9",
-      "name": "Scene Tools",
-      "status": "complete",
-      "description": "Refactor Tilemap to use Chunk-based Mesh rendering.",
-      "implementation_steps": [
-        "Create TilemapChunk class",
-        "Integrate with EditorTilemapSystem",
-        "Debug Rendering"
-      ]
-    },
-    {
-      "id": "10",
-      "name": "Vital Components Implementation",
+      "name": "Advanced Features",
       "status": "pending",
       "tasks": [
-        "Implement AudioSource Component & System",
-        "Implement Text/Label Component & System",
-        "Implement Sprite Animator Component",
-        "Implement Tilemap Component & Editor",
-        "Implement Input Manager System",
-        "Implement Physics Shapes (CircleCollider)",
-        "Implement Z-Index / Layer Sorting",
-        "Implement Runtime Scene Switching"
-      ]
-    },
-    {
-      "id": "11",
-      "name": "Advanced Scripting System (Scripting 2.0)",
-      "status": "pending",
-      "tasks": [
-        "Implement AST-based Script Parsing (acorn/typescript)",
-        "Strict Script Lifecycle (onEnable, onDisable, onDestroy)",
-        "Support for TypeScript Scripts & Compilation",
-        "Script Properties Decorators or Metadata"
-      ]
-    },
-    {
-      "id": "12",
-      "name": "Visual Scripting System (Event Sheets)",
-      "status": "pending",
-      "tasks": [
-        "Design Event Block Data Structure (JSON)",
-        "Create Visual Block Editor (Drag & Drop)",
-        "Implement 'Block to JS' Transpiler",
-        "Integrate Event Sheets as 'Script Components'"
+        "Tilemap Chunking & Optimization",
+        "Visual Scripting (Event Sheets)",
+        "Prefabs / Templates System",
+        "Build/Export System (Electron Builder)"
       ]
     }
   ]
