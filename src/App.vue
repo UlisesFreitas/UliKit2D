@@ -30,6 +30,12 @@ onMounted(async () => {
     } catch (e) {
         console.error('Failed to load default font:', e);
     }
+    // 3. Global Context Menu Handling
+    window.addEventListener('contextmenu', (e) => {
+        // Prevent Native Context Menu Globally (for custom menu implementation)
+        e.preventDefault();
+    });
+
 });
 </script>
 

@@ -153,7 +153,7 @@ const deleteEntity = () => {
     if (entity) {
         world.remove(entity);
         if (editorStore.selectedEntityId === id) {
-            // editorStore.selectEntity('');
+            editorStore.selectEntity(null);
         }
     }
     updateList();
