@@ -42,10 +42,13 @@
       "description": "Robust Undo/Redo, Clipboard, and Gizmo interaction.",
       "tasks": [
         "Implement HistoryPanel UI",
+        "Add History panel to Layout in AppHeader",
+        "HistoryPanel doesn't need to be in Layout at app start in DockView, it can be opened from the menu.",
         "Refactor CommandManager for History Visualization",
         "Integrate TransformCommand in GizmoManager",
         "Implement ClipboardManager (Cut/Copy/Paste Entities)",
         "Ensure Global Keyboard Shortcuts (Ctrl+Z, Ctrl+Y, Ctrl+C, Ctrl+V, Delete)",
+        "Add functionality of ClipboardManager in AppHeader Edit menu",
         "Fix Gizmo Scaling (Negative Scales/Flipping & Center Scaling)"
       ]
     },
