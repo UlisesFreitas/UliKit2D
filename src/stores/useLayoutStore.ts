@@ -124,7 +124,7 @@ export const useLayoutStore = defineStore('layout', () => {
     const togglePanel = (id: string, title?: string) => {
         if (!dockApi.value) return;
         
-        const panel = dockApi.value.getPanel(id);
+        const panel = dockApi.value.panels.find((p: any) => p.id === id);
         
         if (panel) {
             panel.api.close();
@@ -136,7 +136,7 @@ export const useLayoutStore = defineStore('layout', () => {
     const openPanel = (id: string, title: string = 'Panel') => {
         if (!dockApi.value) return;
         
-        const panel = dockApi.value.getPanel(id);
+        const panel = dockApi.value.panels.find((p: any) => p.id === id);
         if (panel) {
             panel.focus();
             return;
@@ -149,37 +149,53 @@ export const useLayoutStore = defineStore('layout', () => {
                  position = { direction: 'left' }; 
                  break;
             case 'hierarchy':
-                position = { referencePanel: 'scenes', direction: 'below' };
-                if (!dockApi.value.getPanel('scenes')) position = { direction: 'left' };
+                if (dockApi.value.panels.find((p: any) => p.id === 'scenes')) {
+                     position = { referencePanel: 'scenes', direction: 'below' };
+                } else {
+                     position = { direction: 'left' };
+                }
                 break;
             case 'assets':
-                position = { referencePanel: 'hierarchy', direction: 'below' };
-                 if (!dockApi.value.getPanel('hierarchy')) position = { direction: 'left' };
+                if (dockApi.value.panels.find((p: any) => p.id === 'hierarchy')) {
+                    position = { referencePanel: 'hierarchy', direction: 'below' };
+                } else {
+                    position = { direction: 'left' };
+                }
                 break;
             case 'console':
-                position = { referencePanel: 'scene', direction: 'below' };
-                 if (!dockApi.value.getPanel('scene')) position = { direction: 'below' };
+                if (dockApi.value.panels.find((p: any) => p.id === 'scene')) {
+                    position = { referencePanel: 'scene', direction: 'below' };
+                } else {
+                    position = { direction: 'below' }; // Fallback to root or active
+                }
                 break;
             case 'scene':
-                position = { referencePanel: 'console', direction: 'above' };
-                if (!dockApi.value.getPanel('console')) {
-                     const inspector = dockApi.value.getPanel('inspector');
-                     if (inspector) position = { referencePanel: 'inspector', direction: 'left' };
+                if (dockApi.value.panels.find((p: any) => p.id === 'console')) {
+                    position = { referencePanel: 'console', direction: 'above' };
+                } else if (dockApi.value.panels.find((p: any) => p.id === 'inspector')) {
+                     position = { referencePanel: 'inspector', direction: 'left' };
+                } else {
+                     position = { direction: 'right' };
                 }
                 break;
             case 'inspector':
                 position = { direction: 'right' };
                 break;
             case 'layers':
-                position = { referencePanel: 'inspector', direction: 'below' };
-                 if (!dockApi.value.getPanel('inspector')) position = { direction: 'right' };
+                if (dockApi.value.panels.find((p: any) => p.id === 'inspector')) {
+                    position = { referencePanel: 'inspector', direction: 'below' };
+                } else {
+                    position = { direction: 'right' };
+                }
                 break;
             case 'history':
-                position = { referencePanel: 'layers', direction: 'within' };
-                if (!dockApi.value.getPanel('layers')) {
-                     const inspector = dockApi.value.getPanel('inspector');
-                     if (inspector) position = { referencePanel: 'inspector', direction: 'below' };
-                     else position = { direction: 'right' };
+                // Try layers first, then inspector
+                if (dockApi.value.panels.find((p: any) => p.id === 'layers')) {
+                    position = { referencePanel: 'layers', direction: 'within' };
+                } else if (dockApi.value.panels.find((p: any) => p.id === 'inspector')) {
+                     position = { referencePanel: 'inspector', direction: 'below' };
+                } else {
+                     position = { direction: 'right' };
                 }
                 break;
         }

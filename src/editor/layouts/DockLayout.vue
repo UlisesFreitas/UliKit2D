@@ -153,7 +153,7 @@ onMounted(async () => {
                             data: [
                                 { type: 'leaf', data: { views: ['scenes'], id: 'group-scenes' }, size: 200 },
                                 { type: 'leaf', data: { views: ['hierarchy'], id: 'group-hierarchy' }, size: 500 },
-                                { type: 'leaf', data: { views: ['assets'], id: 'group-assets' }, size: 200 }
+                                { type: 'leaf', data: { views: ['layers'], id: 'group-layers' }, size: 200 }
                             ],
                             size: 305
                         },
@@ -164,8 +164,8 @@ onMounted(async () => {
                                 {
                                     type: 'branch',
                                     data: [
-                                        { type: 'leaf', data: { views: ['console', 'history'], id: 'group-console' }, size: 50 },
-                                        { type: 'leaf', data: { views: ['layers'], id: 'group-layers' }, size: 50 }
+                                        { type: 'leaf', data: { views: ['assets'], id: 'group-assets' }, size: 50 },
+                                        { type: 'leaf', data: { views: ['console'], id: 'group-console' }, size: 50 }
                                     ],
                                     size: 200
                                 }
@@ -175,7 +175,8 @@ onMounted(async () => {
                         {
                             type: 'branch',
                             data: [
-                                { type: 'leaf', data: { views: ['inspector'], id: 'group-inspector' }, size: 500 } 
+                                { type: 'leaf', data: { views: ['inspector'], id: 'group-inspector' }, size: 500 },
+                                { type: 'leaf', data: { views: ['history'], id: 'group-history' }, size: 200 } 
                             ],
                             size: 305
                         }
@@ -190,7 +191,7 @@ onMounted(async () => {
                 'hierarchy': { id: 'hierarchy', title: 'Hierarchy', component: 'hierarchy', contentComponent: 'hierarchy' },
                 'assets': { id: 'assets', title: 'Assets', component: 'assets', contentComponent: 'assets' },
                 'scenes': { id: 'scenes', title: 'Scenes', component: 'scenes', contentComponent: 'scenes' },
-                'scene': { id: 'scene', title: 'Scene View', component: 'scene', contentComponent: 'scene', params: { closable: false, locked: true } },
+                'scene': { id: 'scene', title: 'Scene View', component: 'scene', contentComponent: 'scene', suppressClosable: true },
                 'console': { id: 'console', title: 'Console', component: 'console', contentComponent: 'console' },
                 'inspector': { id: 'inspector', title: 'Inspector', component: 'inspector', contentComponent: 'inspector' },
                 'layers': { id: 'layers', title: 'Layers', component: 'layers', contentComponent: 'layers' },

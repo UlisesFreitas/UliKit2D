@@ -1,7 +1,6 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue';
+import { onMounted, watch } from 'vue';
 import { instance as commandManager } from '../commands/CommandManager';
-import type { ICommand } from '../commands/ICommand';
 
 // Debug Log Helper
 const log = (msg: string, ...args: any[]) => {
@@ -11,8 +10,6 @@ const log = (msg: string, ...args: any[]) => {
 // Access Reactive State directly
 const history = commandManager.history;
 const future = commandManager.future;
-
-const currentCommandIndex = computed(() => history.value.length - 1);
 
 onMounted(() => {
     log('Mounted. History Length:', history.value.length);
@@ -80,7 +77,7 @@ const formatTime = (ts: number) => {
 
                 <!-- Future Commands (Redo Stack) -->
                 <div 
-                    v-for="(cmd, index) in [...future].reverse()" 
+                    v-for="cmd in [...future].reverse()" 
                     :key="cmd.id"
                     class="history-item p-1.5 rounded cursor-pointer flex items-center gap-2 opacity-50 hover:opacity-100 hover:bg-bg-hover transition-colors"
                     @click="redo" 

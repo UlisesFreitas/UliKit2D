@@ -473,7 +473,7 @@ watch(() => preferencesStore.grid, () => updateView(), { deep: true });
 </script>
 
 <template>
-  <div 
+  <div
     class="scene-panel" 
     ref="container" 
     tabindex="0"
@@ -572,4 +572,5 @@ watch(() => preferencesStore.grid, () => updateView(), { deep: true });
   overflow: hidden;
   outline: none;
 }
+
 </style>
