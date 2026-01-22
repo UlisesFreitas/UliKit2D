@@ -69,7 +69,7 @@
     {
       "id": "6",
       "name": "Visual Tools & Entity UX",
-      "status": "pending",
+      "status": "completed",
       "description": "Improving how we visualize and interact with invisible logic.",
       "tasks": [
         "Implement Editor-Only Visuals for Empty Entities (Icons/Gizmos)",
@@ -80,18 +80,32 @@
     },
     {
       "id": "7",
-      "name": "Project Settings & Architecture",
-      "status": "pending",
-      "description": "Essential configuration for a shipping game.",
+      "name": "Project Architecture & Core Gameplay",
+      "status": "in-progress",
+      "description": "Essential configuration and Runtime Systems.",
       "tasks": [
-        "Implement Input Manager Editor (Map Keys to Actions)",
-        "Implement Audio Manager Editor (Channels, Buses)",
-        "Implement Physics Settings (Gravity, Layers/Masks Matrix)",
-        "Asset Management 2.0 (Meta files, Import Settings)"
+        "Implement Input Manager Editor (Map Keys to Actions) - DONE",
+        "Implement Audio Manager Editor (Channels, Buses) - DONE",
+        "Implement Physics Settings (Gravity, Layers/Masks Matrix) - DONE",
+        "Implement Runtime InputSystem (Map Settings to API)",
+        "Implement CharacterController Component",
+        "Integrate Input with CharacterController"
       ]
     },
     {
       "id": "8",
+      "name": "Asset Pipeline 2.0",
+      "status": "pending",
+      "description": "Robust Asset Management with Meta files.",
+      "tasks": [
+        "Design Meta File Structure (.meta)",
+        "Implement Asset Importers (Texture, Audio, Script)",
+        "Implement File Watcher & Auto-Import",
+        "Refactor AssetBrowser to use Meta Database"
+      ]
+    },
+    {
+      "id": "9",
       "name": "Inspector Overhaul (Live Mode)",
       "status": "pending",
       "description": "Make the editor feel alive and reactive.",
@@ -103,7 +117,7 @@
       ]
     },
     {
-      "id": "9",
+      "id": "10",
       "name": "Advanced Features",
       "status": "pending",
       "tasks": [

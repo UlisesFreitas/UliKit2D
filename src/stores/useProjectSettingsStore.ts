@@ -19,13 +19,22 @@ export interface IProjectSettings {
     physics: {
         gravity: { x: number; y: number };
         debugDraw: boolean;
+        collisionMatrix?: Record<string, Record<string, boolean>>; // { 'Player': { 'Enemy': true } }
     };
     tags: string[];
     layers: string[];
     layouts: Record<string, any>;
     editor: {
         historyMaxSteps: number;
-        historyMaxBytes: number; // 0 = unlimited? or standard 10MB
+        historyMaxBytes: number;
+    };
+    input: {
+        actions: Record<string, string[]>;
+        axes: Record<string, { negative: string; positive: string; altNegative?: string; altPositive?: string; gravity: number; sensitivity: number; dead: number }>;
+    };
+    audio: {
+        masterVolume: number;
+        channels: Record<string, { volume: number; muted: boolean }>;
     };
 }
 
@@ -44,7 +53,25 @@ const DEFAULT_SETTINGS: IProjectSettings = {
     },
     physics: {
         gravity: { x: 0, y: 9.81 },
-        debugDraw: false
+        debugDraw: false,
+        collisionMatrix: {}
+    },
+    input: {
+        actions: {
+            'Jump': ['Space', 'Enter'],
+            'Fire': ['KeyZ', 'MouseLeft']
+        },
+        axes: {
+            'Horizontal': { negative: 'ArrowLeft', positive: 'ArrowRight', altNegative: 'KeyA', altPositive: 'KeyD', gravity: 3, sensitivity: 3, dead: 0.001 },
+            'Vertical': { negative: 'ArrowUp', positive: 'ArrowDown', altNegative: 'KeyW', altPositive: 'KeyS', gravity: 3, sensitivity: 3, dead: 0.001 }
+        }
+    },
+    audio: {
+        masterVolume: 1.0,
+        channels: {
+            'Music': { volume: 1.0, muted: false },
+            'SFX': { volume: 1.0, muted: false }
+        }
     },
     tags: ['Player', 'Enemy', 'Ground'],
     layers: ['Default', 'UI', 'Player', 'Background'],

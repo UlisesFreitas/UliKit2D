@@ -23,7 +23,7 @@ const emit = defineEmits<{
 
 const store = useProjectSettingsStore();
 const ui = useUIStore();
-const activeTab = ref<'general' | 'display' | 'physics' | 'editor' | 'tags' | 'layouts'>('general');
+const activeTab = ref<'general' | 'display' | 'input' | 'audio' | 'physics' | 'editor' | 'tags' | 'layouts'>('general');
 
 const onClose = () => {
     if (store.isDirty) {
@@ -44,6 +44,31 @@ const onSave = async () => {
 const onApply = () => {
     store.applySettings();
     ui.showToast({ title: 'Settings Applied', description: 'Changes applied to runtime.' });
+};
+
+// Collision Matrix Helpers
+const getCollision = (a: string, b: string) => {
+    if (!store.settings.physics.collisionMatrix) return true; // Default true
+    if (!store.settings.physics.collisionMatrix[a]) return true;
+    // If explicit false, return false. If undefined, return true.
+    return store.settings.physics.collisionMatrix[a][b] !== false;
+};
+
+const toggleCollision = (a: string, b: string) => {
+    if (!store.settings.physics.collisionMatrix) store.settings.physics.collisionMatrix = {};
+    
+    // Ensure nested objects
+    if (!store.settings.physics.collisionMatrix[a]) store.settings.physics.collisionMatrix[a] = {};
+    if (!store.settings.physics.collisionMatrix[b]) store.settings.physics.collisionMatrix[b] = {};
+
+    const current = getCollision(a, b);
+    const newValue = !current;
+
+    // Symmetric update
+    store.settings.physics.collisionMatrix[a][b] = newValue;
+    store.settings.physics.collisionMatrix[b][a] = newValue;
+    
+    store.isDirty = true;
 };
 </script>
 
@@ -66,7 +91,7 @@ const onApply = () => {
                     <!-- Sidebar Tabs -->
                     <div class="w-48 border-r border-border bg-bg-base/50 flex flex-col py-2">
                         <button 
-                            v-for="tab in ['General', 'Display', 'Physics', 'Editor', 'Tags & Layers', 'Layouts']"
+                            v-for="tab in ['General', 'Display', 'Input', 'Audio', 'Physics', 'Editor', 'Tags & Layers', 'Layouts']"
                             :key="tab"
                             @click="activeTab = (tab.split(' ')[0] || '').toLowerCase() as any"
                             class="px-4 py-2 text-left text-sm transition-colors border-l-2"
@@ -135,6 +160,123 @@ const onApply = () => {
                             </div>
                         </div>
 
+                        <!-- INPUT TAB -->
+                        <div v-if="activeTab === 'input'" class="space-y-6 animate-fade-in">
+                            <h3 class="text-lg font-bold text-accent mb-4">Input Manager</h3>
+
+                            <!-- Actions -->
+                            <div class="space-y-4">
+                                <div class="flex justify-between items-center border-b border-white/10 pb-2">
+                                    <h4 class="font-bold text-sm">Actions (Buttons)</h4>
+                                    <button @click="store.settings.input.actions['NewAction'] = ['Space']" class="text-xs bg-bg-hover hover:bg-accent px-2 py-1 rounded transition">+ Add Action</button>
+                                </div>
+                                
+                                <div v-if="Object.keys(store.settings.input.actions).length === 0" class="text-text-secondary text-xs italic">
+                                    No actions defined.
+                                </div>
+
+                                <div v-for="(keys, name) in store.settings.input.actions" :key="name" class="bg-bg-panel border border-border rounded p-3">
+                                    <div class="flex items-center justify-between mb-2">
+                                        <div class="flex items-center gap-2">
+                                            <span class="text-text-secondary text-xs">Name:</span>
+                                            <!-- Rename Logic (Simple Hack: Delete & Re-add if logic needed, for now just allow editing Key, not Name easily without sophisticated UI component) -->
+                                            <!-- Actually let's use a non-model input for name or advanced refactor later. For now read-only name or basic support -->
+                                            <span class="font-bold text-sm">{{ name }}</span> 
+                                        </div>
+                                        <button @click="delete store.settings.input.actions[name]" class="text-red-500 hover:text-red-400 text-xs">Remove</button>
+                                    </div>
+                                    <div class="flex flex-wrap gap-2">
+                                        <div v-for="(_key, kIndex) in keys" :key="kIndex" class="flex items-center bg-bg-base rounded px-2 py-1 text-xs border border-white/10">
+                                            <input v-model="store.settings.input.actions[name]![kIndex]" class="bg-transparent outline-none w-20 text-center" />
+                                            <button @click="store.settings.input.actions[name]!.splice(kIndex, 1)" class="ml-2 text-white/50 hover:text-white">×</button>
+                                        </div>
+                                        <button @click="store.settings.input.actions[name]?.push('')" class="text-xs bg-white/5 hover:bg-white/10 px-2 py-1 rounded text-white/70">+</button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Axes -->
+                             <div class="space-y-4">
+                                <div class="flex justify-between items-center border-b border-white/10 pb-2">
+                                    <h4 class="font-bold text-sm">Axes (Analog/Digital)</h4>
+                                    <button @click="store.settings.input.axes['NewAxis'] = { negative: 'Left', positive: 'Right', gravity: 3, sensitivity: 3, dead: 0.001 }" class="text-xs bg-bg-hover hover:bg-accent px-2 py-1 rounded transition">+ Add Axis</button>
+                                </div>
+
+                                <div v-if="Object.keys(store.settings.input.axes).length === 0" class="text-text-secondary text-xs italic">
+                                    No axes defined.
+                                </div>
+                                
+                                <div v-for="(config, name) in store.settings.input.axes" :key="name" class="bg-bg-panel border border-border rounded p-3 text-xs">
+                                     <div class="flex items-center justify-between mb-2">
+                                        <span class="font-bold text-sm">{{ name }}</span>
+                                        <button @click="delete store.settings.input.axes[name]" class="text-red-500 hover:text-red-400">Remove</button>
+                                    </div>
+                                    
+                                    <div class="grid grid-cols-2 gap-4">
+                                        <div class="space-y-2">
+                                            <div class="flex justify-between">
+                                                <span class="text-text-secondary">Negative</span>
+                                                <input v-model="config.negative" class="bg-bg-input border border-border px-1 w-24 rounded" />
+                                            </div>
+                                            <div class="flex justify-between">
+                                                <span class="text-text-secondary">Positive</span>
+                                                <input v-model="config.positive" class="bg-bg-input border border-border px-1 w-24 rounded" />
+                                            </div>
+                                            <div class="flex justify-between">
+                                                <span class="text-text-secondary">Alt Neg</span>
+                                                <input v-model="config.altNegative" class="bg-bg-input border border-border px-1 w-24 rounded" />
+                                            </div>
+                                            <div class="flex justify-between">
+                                                <span class="text-text-secondary">Alt Pos</span>
+                                                <input v-model="config.altPositive" class="bg-bg-input border border-border px-1 w-24 rounded" />
+                                            </div>
+                                        </div>
+                                        
+                                        <div class="space-y-2">
+                                            <div class="flex justify-between">
+                                                <span class="text-text-secondary">Gravity</span>
+                                                <input v-model.number="config.gravity" type="number" class="bg-bg-input border border-border px-1 w-16 rounded text-right" />
+                                            </div>
+                                            <div class="flex justify-between">
+                                                <span class="text-text-secondary">Sensitivity</span>
+                                                <input v-model.number="config.sensitivity" type="number" class="bg-bg-input border border-border px-1 w-16 rounded text-right" />
+                                            </div>
+                                            <div class="flex justify-between">
+                                                <span class="text-text-secondary">Dead Zone</span>
+                                                <input v-model.number="config.dead" type="number" step="0.01" class="bg-bg-input border border-border px-1 w-16 rounded text-right" />
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- AUDIO TAB -->
+                        <div v-if="activeTab === 'audio'" class="space-y-6 animate-fade-in">
+                             <h3 class="text-lg font-bold text-accent mb-4">Audio Settings</h3>
+                             
+                             <div class="flex flex-col gap-1">
+                                <label class="text-xs text-text-secondary">Master Volume</label>
+                                <div class="flex items-center gap-2">
+                                     <input v-model.number="store.settings.audio.masterVolume" type="range" min="0" max="1" step="0.01" class="flex-1 accent-accent" />
+                                     <span class="text-xs w-8 text-right">{{ (store.settings.audio.masterVolume * 100).toFixed(0) }}%</span>
+                                </div>
+                             </div>
+
+                             <div class="border-t border-white/10 pt-4">
+                                <h4 class="font-bold text-sm mb-2">Channels / Buses</h4>
+                                <div v-for="(config, name) in store.settings.audio.channels" :key="name" class="flex items-center gap-4 bg-bg-panel p-2 rounded mb-2">
+                                     <div class="w-16 font-bold text-xs">{{ name }}</div>
+                                     <input v-model.number="config.volume" type="range" min="0" max="1" step="0.01" class="flex-1 accent-accent" :disabled="config.muted" />
+                                     <span class="text-xs w-8 text-right">{{ (config.volume * 100).toFixed(0) }}%</span>
+                                     <div class="flex items-center gap-1">
+                                        <input v-model="config.muted" type="checkbox" :id="'mute-'+name" class="accent-red-500" />
+                                        <label :for="'mute-'+name" class="text-xs text-text-secondary">Mute</label>
+                                     </div>
+                                </div>
+                             </div>
+                        </div>
+
                         <!-- PHYSICS TAB -->
                         <div v-if="activeTab === 'physics'" class="space-y-4 animate-fade-in">
                              <h3 class="text-lg font-bold text-accent mb-4">Physics World</h3>
@@ -156,6 +298,36 @@ const onApply = () => {
                              <div class="flex items-center gap-2 mt-4">
                                 <input v-model="store.settings.physics.debugDraw" type="checkbox" id="debugDraw" class="accent-accent" />
                                 <label for="debugDraw" class="text-sm">Enable Debug Draw (Colliders)</label>
+                            </div>
+
+                             <!-- Collision Matrix -->
+                            <div class="mt-6">
+                                <h4 class="font-bold text-sm mb-2">Collision Matrix</h4>
+                                <div class="overflow-x-auto bg-bg-panel border border-border rounded p-4">
+                                    <table class="w-full text-xs">
+                                        <thead>
+                                            <tr>
+                                                <th class="p-1"></th>
+                                                <th v-for="layer in store.settings.layers" :key="'h-'+layer" class="p-1 text-center font-normal text-text-secondary rotate-45 h-16 w-8">{{ layer }}</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <tr v-for="(rowLayer, _rIndex) in store.settings.layers" :key="'r-'+rowLayer">
+                                                <td class="p-1 text-right font-bold text-text-primary px-2 whitespace-nowrap">{{ rowLayer }}</td>
+                                                <td v-for="(colLayer, _cIndex) in store.settings.layers" :key="'c-'+colLayer" class="p-1 text-center">
+                                                    <!-- Only render lower triangle or full? Full is fine -->
+                                                    <input 
+                                                        type="checkbox" 
+                                                        :checked="getCollision(rowLayer, colLayer)" 
+                                                        @change="toggleCollision(rowLayer, colLayer)"
+                                                        class="accent-accent cursor-pointer"
+                                                    />
+                                                </td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                                <p class="text-[10px] text-text-secondary mt-2">Unchecked pairs will not collide physically.</p>
                             </div>
                         </div>
 
