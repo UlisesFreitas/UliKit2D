@@ -31,7 +31,8 @@ export class RenderSystem {
                this.textCache.get(id) || 
                this.nineSliceCache.get(id) || 
                this.bitmapTextCache.get(id) ||
-               this.cameraIconCache.get(id);
+               this.cameraIconCache.get(id) ||
+               this.emptyIconCache.get(id);
     }
 
     /**
@@ -171,30 +172,38 @@ export class RenderSystem {
                 this.removeLabel(entity.id!);
                 this.removeSprite(entity.id!);
                 this.removeNineSlice(entity.id!);
+                this.removeEmpty(entity.id!);
             } else if (entity.label) {
                 this.updateLabel(entity);
                 this.removeBitmapText(entity.id!);
                 this.removeSprite(entity.id!);
                 this.removeNineSlice(entity.id!);
+                this.removeEmpty(entity.id!);
             } else if (entity.nineSliceSprite) {
                 this.updateNineSlice(entity);
                 this.removeBitmapText(entity.id!);
                 this.removeLabel(entity.id!);
                 this.removeSprite(entity.id!);
+                this.removeEmpty(entity.id!);
             } else if (entity.sprite) {
                 this.updateSprite(entity);
                 this.removeBitmapText(entity.id!);
                 this.removeLabel(entity.id!);
                 this.removeNineSlice(entity.id!);
                 this.removeCameraIcon(entity.id!);
+                this.removeEmpty(entity.id!);
             } else if (entity.camera) {
                  this.updateCamera(entity);
                  this.removeSprite(entity.id!);
                  this.removeLabel(entity.id!);
                  this.removeBitmapText(entity.id!);
                  this.removeNineSlice(entity.id!);
+                 this.removeEmpty(entity.id!);
             } else {
-                 // Cleanup
+                 // No Visual Components -> "Empty Entity" Visual
+                 this.updateEmpty(entity);
+
+                 // Cleanup others
                  this.removeBitmapText(entity.id!);
                  this.removeLabel(entity.id!);
                  this.removeSprite(entity.id!);
@@ -223,6 +232,9 @@ export class RenderSystem {
         }
         for (const id of this.cameraIconCache.keys()) {
             if (!activeIds.has(id)) this.removeCameraIcon(id);
+        }
+        for (const id of this.emptyIconCache.keys()) {
+            if (!activeIds.has(id)) this.removeEmpty(id);
         }
 
     }
@@ -742,6 +754,88 @@ export class RenderSystem {
         container.scale.set(entity.transform.scale.x, entity.transform.scale.y);
 
         container.visible = entity.visible !== false;
+    }
+
+    private emptyIconCache: Map<string, Container> = new Map();
+
+    private updateEmpty(entity: any) {
+        let container = this.emptyIconCache.get(entity.id!);
+        
+        if (!container) {
+             container = new Container();
+             
+             // 1. Hit Area (for selection)
+             container.hitArea = new Rectangle(-16, -16, 32, 32);
+
+             // 2. Icon Sprite
+             const sprite = new Sprite(Texture.EMPTY);
+             sprite.anchor.set(0.5);
+             sprite.width = 24;
+             sprite.height = 24;
+             sprite.alpha = 0.5; // Semi-transparent for editor helper
+             container.addChild(sprite);
+             
+             // Load Icon
+             // We reuse defaultCameraIcon or specific 'defaultEmpty' if available. 
+             // Using a embedded base64 or a known path would be optimal. 
+             // Since we don't have 'defaultEmpty' imported here, let's use a simple Graphics fallback first, 
+             // then try to load if we import it.
+             // Actually, let's draw a Graphics cross/diamond.
+             const g = new Graphics();
+             // Initial draw will happen in update loop
+             container.addChild(g);
+
+             // Parent to Overlay (Editor Helpers should be on top?)
+             // OR Base Layer to respect sorting? 
+             // Empty Transformers usually sit in the layer but are invisible in-game.
+             // Editor Overlay is safer to ensure visibility.
+             this.editorOverlay.addChild(container);
+             
+             this.emptyIconCache.set(entity.id!, container);
+             this.prepareVisual(container, entity.id!);
+        } else {
+             if (container.parent !== this.editorOverlay) {
+                 this.editorOverlay.addChild(container);
+             }
+        }
+        this.prepareVisual(container, entity.id!);
+
+        // Sync Transform
+        container.x = entity.transform.x;
+        container.y = entity.transform.y;
+        container.rotation = entity.transform.rotation;
+        
+        // DO NOT scale the visual container with the entity scale.
+        // It's a helper handle (Diamond/Cross), it should remain visible at constant size (or respecting zoom)
+        // Actually, handles usually scale with Zoom inverse to stay constant on screen, 
+        // BUT for now, let's just make it independent of entity scale so 10x scale doesn't explode the line width.
+        // We do respect negative scale for flipping if needed, but for a symmetrical diamond, it doesn't matter.
+        container.scale.set(1, 1);
+        
+        container.visible = entity.visible !== false;
+
+        // Redraw Geometry to maintain hairline width relative to Zoom
+        const zoom = this.app.stage.scale.x;
+        const g = container.children.find(c => c instanceof Graphics) as Graphics;
+        if (g) {
+             g.clear();
+             const lw = 1 / zoom;
+             // Diamond
+             g.moveTo(-10, 0); g.lineTo(10, 0);
+             g.moveTo(0, -10); g.lineTo(0, 10);
+             g.stroke({ width: lw, color: 0xFFFFFF, alpha: 0.5 });
+             g.circle(0,0, 4);
+             g.stroke({ width: lw, color: 0xFFFFFF, alpha: 0.5});
+        }
+    }
+
+    private removeEmpty(id: string) {
+        if (this.emptyIconCache.has(id)) {
+            const icon = this.emptyIconCache.get(id)!;
+            if (icon.parent) icon.parent.removeChild(icon);
+            icon.destroy({ children: true });
+            this.emptyIconCache.delete(id);
+        }
     }
 
     /**

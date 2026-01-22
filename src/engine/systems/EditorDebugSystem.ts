@@ -36,9 +36,11 @@ export class EditorDebugSystem {
         // Cons: Layers can't easily have different z-indices relative to each other 
         // without multiple Graphics objects. For Debug, usually fine.
         
+        const screenScale = this.app.stage.scale.x;
+
         for (const layer of this.layers) {
             if (layer.enabled) {
-                layer.update(this.graphics);
+                layer.update(this.graphics, screenScale);
             }
         }
     }

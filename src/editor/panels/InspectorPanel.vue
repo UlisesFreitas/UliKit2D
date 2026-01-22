@@ -256,6 +256,7 @@ const handleAddComponent = async (payload: { type: string, data: any }) => {
 };
 
 const existingComponentKeys = computed(() => {
+    revision.value; // Dependency for reactivity
     if (!selectedEntity.value) return [];
     return Object.keys(selectedEntity.value).filter(k => !['id', 'name', 'visible', 'script'].includes(k));
 });
@@ -378,7 +379,7 @@ const handleSaveCollisionMask = (payload: { vertices: { x: number, y: number }[]
                         <div class="font-bold text-sm capitalize">{{ item.key }}</div>
                     </div>
                     <button 
-                        v-if="item.key !== 'transform' && item.key !== 'sprite'" 
+                        v-if="item.key !== 'transform'" 
                         @click.stop="removeComponent(item.key)"
                         class="text-xs text-text-secondary hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
                         title="Remove Component"

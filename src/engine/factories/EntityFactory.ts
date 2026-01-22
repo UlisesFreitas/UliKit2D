@@ -42,8 +42,7 @@ export class EntityFactory {
 
         switch (type) {
             case 'Empty':
-                // Just transform
-                data.sprite = { texture: defaultEmpty, anchor: { x: 0.5, y: 0.5 }, width: 32, height: 32 };
+                // Just transform, no visual components
                 break;
             case 'Sprite':
                 data.sprite = { texture: defaultSprite, anchor: { x: 0.5, y: 0.5 }, width: 32, height: 32 };

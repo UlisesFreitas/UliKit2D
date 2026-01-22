@@ -7,19 +7,20 @@ export class PhysicsDebugLayer implements DebugLayer {
     public name = 'Physics';
     public enabled = true;
 
-    public update(g: Graphics) {
+    public update(g: Graphics, screenScale: number = 1) {
         if (!this.enabled) return;
 
+        const lineWidth = 1 / screenScale;
+
         // 1. Draw Physical Bodies (Matter.js)
-        this.drawPhysicsBodies(g);
+        this.drawPhysicsBodies(g, lineWidth);
 
         // 2. Draw Colliders (Editor Gizmos)
-        this.drawColliderGizmos(g);
+        this.drawColliderGizmos(g, lineWidth);
     }
 
-    private drawPhysicsBodies(g: Graphics) {
+    private drawPhysicsBodies(g: Graphics, lineWidth: number) {
         // zoom is unused for now, kept logic simple
-        const lineWidth = 2;
 
         const entities = world.with('physicsBody');
         for (const entity of entities) {
@@ -45,9 +46,8 @@ export class PhysicsDebugLayer implements DebugLayer {
         }
     }
 
-    private drawColliderGizmos(g: Graphics) {
+    private drawColliderGizmos(g: Graphics, lineWidth: number) {
         const entities = world.with('transform');
-        const lineWidth = 2; // Fixed width
 
         for (const entity of entities) {
             
