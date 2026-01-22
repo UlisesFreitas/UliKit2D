@@ -68,6 +68,18 @@
     },
     {
       "id": "6",
+      "name": "Visual Tools & Entity UX",
+      "status": "pending",
+      "description": "Improving how we visualize and interact with invisible logic.",
+      "tasks": [
+        "Implement Editor-Only Visuals for Empty Entities (Icons/Gizmos)",
+        "Decouple Sprite Component from default 'Create Entity'",
+        "Ensure SelectionManager hits Editor-Only Visuals",
+        "Refactor Gizmo Bounds for Component-less Entities"
+      ]
+    },
+    {
+      "id": "7",
       "name": "Project Settings & Architecture",
       "status": "pending",
       "description": "Essential configuration for a shipping game.",
@@ -79,7 +91,7 @@
       ]
     },
     {
-      "id": "7",
+      "id": "8",
       "name": "Inspector Overhaul (Live Mode)",
       "status": "pending",
       "description": "Make the editor feel alive and reactive.",
@@ -91,7 +103,7 @@
       ]
     },
     {
-      "id": "8",
+      "id": "9",
       "name": "Advanced Features",
       "status": "pending",
       "tasks": [
