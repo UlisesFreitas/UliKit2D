@@ -50,6 +50,17 @@ const debugInfo = ref({ screen: {x:0, y:0}, world: {x:0, y:0}, lastClick: 'None'
 const hoveredEntityDebug = ref<any>(null); // New Entity Info Debug
 const highlightGraphics = ref<any>(null); // For Tilemap highlight
 
+const debugLayers = ref<{name: string, enabled: boolean}[]>([]);
+const isDebugCollapsed = ref(false);
+const showDebugPanel = ref(false);
+
+const toggleDebugLayer = (layer: {name: string, enabled: boolean}) => {
+    layer.enabled = !layer.enabled;
+    if (engine.editorDebugSystem) {
+        engine.editorDebugSystem.toggleLayer(layer.name, layer.enabled);
+    }
+};
+
 const sceneVersion = ref(0); // Force update on scene reload
 
 eventBus.on('scene-loaded', () => {
@@ -459,6 +470,14 @@ onMounted(async () => {
          highlightGraphics.value.zIndex = 99999; // Top
          highlightGraphics.value.eventMode = 'none';
          engine.app.stage.addChild(highlightGraphics.value);
+
+         // Sync Debug Layers
+         if (engine.editorDebugSystem) {
+             debugLayers.value = engine.editorDebugSystem.layers.map(l => ({
+                 name: l.name,
+                 enabled: l.enabled
+             }));
+         }
     }
 });
 
@@ -470,6 +489,8 @@ onUnmounted(() => {
 // Watchers
 watch(zoom, () => updateView());
 watch(() => preferencesStore.grid, () => updateView(), { deep: true });
+
+import { Check } from 'lucide-vue-next';
 </script>
 
 <template>
@@ -539,11 +560,39 @@ watch(() => preferencesStore.grid, () => updateView(), { deep: true });
         <Toolbar />
     </div>
 
+    <!-- Debug Layers Panel (Bottom Right) -->
+    <div v-if="showDebugPanel" class="absolute bottom-4 right-4 bg-black/80 text-white p-2 rounded z-[101] font-mono select-none border border-gray-700 shadow-lg min-w-[200px]">
+        <div class="font-bold text-yellow-400 mb-1 border-b border-gray-600 flex justify-between items-center cursor-pointer" @click="isDebugCollapsed = !isDebugCollapsed">
+            <span>DEBUG TOOLS</span>
+            <span class="text-xs">{{ isDebugCollapsed ? '+' : '-' }}</span>
+        </div>
+        
+        <div v-if="!isDebugCollapsed" class="flex flex-col space-y-1 mt-2">
+            <div 
+                v-for="layer in debugLayers" 
+                :key="layer.name" 
+                class="flex items-center space-x-2 p-1 hover:bg-white/10 rounded cursor-pointer text-xs"
+                @click="toggleDebugLayer(layer)"
+            >
+                <div class="w-4 h-4 border border-gray-500 rounded flex items-center justify-center bg-black/50">
+                     <Check v-if="layer.enabled" :size="12" class="text-green-400" />
+                </div>
+                <span :class="{'text-white': layer.enabled, 'text-gray-400': !layer.enabled}">{{ layer.name }}</span>
+            </div>
+            
+            <!-- Quick Actions (if any) -->
+            <div class="border-t border-gray-700 mt-2 pt-1 text-[10px] text-gray-500 italic text-center">
+                 Click to toggle layers
+            </div>
+        </div>
+    </div>
+
     <!-- Overlay Toolbar (Bottom Center) -->
     <div class="absolute bottom-6 left-1/2 transform -translate-x-1/2 z-[100] pb-2">
         <SceneToolbar 
             v-model:zoom="zoom"
             v-model:showGrid="showGrid"
+            v-model:showDebugPanel="showDebugPanel"
             :snapToGrid="snapToGrid"
             @update:zoom="val => { zoom = val; updateView(); }"
              @update:snapToGrid="val => { 

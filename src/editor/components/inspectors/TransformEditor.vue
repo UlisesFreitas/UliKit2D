@@ -1,4 +1,7 @@
 <script setup lang="ts">
+import { instance as commandManager } from '../../commands/CommandManager';
+import { TransformCommand } from '../../commands/TransformCommand';
+import { ref } from 'vue';
 
 const props = defineProps<{
     transform: { x: number; y: number; rotation: number; scale: { x: number; y: number }; zIndex?: number };
@@ -10,6 +13,54 @@ const emit = defineEmits<{
     (e: 'update', val: any): void;
 }>();
 
+const startState = ref<any>(null);
+
+const handleFocus = () => {
+    if (!props.transform) return;
+    const t = props.transform;
+    startState.value = {
+        x: t.x,
+        y: t.y,
+        scaleX: t.scale.x,
+        scaleY: t.scale.y,
+        rotation: t.rotation
+    };
+};
+
+const handleChange = () => {
+    if (!startState.value || !props.entity || !props.transform) return;
+    
+    const t = props.transform;
+    const newState = {
+        x: t.x,
+        y: t.y,
+        scaleX: t.scale.x,
+        scaleY: t.scale.y,
+        rotation: t.rotation
+    };
+    
+    // Check for difference
+    const old = startState.value;
+    if (Math.abs(newState.x - old.x) > 0.001 ||
+        Math.abs(newState.y - old.y) > 0.001 ||
+        Math.abs(newState.scaleX - old.scaleX) > 0.001 ||
+        Math.abs(newState.scaleY - old.scaleY) > 0.001 ||
+        Math.abs(newState.rotation - old.rotation) > 0.001) {
+            
+        // Create Command
+        const cmd = new TransformCommand([
+            {
+                entityId: props.entity.id,
+                oldState: old,
+                newState: newState
+            }
+        ], 'Inspector Transform');
+        
+        commandManager.execute(cmd);
+    }
+    
+    startState.value = null;
+};
 
 const update = (key: string, val: number) => {
     emit('update', { key, val });
@@ -29,6 +80,8 @@ const update = (key: string, val: number) => {
                         class="w-full u-input bg-bg-input text-xs p-1 px-2 outline-none text-text-primary"
                         name="transform-x"
                         :value="transform.x"
+                        @focus="handleFocus"
+                        @change="handleChange"
                         @input="(e) => {
                             const val = parseFloat((e.target as HTMLInputElement).value);
                             transform.x = val;
@@ -43,6 +96,8 @@ const update = (key: string, val: number) => {
                         class="w-full u-input bg-bg-input text-xs p-1 px-2 outline-none text-text-primary"
                         name="transform-y"
                         :value="transform.y"
+                        @focus="handleFocus"
+                        @change="handleChange"
                         @input="(e) => {
                             const val = parseFloat((e.target as HTMLInputElement).value);
                             transform.y = val;
@@ -64,6 +119,8 @@ const update = (key: string, val: number) => {
                         class="w-full u-input bg-bg-input text-xs p-1 px-2 outline-none text-text-primary"
                         name="transform-rotation"
                         :value="Math.round(transform.rotation * (180 / Math.PI) * 100) / 100"
+                        @focus="handleFocus"
+                        @change="handleChange"
                         @input="(e) => {
                             const val = parseFloat((e.target as HTMLInputElement).value);
                             transform.rotation = val * (Math.PI / 180);
@@ -108,6 +165,8 @@ const update = (key: string, val: number) => {
                         class="w-full u-input bg-bg-input text-xs p-1 px-2 outline-none text-text-primary placeholder-text-secondary"
                         name="transform-scale-x"
                         :value="transform.scale.x"
+                        @focus="handleFocus"
+                        @change="handleChange"
                         @input="(e) => {
                             const val = parseFloat((e.target as HTMLInputElement).value);
                             transform.scale.x = val;
@@ -123,6 +182,8 @@ const update = (key: string, val: number) => {
                         class="w-full u-input bg-bg-input text-xs p-1 px-2 outline-none text-text-primary"
                         name="transform-scale-y"
                         :value="transform.scale.y"
+                        @focus="handleFocus"
+                        @change="handleChange"
                         @input="(e) => {
                             const val = parseFloat((e.target as HTMLInputElement).value);
                             transform.scale.y = val;

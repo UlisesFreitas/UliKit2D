@@ -14,19 +14,22 @@ import {
     ZoomIn, 
     ZoomOut, 
     Grid, 
-    Magnet 
+    Magnet,
+    Bug
 } from 'lucide-vue-next';
 
 const props = defineProps<{
     zoom: number;
     showGrid: boolean;
     snapToGrid: boolean;
+    showDebugPanel: boolean;
 }>();
 
 const emit = defineEmits<{
     (e: 'update:zoom', value: number): void;
     (e: 'update:showGrid', value: boolean): void;
     (e: 'update:snapToGrid', value: boolean): void;
+    (e: 'update:showDebugPanel', value: boolean): void;
     (e: 'undo'): void;
     (e: 'redo'): void;
 }>();
@@ -39,6 +42,7 @@ const adjustZoom = (delta: number) => {
     emit('update:zoom', newZoom);
 };
 
+// Debug Layers Logic moved to ScenePanel
 </script>
 
 <template>
@@ -120,6 +124,21 @@ const adjustZoom = (delta: number) => {
             </TooltipTrigger>
             <TooltipPortal>
                 <TooltipContent class="tooltip-content">Snap to Grid</TooltipContent>
+            </TooltipPortal>
+        </TooltipRoot>
+
+        <div class="w-[1px] h-4 bg-border mx-2"></div>
+
+        <TooltipRoot>
+            <TooltipTrigger 
+                class="icon-btn" 
+                :class="{'active': showDebugPanel}"
+                @click="emit('update:showDebugPanel', !showDebugPanel)"
+            >
+                <Bug :size="16" />
+            </TooltipTrigger>
+            <TooltipPortal>
+                <TooltipContent class="tooltip-content">Debug Tools</TooltipContent>
             </TooltipPortal>
         </TooltipRoot>
 

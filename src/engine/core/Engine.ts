@@ -1,5 +1,5 @@
 import { PhysicsSystem } from '../physics/PhysicsSystem';
-import { PhysicsDebugSystem } from '../systems/PhysicsDebugSystem';
+// import { PhysicsDebugSystem } from '../systems/PhysicsDebugSystem';
 import { ScriptSystem } from '../scripting/ScriptSystem';
 import { AudioSystem } from '../audio/AudioSystem';
 import { AnimationSystem } from '../systems/AnimationSystem';
@@ -20,7 +20,6 @@ export class Engine {
     private animationSystem: AnimationSystem;
     public renderSystem: RenderSystem;
     public editorDebugSystem: EditorDebugSystem;
-    public physicsDebugSystem: PhysicsDebugSystem;
     public editorTilemapSystem: EditorTilemapSystem; // Added
 
     public onUpdate: ((deltaTime: number) => void) | null = null;
@@ -37,7 +36,6 @@ export class Engine {
         // Actually app is created in constructor, so we can pass it.
         this.renderSystem = new RenderSystem(this.app);
         this.editorDebugSystem = new EditorDebugSystem(this.app);
-        this.physicsDebugSystem = new PhysicsDebugSystem(this.app);
         this.editorTilemapSystem = new EditorTilemapSystem(this.app); // Added
     }
 
@@ -107,7 +105,7 @@ export class Engine {
         if (this.editorTilemapSystem) {
              this.editorTilemapSystem.update(); // Added
         }
-        this.physicsDebugSystem.update();
+        // this.physicsDebugSystem.update();
         if (this.editorDebugSystem) {
              this.editorDebugSystem.update();
         }

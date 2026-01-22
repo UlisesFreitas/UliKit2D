@@ -1,109 +1,52 @@
 import { Application, Container, Graphics } from 'pixi.js';
-import { world } from '../ecs/ECS';
-// Removed Check: selectionManager no longer needed here
+import type { DebugLayer } from '../debug/DebugLayer';
+import { PlaceholderDebugLayer } from '../debug/layers/PlaceholderDebugLayer';
+import { PhysicsDebugLayer } from '../debug/layers/PhysicsDebugLayer';
+import { CameraFrustumDebugLayer } from '../debug/layers/CameraFrustumDebugLayer';
 
 export class EditorDebugSystem {
     private app: Application;
     private container: Container;
-    private debugGraphics: Map<string, Graphics> = new Map();
-    // Removed: debugLabels
+    private graphics: Graphics;
+    public layers: DebugLayer[] = [];
 
     constructor(app: Application) {
         this.app = app;
         this.container = new Container();
         this.container.zIndex = 999999; // Ensure Above Everything
+        this.container.label = 'EditorDebugSystem';
+        
+        this.graphics = new Graphics();
+        this.container.addChild(this.graphics);
+        
         this.app.stage.addChild(this.container);
-        this.app.stage.sortableChildren = true;
+        this.app.stage.sortableChildren = true; // Ensure zIndex works
+
+        // Initialize Layers
+        this.layers.push(new PlaceholderDebugLayer());
+        this.layers.push(new PhysicsDebugLayer());
+        this.layers.push(new CameraFrustumDebugLayer(this.app));
     }
 
     public update() {
-        const entities = world.with('transform');
-
-        // Identify active entities to keep
-        const activeIds = new Set<string>();
-
-        for (const entity of entities) {
-            const id = entity.id as string;
-            activeIds.add(id);
-
-            // Check if entity needs a debug placeholder
-            // Condition: No Sprite AND No Label AND NOT Camera
-            // Cameras are handled by RenderSystem with an Icon.
-            const hasVisibleSprite = entity.sprite && entity.sprite.texture && entity.sprite.texture.trim() !== '';
-            const hasVisibleLabel = entity.label && entity.label.text && entity.label.text.trim() !== '';
-            const hasVisibleBitmapText = entity.bitmapText && entity.bitmapText.text && entity.bitmapText.text.trim() !== '';
-            const hasVisibleNineSlice = entity.nineSliceSprite && entity.nineSliceSprite.texture && entity.nineSliceSprite.texture.trim() !== '';
-            
-            // RenderSystem handles Sprites/Labels. DebugSystem handles the rest (Mockups, Invisible Entities, CAMERAS).
-            // FIX: Explicitly exclude Camera entities, as they are rendered by RenderSystem (Icon)
-            if (!hasVisibleSprite && !hasVisibleLabel && !hasVisibleBitmapText && !hasVisibleNineSlice && !entity.camera) {
-                let graphics = this.debugGraphics.get(id);
-                if (!graphics) {
-                    graphics = new Graphics();
-                    this.container.addChild(graphics);
-                    this.debugGraphics.set(id, graphics);
-                }
-
-                // Draw Placeholder (Hollow Box with Cross)
-                this.drawPlaceholder(graphics, entity);
-            } else {
-                // If it HAS a sprite, remove debug graphics if exists
-                this.removeGraphics(id);
-            }
-
-            // REMOVED: this.updateLabel(id, entity);
-        }
-
-        // Cleanup stale graphics
-        for (const [id] of this.debugGraphics) {
-            if (!activeIds.has(id)) {
-                this.removeGraphics(id);
+        this.graphics.clear();
+        
+        // Single Graphics Context Interaction
+        // Pros: One draw call (batching depends on Pixi)
+        // Cons: Layers can't easily have different z-indices relative to each other 
+        // without multiple Graphics objects. For Debug, usually fine.
+        
+        for (const layer of this.layers) {
+            if (layer.enabled) {
+                layer.update(this.graphics);
             }
         }
     }
 
-    // Removed updateLabel / removeLabel
-
-    public onEntityClicked: ((id: string) => void) | null = null;
-    
-    private drawPlaceholder(g: Graphics, entity: any) {
-        g.clear();
-        
-        g.eventMode = 'none';
-        g.cursor = 'default';
-
-        const { x, y, rotation } = entity.transform;
-        
-        // Apply Transform to Graphics Container
-        g.position.set(x, y);
-        g.rotation = rotation;
-        // Optional: Apply scale if desired, but user only asked for rotation. 
-        // Keeping size constant (60) makes it easier to find/grab, 
-        // but rotating requires local coordinate space.
-        
-        const size = 60;
-        
-        // Draw in local space (centered)
-        g.rect(-size/2, -size/2, size, size);
-        g.fill({ color: 0x00FFFF, alpha: 0.2 }); // Cyan transparent fill
-        g.stroke({ width: 4, color: 0x00FFFF, alpha: 0.8 }); // Thick border
-        
-        // Cross
-        g.moveTo(-size/2, -size/2);
-        g.lineTo(size/2, size/2);
-        
-        g.moveTo(size/2, -size/2);
-        g.lineTo(-size/2, size/2);
-        
-        g.stroke({ width: 2, color: 0x00FFFF, alpha: 0.5 });
-    }
-
-    private removeGraphics(id: string) {
-        const graphics = this.debugGraphics.get(id);
-        if (graphics) {
-            this.container.removeChild(graphics);
-            graphics.destroy();
-            this.debugGraphics.delete(id);
+    public toggleLayer(name: string, enabled: boolean) {
+        const layer = this.layers.find(l => l.name === name);
+        if (layer) {
+            layer.enabled = enabled;
         }
     }
 

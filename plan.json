@@ -55,7 +55,7 @@
     {
       "id": "5",
       "name": "Editor Debug System 2.0",
-      "status": "pending",
+      "status": "completed",
       "description": "Centralized control for all visual debugging tools.",
       "tasks": [
         "Refactor EditorDebugSystem to use Layers/Channels",

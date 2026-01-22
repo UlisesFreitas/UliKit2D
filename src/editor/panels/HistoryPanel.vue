@@ -31,6 +31,11 @@ const redo = () => {
     commandManager.redo();
 };
 
+const resetHistory = () => {
+    log('User Clicked Reset');
+    commandManager.clear();
+};
+
 const jumpTo = (index: number) => {
     log('Jumping to index:', index);
     // TODO: Implement Jump Logic if needed, or just loop undo/redo
@@ -104,6 +109,13 @@ const formatTime = (ts: number) => {
                 :disabled="future.length === 0"
             >
                 Redo
+            </button>
+            <button 
+                class="px-2 py-1 bg-red-900/50 hover:bg-red-900 border border-red-800 rounded text-red-200 text-[10px]"
+                @click="resetHistory"
+                title="Clear History"
+            >
+                Reset
             </button>
         </div>
     </div>

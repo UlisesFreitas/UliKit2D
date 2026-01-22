@@ -61,6 +61,13 @@ export class CommandManager {
         }
     }
 
+    public clear() {
+        console.log('[CommandManager] History Cleared');
+        this.history.value = [];
+        this.future.value = [];
+        this.updateState();
+    }
+
     private updateState() {
         console.log('[CommandManager] Update State. History:', this.history.value.length, 'Future:', this.future.value.length);
         const editorStore = useEditorStore();
