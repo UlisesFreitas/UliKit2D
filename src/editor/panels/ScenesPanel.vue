@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, nextTick } from 'vue';
+import { ref, onMounted, nextTick, onUnmounted } from 'vue';
 import { getFileSystem } from '../../api/FileSystem';
 import { SceneManager } from '../../engine/managers/SceneManager';
 import { ProjectManager } from '../managers/ProjectManager';
@@ -18,6 +18,12 @@ const isLoading = ref(false);
 const isCreating = ref(false);
 const newSceneName = ref('');
 const inputRef = ref<HTMLInputElement | null>(null);
+
+// Selection & Renaming
+const selectedPath = ref<string | null>(null);
+const renamingPath = ref<string | null>(null);
+const renameValue = ref('');
+const renameInputRef = ref<HTMLInputElement | null>(null);
 
 // Context Menu State
 const menuState = ref({
@@ -51,6 +57,10 @@ const loadScenes = async () => {
     }
 };
 
+const onSelectScene = (scene: SceneFile) => {
+    selectedPath.value = scene.path;
+};
+
 const onOpenScene = async (scene: SceneFile) => {
     if (await ui.confirm({ title: 'Load Scene', message: `Load scene "${scene.name}"? Unsaved changes will be lost.` })) {
         const success = await SceneManager.loadSceneFromFile(scene.path);
@@ -62,6 +72,7 @@ const onOpenScene = async (scene: SceneFile) => {
 };
 
 const showContextMenu = (e: MouseEvent, scene: SceneFile) => {
+    selectedPath.value = scene.path; // Auto select on right click
     menuState.value = {
         visible: true,
         x: e.clientX,
@@ -79,6 +90,63 @@ const showContextMenu = (e: MouseEvent, scene: SceneFile) => {
     }, 0);
 };
 
+const startRename = (scene: SceneFile) => {
+    renamingPath.value = scene.path;
+    renameValue.value = scene.name;
+    menuState.value.visible = false;
+    nextTick(() => {
+        // Since it's in v-for, ref is an array
+        const input = Array.isArray(renameInputRef.value) ? renameInputRef.value[0] : renameInputRef.value;
+        input?.focus();
+        input?.select();
+    });
+};
+
+const cancelRename = () => {
+    renamingPath.value = null;
+    renameValue.value = '';
+};
+
+const confirmRename = async () => {
+    if (!renamingPath.value) return;
+    const oldPath = renamingPath.value;
+    const newName = renameValue.value.trim();
+    
+    // Find scene object
+    const scene = scenes.value.find(s => s.path === oldPath);
+    if (!scene) return cancelRename();
+
+    if (!newName || newName === scene.name) return cancelRename();
+
+    // Check collision
+    if (scenes.value.some(s => s.name === newName)) {
+        ui.showToast({ title: 'Error', description: 'Name already exists', type: 'error' });
+        return;
+    }
+
+    try {
+        // Read -> Write -> Delete (Simulate Rename)
+        const content = await fs.readFile(oldPath);
+        const newPath = `assets/scenes/${newName}.json`;
+        
+        await fs.writeFile(newPath, content);
+        await fs.deleteFile(oldPath); // Only delete if write success
+        
+        // Update Active Scene if needed
+        if (SceneManager.activeSceneName === scene.name) {
+            SceneManager.activeSceneName = newName;
+        }
+
+        ui.showToast({ title: 'Renamed', description: `Renamed to ${newName}`, type: 'success' });
+        cancelRename();
+        await loadScenes();
+        selectedPath.value = newPath; // Maintain selection
+    } catch (e: any) {
+        ui.showToast({ title: 'Error', description: 'Rename failed: ' + e.message, type: 'error' });
+        cancelRename();
+    }
+};
+
 const onDeleteScene = async () => {
     const scene = menuState.value.scene;
     if (!scene) return;
@@ -89,27 +157,18 @@ const onDeleteScene = async () => {
         confirmText: 'Delete',
         isDanger: true
     })) {
-        console.log('[ScenesPanel] Context Menu Deleting:', scene.path);
         try {
             const success = await fs.deleteFile(scene.path);
-            console.log('[ScenesPanel] Context Delete result:', success);
             if (success) {
-                console.log('Scene deleted:', scene.name);
-                scenes.value = scenes.value.filter(s => s.path !== scene.path);
-                ui.showToast({ title: 'Deleted', description: `Scene ${scene.name} deleted.`, type: 'success' });
-                
-                // If we deleted the ACTIVE scene, we must reset the world
                 if (scene.name === SceneManager.activeSceneName) {
-                    SceneManager.createDefaultScene(); // Clears world, adds new Camera
-                    // We effectively switch to "Untitled Scene" state which is unsaved
+                    SceneManager.createDefaultScene();
                 }
-
                 await loadScenes();
+                ui.showToast({ title: 'Deleted', description: `Scene ${scene.name} deleted.`, type: 'success' });
             } else {
-                ui.showToast({ title: 'Error', description: 'Failed to delete scene (fs returned false).', type: 'error' });
+                ui.showToast({ title: 'Error', description: 'Failed to delete scene.', type: 'error' });
             }
         } catch (e: any) {
-             console.error('[ScenesPanel] Context Delete error:', e);
              ui.showToast({ title: 'Error', description: 'Error deleting scene: ' + e.message, type: 'error' });
         }
     }
@@ -134,37 +193,9 @@ const onDuplicateScene = async () => {
     menuState.value.visible = false;
 };
 
-// Also verify delete from 'X' button if we keep it
 const onDeleteSceneDirect = async (scene: SceneFile) => {
-    menuState.value.scene = scene; 
-    // console.log('[ScenesPanel] Clicked delete for:', scene.path);
-    if (await ui.confirm({ 
-        title: 'Delete Scene', 
-        message: `Delete "${scene.name}"?`,
-        confirmText: 'Delete',
-        isDanger: true
-    })) {
-        console.log('[ScenesPanel] Deleting scene:', scene.path);
-        try {
-            const success = await fs.deleteFile(scene.path);
-            console.log('[ScenesPanel] Delete result:', success);
-            if (success) {
-                // Optimistic update
-                scenes.value = scenes.value.filter(s => s.path !== scene.path);
-                ui.showToast({ title: 'Deleted', description: `Scene ${scene.name} deleted.`, type: 'success' });
-
-                if (scene.name === SceneManager.activeSceneName) {
-                    SceneManager.createDefaultScene();
-                }
-
-                await loadScenes();
-            }
-            else ui.showToast({ title: 'Error', description: 'Failed to delete (fs returned false).', type: 'error' });
-        } catch(e: any) {
-            console.error('[ScenesPanel] Delete error:', e);
-            ui.showToast({ title: 'Error', description: 'Error: ' + e.message, type: 'error' });
-        }
-    }
+    menuState.value.scene = scene;
+    await onDeleteScene();
 };
 
 const startCreate = () => {
@@ -183,8 +214,6 @@ const cancelCreate = () => {
 
 const confirmCreate = async () => {
     if (!newSceneName.value) return;
-    
-    // Check for duplicate name
     const exists = scenes.value.some(s => s.name === newSceneName.value);
     if (exists) {
         if (!await ui.confirm({ title: 'Scene Exists', message: `Scene "${newSceneName.value}" already exists. Overwrite?`, confirmText: 'Overwrite' })) {
@@ -198,7 +227,6 @@ const confirmCreate = async () => {
         SceneManager.activeSceneName = newSceneName.value;
         await ProjectManager.saveProject();
         isCreating.value = false;
-        // Refresh list
         await loadScenes();
         ui.showToast({ title: 'Created', description: `Scene ${newSceneName.value} created.`, type: 'success' });
     } catch (e) {
@@ -212,8 +240,21 @@ const onRefresh = () => {
     loadScenes();
 };
 
+// Global shortcuts (F2)
+const handleGlobalKeydown = (e: KeyboardEvent) => {
+    if (e.key === 'F2' && selectedPath.value && !isCreating.value && !renamingPath.value) {
+        const scene = scenes.value.find(s => s.path === selectedPath.value);
+        if (scene) startRename(scene);
+    }
+};
+
 onMounted(() => {
     loadScenes();
+    window.addEventListener('keydown', handleGlobalKeydown);
+});
+
+onUnmounted(() => {
+    window.removeEventListener('keydown', handleGlobalKeydown);
 });
 </script>
 
@@ -241,10 +282,9 @@ onMounted(() => {
                     class="flex-1 bg-bg-input text-text-primary px-2 py-1 rounded border border-border focus:border-accent outline-none"
                     @keyup.enter="confirmCreate"
                     @keyup.esc="cancelCreate"
+                    @blur="cancelCreate"
                     placeholder="Scene Name"
                 />
-                <button @click="confirmCreate" class="text-green-500 hover:text-green-400">✓</button>
-                <button @click="cancelCreate" class="text-red-500 hover:text-red-400">×</button>
             </div>
         </div>
 
@@ -253,15 +293,37 @@ onMounted(() => {
             <div 
                 v-for="scene in scenes" 
                 :key="scene.path"
-                class="group flex items-center px-2 py-1.5 rounded cursor-pointer hover:bg-bg-hover"
+                class="group flex items-center px-2 py-1.5 rounded cursor-pointer border border-transparent"
+                :class="{ 
+                    'bg-bg-hover border-accent/20': selectedPath === scene.path,
+                    'hover:bg-bg-hover': selectedPath !== scene.path 
+                }"
+                @click="onSelectScene(scene)"
                 @dblclick="onOpenScene(scene)"
                 @contextmenu.stop.prevent="showContextMenu($event, scene)"
             >
                 <div class="w-4 text-center mr-2 text-text-tertiary">📄</div>
-                <div class="flex-1 truncate select-none" :class="{ 'font-bold': scene.name === SceneManager.activeSceneName }">{{ scene.name }}</div>
+                
+                <!-- Rename Input -->
+                <input 
+                    v-if="renamingPath === scene.path"
+                    ref="renameInputRef"
+                    v-model="renameValue"
+                    class="flex-1 bg-bg-input text-text-primary px-1 rounded outline-none min-w-0"
+                    @click.stop
+                    @keyup.enter="confirmRename"
+                    @keyup.esc="cancelRename"
+                    @blur="confirmRename"
+                />
+                
+                <!-- Scene Name -->
+                <div v-else class="flex-1 truncate select-none" :class="{ 'font-bold': scene.name === SceneManager.activeSceneName }">
+                    {{ scene.name }}
+                    <span v-if="scene.name === SceneManager.activeSceneName" class="text-[9px] ml-2 text-accent uppercase tracking-widest opacity-50">(Active)</span>
+                </div>
                 
                 <!-- Direct Delete Button (X) -->
-                <button class="hidden group-hover:block hover:text-red-400 text-text-tertiary px-1" @click.stop="onDeleteSceneDirect(scene)">
+                <button v-if="renamingPath !== scene.path" class="hidden group-hover:block hover:text-red-400 text-text-tertiary px-1" @click.stop="onDeleteSceneDirect(scene)">
                     ×
                 </button>
             </div>
@@ -278,6 +340,7 @@ onMounted(() => {
         <div v-if="menuState.visible" 
              class="fixed bg-bg-panel border border-border shadow-lg rounded z-50 py-1 min-w-[140px]"
              :style="{ top: menuState.y + 'px', left: menuState.x + 'px' }">
+            <button @click="startRename(menuState.scene!)" class="w-full text-left px-3 py-1.5 hover:bg-bg-hover text-xs">Rename</button>
             <button @click="onDuplicateScene" class="w-full text-left px-3 py-1.5 hover:bg-bg-hover text-xs">Duplicate</button>
             <div class="h-[1px] bg-border my-1"></div>
             <button @click="onDeleteScene" class="w-full text-left px-3 py-1.5 hover:bg-red-900 hover:text-white text-xs text-red-400">Delete</button>

@@ -8,11 +8,15 @@ import { instance as engine } from '../../engine/core/Engine';
 
 const editorStore = useEditorStore();
 const entities = ref<Entity[]>([]);
+const activeSceneName = ref(SceneManager.activeSceneName);
 
 const collapsedScene = ref(false);
 
 const updateList = () => {
     console.log('[HierarchyPanel] updateList called. World Count:', world.entities.length);
+    // Sync Scene Name
+    activeSceneName.value = SceneManager.activeSceneName;
+    
     // Create shallow copies to force Vue reactivity update since entity objects are not reactive
     entities.value = world.entities.map(e => ({ ...e }));
 };
@@ -52,6 +56,8 @@ onMounted(() => {
     eventBus.on('entity-updated', updateList);
     // Also listen for selection changes as they might accompany deletions
     eventBus.on('selection-changed', updateList);
+    // Listen for scene changes (Load/New)
+    eventBus.on('scene-loaded', updateList);
 });
 
 onUnmounted(() => {
@@ -59,6 +65,7 @@ onUnmounted(() => {
     if (unsubRemove) unsubRemove();
     eventBus.off('entity-updated', updateList);
     eventBus.off('selection-changed', updateList);
+    eventBus.off('scene-loaded', updateList);
 });
 
 const select = (id: string | undefined) => {
@@ -203,7 +210,7 @@ const duplicateEntity = () => {
             >
                 <span class="mr-1 text-xs opacity-70">{{ collapsedScene ? '▶' : '▼' }}</span>
                 <span class="text-accent-color">Scene</span>
-                <span class="ml-2 text-xs text-text-secondary font-normal opacity-50">{{ SceneManager.activeSceneName }}</span>
+                <span class="ml-2 text-xs text-text-secondary font-normal opacity-50">{{ activeSceneName }}</span>
             </div>
             
             <!-- Entities (Children of Scene) -->
