@@ -223,11 +223,22 @@ const confirmCreate = async () => {
     
     isLoading.value = true;
     try {
-        SceneManager.createDefaultScene();
-        SceneManager.activeSceneName = newSceneName.value;
+        // 1. Setup new "empty" scene in memory
+        SceneManager.createDefaultScene(); 
+        SceneManager.activeSceneName = newSceneName.value; // Update name match file
+        
+        // 2. Save it to disk as the new file
         await ProjectManager.saveProject();
+        
+        // 3. Update UI
         isCreating.value = false;
         await loadScenes();
+        
+        // 4. Important: Select/Load this new scene properly to ensure everything is matched
+        // Although createDefaultScene cleared world, we want to ensure we "are" on this file path.
+        const newPath = `assets/scenes/${newSceneName.value}.json`;
+        selectedPath.value = newPath;
+        
         ui.showToast({ title: 'Created', description: `Scene ${newSceneName.value} created.`, type: 'success' });
     } catch (e) {
         ui.showToast({ title: 'Error', description: 'Failed to create scene: ' + e, type: 'error' });

@@ -58,6 +58,7 @@ onMounted(() => {
     eventBus.on('selection-changed', updateList);
     // Listen for scene changes (Load/New)
     eventBus.on('scene-loaded', updateList);
+    eventBus.on('scene-cleared', updateList);
 });
 
 onUnmounted(() => {
@@ -66,6 +67,7 @@ onUnmounted(() => {
     eventBus.off('entity-updated', updateList);
     eventBus.off('selection-changed', updateList);
     eventBus.off('scene-loaded', updateList);
+    eventBus.off('scene-cleared', updateList);
 });
 
 const select = (id: string | undefined) => {

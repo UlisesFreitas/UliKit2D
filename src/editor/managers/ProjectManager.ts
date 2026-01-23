@@ -94,6 +94,16 @@ export class ProjectManager {
                     if (hasDefaultScene) {
                         console.log('[ProjectManager] Loading initial scene: assets/scenes/NewScene.json');
                         await SceneManager.loadSceneFromFile('assets/scenes/NewScene.json');
+                    } else if (sceneFiles.length > 0) {
+                        // Fallback: Load first available scene logic
+                        const firstScene = sceneFiles.find(f => f.name.endsWith('.json'));
+                        if (firstScene) {
+                             console.log(`[ProjectManager] NewScene.json not found. Loading ${firstScene.name}`);
+                             await SceneManager.loadSceneFromFile(firstScene.path);
+                        } else {
+                             console.warn('[ProjectManager] No JSON scenes found. Creating default.');
+                             SceneManager.createDefaultScene();
+                        }
                     } else {
                         console.warn('[ProjectManager] NewScene.json not found. Creating default scene.');
                         SceneManager.createDefaultScene();

@@ -172,6 +172,7 @@ export class SceneManager {
     }
 
     static loadScene(dataOrJson: string | any, name: string = 'Untitled Scene') {
+        eventBus.emit('scene-cleared'); // Notify UI to clear immediately
         world.clear();
         this._activeSceneName = name;
         this._layers = []; // Clear current
@@ -270,6 +271,7 @@ export class SceneManager {
     }
 
     static createDefaultScene() {
+        eventBus.emit('scene-cleared');
         world.clear();
         this._activeSceneName = 'Untitled Scene';
         this._layers = [{ 
@@ -277,7 +279,7 @@ export class SceneManager {
             name: 'Base Layer', 
             visible: true, 
             locked: false, 
-            color: 'var(--base-layer-color)', 
+            color: '#333333', 
             type: 'default',
             tileData: {},
             gridSize: { x: 32, y: 32 },

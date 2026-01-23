@@ -38,14 +38,21 @@ const handleEntityUpdate = (id: string) => {
     }
 };
 
+const handleSceneCleared = () => {
+    editorStore.clearSelection();
+    revision.value++;
+};
+
 onMounted(() => {
     eventBus.on('entity-updated', handleEntityUpdate);
     eventBus.on('entity-change', handleEntityUpdate);
+    eventBus.on('scene-cleared', handleSceneCleared);
 });
 
 onUnmounted(() => {
     eventBus.off('entity-updated', handleEntityUpdate);
     eventBus.off('entity-change', handleEntityUpdate);
+    eventBus.on('scene-cleared', handleSceneCleared);
 });
 
 // Polling for live updates when game is playing
