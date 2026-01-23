@@ -32,6 +32,11 @@ export interface IProjectSettings {
         actions: Record<string, string[]>;
         axes: Record<string, { negative: string; positive: string; altNegative?: string; altPositive?: string; gravity: number; sensitivity: number; dead: number }>;
     };
+    time: {
+        fixedTimestep: number;
+        maxAllowedTimestep: number;
+        timeScale: number;
+    };
     audio: {
         masterVolume: number;
         channels: Record<string, { volume: number; muted: boolean }>;
@@ -65,6 +70,11 @@ const DEFAULT_SETTINGS: IProjectSettings = {
             'Horizontal': { negative: 'ArrowLeft', positive: 'ArrowRight', altNegative: 'KeyA', altPositive: 'KeyD', gravity: 3, sensitivity: 3, dead: 0.001 },
             'Vertical': { negative: 'ArrowUp', positive: 'ArrowDown', altNegative: 'KeyW', altPositive: 'KeyS', gravity: 3, sensitivity: 3, dead: 0.001 }
         }
+    },
+    time: {
+        fixedTimestep: 0.02, // 50hz
+        maxAllowedTimestep: 0.1, // Avoid spiraling
+        timeScale: 1.0
     },
     audio: {
         masterVolume: 1.0,
@@ -118,11 +128,23 @@ export const useProjectSettingsStore = defineStore('projectSettings', () => {
                   physics.world.gravity.x = settings.physics.gravity.x;
                   physics.world.gravity.y = settings.physics.gravity.y;
              }
+
+             // Input Config
+             engine.configureInput(settings.input);
+             
+             // Time Config (New)
+             // Check if engine has setTimeSettings
+             if ((engine as any).setTimeSettings) {
+                 (engine as any).setTimeSettings(settings.time);
+             } else {
+                 // Direct set fallback if methods missing (transitional)
+                 (engine as any).timeScale = settings.time.timeScale;
+             }
         }
         
         console.log(`[ProjectSettings] Settings applied. ScaleMode: ${TextureStyle.defaultOptions.scaleMode}`);
     };
-
+    
     // Actions
     const setSettings = (newSettings: IProjectSettings) => {
         // Deep merge or replace

@@ -49,6 +49,21 @@ const lastMouseY = ref(0);
 const debugInfo = ref({ screen: {x:0, y:0}, world: {x:0, y:0}, lastClick: 'None' });
 const hoveredEntityDebug = ref<any>(null); // New Entity Info Debug
 const highlightGraphics = ref<any>(null); // For Tilemap highlight
+const activeKeys = ref<string[]>([]); // Input Debug
+
+// Sync Keys
+let inputInterval: any;
+onMounted(() => {
+    inputInterval = setInterval(() => {
+        if ((window as any).Input) {
+            activeKeys.value = (window as any).Input.activeKeys;
+        }
+    }, 100);
+});
+
+onUnmounted(() => {
+    if (inputInterval) clearInterval(inputInterval);
+});
 
 const debugLayers = ref<{name: string, enabled: boolean}[]>([]);
 const isDebugCollapsed = ref(false);
@@ -527,6 +542,12 @@ import { Check } from 'lucide-vue-next';
              
              <div class="col-span-2 mt-2 border-t border-gray-700 pt-1 text-[10px] text-gray-500">
                  Last Click: <span class="text-white">{{ debugInfo.lastClick }}</span>
+             </div>
+             
+             <!-- Extended Input Debug -->
+             <div class="col-span-2 mt-2 border-t border-gray-700 pt-1 text-[10px] text-gray-400">
+                <div>Keys: <span class="text-white font-mono break-all">{{ activeKeys.join(', ') || 'None' }}</span></div>
+                <div>Diff: <span class="text-white">{{ activeKeys.length }}</span></div>
              </div>
         </div>
     </div>

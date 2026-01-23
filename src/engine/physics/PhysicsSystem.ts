@@ -173,7 +173,8 @@ export class PhysicsSystem {
                     (body as any)._lastScale = { x: sx, y: sy };
                     (body as any)._lastDims = { w, h };
                     
-                    entity.physicsBody = body;
+                    // CRITICAL: Use addComponent so Miniplex updates query buckets (e.g. for CharacterSystem)
+                    world.addComponent(entity, 'physicsBody', body);
                     Matter.World.add(this.engine.world, body);
                 }
             } else {

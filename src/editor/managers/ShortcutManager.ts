@@ -46,6 +46,13 @@ export class ShortcutManager {
                         e.preventDefault();
                         break;
 
+                    case 'r':
+                        // Ctrl + R -> Play/Stop
+                        if (store.isPlaying) store.stopGame();
+                        else store.playGame();
+                        e.preventDefault();
+                        break;
+
                     case 'a':
                          // Ctrl + A -> Select All
                          if (store.selectAll) {

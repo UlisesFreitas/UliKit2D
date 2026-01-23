@@ -23,7 +23,7 @@ const emit = defineEmits<{
 
 const store = useProjectSettingsStore();
 const ui = useUIStore();
-const activeTab = ref<'general' | 'display' | 'input' | 'audio' | 'physics' | 'editor' | 'tags' | 'layouts'>('general');
+const activeTab = ref<'general' | 'display' | 'input' | 'time' | 'audio' | 'physics' | 'editor' | 'tags' | 'layouts'>('general');
 
 const onClose = () => {
     if (store.isDirty) {
@@ -91,7 +91,7 @@ const toggleCollision = (a: string, b: string) => {
                     <!-- Sidebar Tabs -->
                     <div class="w-48 border-r border-border bg-bg-base/50 flex flex-col py-2">
                         <button 
-                            v-for="tab in ['General', 'Display', 'Input', 'Audio', 'Physics', 'Editor', 'Tags & Layers', 'Layouts']"
+                            v-for="tab in ['General', 'Display', 'Input', 'Time', 'Audio', 'Physics', 'Editor', 'Tags & Layers', 'Layouts']"
                             :key="tab"
                             @click="activeTab = (tab.split(' ')[0] || '').toLowerCase() as any"
                             class="px-4 py-2 text-left text-sm transition-colors border-l-2"
@@ -249,6 +249,31 @@ const toggleCollision = (a: string, b: string) => {
                                     </div>
                                 </div>
                             </div>
+                        </div>
+
+                        <!-- TIME TAB -->
+                        <div v-if="activeTab === 'time'" class="space-y-4 animate-fade-in">
+                             <h3 class="text-lg font-bold text-accent mb-4">Time Settings</h3>
+                             
+                             <div class="grid grid-cols-1 gap-4">
+                                <div class="flex flex-col gap-1">
+                                    <label class="text-xs text-text-secondary">Fixed Timestep</label>
+                                    <input v-model.number="store.settings.time.fixedTimestep" type="number" step="0.001" class="bg-bg-input border border-border rounded px-3 py-1.5 text-sm text-text-primary outline-none focus:border-accent transition-colors" />
+                                </div>
+                                <div class="flex flex-col gap-1">
+                                    <label class="text-xs text-text-secondary">Maximum Allowed Timestep</label>
+                                    <input v-model.number="store.settings.time.maxAllowedTimestep" type="number" step="0.001" class="bg-bg-input border border-border rounded px-3 py-1.5 text-sm text-text-primary outline-none focus:border-accent transition-colors" />
+                                </div>
+                                <div class="flex flex-col gap-1">
+                                    <label class="text-xs text-text-secondary">Time Scale</label>
+                                    <input v-model.number="store.settings.time.timeScale" type="number" step="0.1" class="bg-bg-input border border-border rounded px-3 py-1.5 text-sm text-text-primary outline-none focus:border-accent transition-colors" />
+                                </div>
+                                <div class="flex flex-col gap-1">
+                                    <label class="text-xs text-text-secondary">Maximum Particle Timestep</label>
+                                    <input type="number" value="0.03" disabled class="bg-bg-input border border-border rounded px-3 py-1.5 text-sm text-text-disabled outline-none opacity-50 cursor-not-allowed" />
+                                    <p class="text-[10px] text-text-secondary opacity-70">Not implemented yet (Particles System).</p>
+                                </div>
+                             </div>
                         </div>
 
                         <!-- AUDIO TAB -->

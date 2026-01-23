@@ -8,6 +8,7 @@ import { EditorDebugSystem } from '../systems/EditorDebugSystem';
 import { EditorTilemapSystem } from '../../editor/systems/EditorTilemapSystem';
 import { Input } from '../input/InputManager';
 import { Application } from 'pixi.js';
+import { CharacterSystem } from '../systems/CharacterSystem';
 
 export class Engine {
     public app: Application;
@@ -18,12 +19,14 @@ export class Engine {
     private scriptSystem: ScriptSystem;
     private audioSystem: AudioSystem;
     private animationSystem: AnimationSystem;
+    private characterSystem: CharacterSystem; // Added
     public renderSystem: RenderSystem;
     public editorDebugSystem: EditorDebugSystem;
-    public editorTilemapSystem: EditorTilemapSystem; // Added
+    public editorTilemapSystem: EditorTilemapSystem;
 
     public onUpdate: ((deltaTime: number) => void) | null = null;
     public onRender: (() => void) | null = null;
+
 
     constructor() {
         this.app = new Application();
@@ -31,14 +34,11 @@ export class Engine {
         this.scriptSystem = new ScriptSystem();
         this.audioSystem = new AudioSystem();
         this.animationSystem = new AnimationSystem();
-        // RenderSystem initialized later or passed app reference? 
-        // We need app to be init first usually, but we can pass existing instance.
-        // Actually app is created in constructor, so we can pass it.
+        this.characterSystem = new CharacterSystem(); // Added
         this.renderSystem = new RenderSystem(this.app);
         this.editorDebugSystem = new EditorDebugSystem(this.app);
-        this.editorTilemapSystem = new EditorTilemapSystem(this.app); // Added
+        this.editorTilemapSystem = new EditorTilemapSystem(this.app);
     }
-
     public async init(container: HTMLElement) {
         await this.app.init({
             resizeTo: container,
@@ -47,6 +47,10 @@ export class Engine {
         });
         container.appendChild(this.app.canvas);
         Input.initialize(this.app.canvas);
+    }
+
+    public configureInput(settings: { actions: Record<string, string[]>, axes: Record<string, any> }) {
+        Input.loadConfig(settings);
     }
 
     public start() {
@@ -67,13 +71,13 @@ export class Engine {
 
     public startSimulation() {
         this.isSimulationRunning = true;
-        Input.reset();
+        // Input.reset(); 
         this.audioSystem.start();
     }
 
     public stopSimulation() {
         this.isSimulationRunning = false;
-        Input.reset();
+        // Input.reset();
         this.audioSystem.stopAll();
     }
 
@@ -81,18 +85,33 @@ export class Engine {
         return this.physicsSystem;
     }
 
+    // Time Settings
+    public timeScale: number = 1.0;
+    
+    public setTimeSettings(settings: { fixedTimestep: number, maxAllowedTimestep: number, timeScale: number }) {
+        this.timeScale = settings.timeScale;
+        // Optionally pass fixedTimestep to PhysicsSystem if managed there
+        // this.physicsSystem.setTimeSettings(settings);
+    }
+
     private gameLoop = (time: number) => {
         if (!this.isRunning) return;
 
-        const deltaTime = time - this.lastTime;
+        const rawDelta = time - this.lastTime;
         this.lastTime = time;
+        
+        // Apply Time Scale
+        const deltaTime = rawDelta * this.timeScale;
 
+        // Input Update (Always run to clear frame flags)
+        Input.update();
         if (this.isSimulationRunning) {
             this.physicsSystem.update(deltaTime);
-            Input.update(); // Update input state (clears frame-based flags)
+            this.characterSystem.update(deltaTime); // Added
             this.scriptSystem.update(deltaTime);
-            this.animationSystem.update(deltaTime / 1000); // Pass seconds
+            this.animationSystem.update(deltaTime / 1000);
         }
+
 
         // Custom Logic Update
         if (this.onUpdate) {

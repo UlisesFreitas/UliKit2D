@@ -149,6 +149,7 @@ export class SceneManager {
                  label: entity.label ? { ...entity.label } : undefined,
                  bitmapText: entity.bitmapText ? { ...entity.bitmapText } : undefined,
                  nineSliceSprite: entity.nineSliceSprite ? { ...entity.nineSliceSprite } : undefined,
+                 characterController: entity.characterController ? { ...entity.characterController } : undefined,
                  polygonCollider: entity.polygonCollider ? { ...entity.polygonCollider } : undefined,
                  animator: entity.animator ? JSON.parse(JSON.stringify(entity.animator)) : undefined,
                  script: entity.script ? (Array.isArray(entity.script) ? entity.script.map(s => ({...s})) : []) : undefined

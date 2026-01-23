@@ -27,3 +27,11 @@ export function update(entity, dt, params) {
     entity.transform.rotation += params.speed * (dt / 1000);
 }
 ```
+
+## Checklist: Adding New Native Components
+When adding a new Core Component (e.g., `CharacterController`), you MUST:
+1.  **Define Interface**: Add the property to `Entity` interface in `src/engine/ecs/ECS.ts`.
+2.  **Update Serializer**: Add the property to the whitelist in `SceneManager.saveScene()` (`src/engine/managers/SceneManager.ts`).
+3.  **Register Editor**: Add the component to `src/editor/panels/InspectorPanel.vue` (Import Editor + `handleAddComponent` logic + Defaults).
+4.  **Register Picker**: Add to `src/editor/components/modals/AddComponentModal.vue`.
+5.  **Create Inspector**: Create `src/editor/components/inspectors/MyComponentEditor.vue`.

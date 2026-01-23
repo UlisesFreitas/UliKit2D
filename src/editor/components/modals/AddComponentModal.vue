@@ -25,7 +25,8 @@ const CORE_COMPONENTS = [
     { type: 'label', name: 'Text Label', icon: '📝', description: 'Displays text' },
     { type: 'bitmapText', name: 'Bitmap Text', icon: '🔤', description: 'High-performance styled text' },
     { type: 'polygonCollider', name: 'Polygon Collider 2D', icon: '📐', description: 'Custom shape collision' },
-    { type: 'nineSliceSprite', name: 'Nine Slice Sprite', icon: '🍱', description: 'Scalable UI panel/frame' }
+    { type: 'nineSliceSprite', name: 'Nine Slice Sprite', icon: '🍱', description: 'Scalable UI panel/frame' },
+    { type: 'characterController', name: 'Character Controller', icon: '🏃', description: 'Physics movement input' }
 ];
 
 const loadScripts = async () => {

@@ -43,14 +43,12 @@ export class ProjectManager {
                  // LOAD THE INITIAL SCENE
                  // Dynamic import to avoid circular dependency issues if any
                  const { SceneManager } = await import('../../engine/managers/SceneManager');
-                 try {
-                    await SceneManager.loadSceneFromFile('assets/scenes/NewScene.json');
-                 } catch (e) {
-                     console.warn('[ProjectManager] Failed to load initial scene file. Using fallback default scene.', e);
-                     SceneManager.createDefaultScene();
-                     // Manually set name so it looks like the file
-                     (SceneManager as any)._activeSceneName = 'NewScene'; 
-                 }
+                 // Create default scene directly for new projects
+                 SceneManager.createDefaultScene();
+                 (SceneManager as any)._activeSceneName = 'NewScene';
+                 
+                 // Optional: Auto-save the initial scene?
+                 // await ProjectManager.saveProject();
             } else {
                 console.error('Failed to create project:', result.error);
                 alert('Failed to create project: ' + result.error);
@@ -88,19 +86,23 @@ export class ProjectManager {
 
             // Load Initial Scene
             const { SceneManager } = await import('../../engine/managers/SceneManager');
-            try {
-                // Try NewScene.json first
-                console.log('[ProjectManager] Loading initial scene: assets/scenes/NewScene.json');
-                const success = await SceneManager.loadSceneFromFile('assets/scenes/NewScene.json');
-                
-                if (!success) {
-                    console.warn('[ProjectManager] NewScene.json load returned false. Creating default scene.');
+                // Check if NewScene.json exists to avoid 404/ENOENT errors
+                try {
+                    const sceneFiles = await fs.readdir('assets/scenes');
+                    const hasDefaultScene = sceneFiles.some(f => f.name === 'NewScene.json');
+
+                    if (hasDefaultScene) {
+                        console.log('[ProjectManager] Loading initial scene: assets/scenes/NewScene.json');
+                        await SceneManager.loadSceneFromFile('assets/scenes/NewScene.json');
+                    } else {
+                        console.warn('[ProjectManager] NewScene.json not found. Creating default scene.');
+                        SceneManager.createDefaultScene();
+                    }
+                } catch (e) {
+                    // Start fresh if folder missing
+                    console.warn('[ProjectManager] Could not read assets/scenes directory. Creating default scene.', e);
                     SceneManager.createDefaultScene();
                 }
-            } catch (e) {
-                console.error('[ProjectManager] Error loading initial scene:', e);
-                SceneManager.createDefaultScene();
-            }
         }
     }
 

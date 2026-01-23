@@ -16,6 +16,7 @@ import TilemapSettingsPanel from '../panels/TilemapSettingsPanel.vue';
 import StatusBar from '../components/StatusBar.vue';
 
 import { useLayoutStore } from '../../stores/useLayoutStore';
+import { useProjectSettingsStore } from '../../stores/useProjectSettingsStore'; // Added
 import { ThemeManager } from '../managers/ThemeManager';
 
 // IMMORTAL PIXI IMPORTS
@@ -100,6 +101,9 @@ onMounted(async () => {
         (window as any).engine = engine;
         await engine.init(pixiRoot.value);
         engine.start(); // Start the Game Loop (Rendering, Gizmos, etc)
+        
+        // Force Apply Settings (Input, Display, Physics) now that Engine is ready
+        useProjectSettingsStore().applySettings();
         
         // Initialize Core Editor Systems that depend on Pixi
         const { instance: gizmoManager } = await import('../gizmos/GizmoManager');

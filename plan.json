@@ -87,9 +87,9 @@
         "Implement Input Manager Editor (Map Keys to Actions) - DONE",
         "Implement Audio Manager Editor (Channels, Buses) - DONE",
         "Implement Physics Settings (Gravity, Layers/Masks Matrix) - DONE",
-        "Implement Runtime InputSystem (Map Settings to API)",
-        "Implement CharacterController Component",
-        "Integrate Input with CharacterController"
+        "Implement Runtime InputSystem (Map Settings to API) - DONE",
+        "Implement CharacterController Component - DONE",
+        "Integrate Input with CharacterController - DONE"
       ]
     },
     {

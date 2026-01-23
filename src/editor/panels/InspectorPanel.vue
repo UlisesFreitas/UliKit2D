@@ -20,6 +20,7 @@ import BitmapTextEditor from '../components/inspectors/BitmapTextEditor.vue';
 import CircleColliderEditor from '../components/inspectors/CircleColliderEditor.vue';
 import NineSliceEditor from '../components/inspectors/NineSliceEditor.vue';
 import PolygonColliderEditor from '../components/inspectors/PolygonColliderEditor.vue';
+import CharacterControllerEditor from '../components/inspectors/CharacterControllerEditor.vue';
 
 import AddComponentModal from '../components/modals/AddComponentModal.vue';
 import CollisionModal from '../components/modals/CollisionModal.vue';
@@ -246,7 +247,8 @@ const handleAddComponent = async (payload: { type: string, data: any }) => {
              data = { text: 'Bitmap Text', fontSize: 32, fontName: '', tint: 0xffffff, align: 'left' };
         } else if (payload.type === 'nineSliceSprite' && Object.keys(data).length === 0) {
              data = { texture: '', width: 100, height: 100, left: 10, right: 10, top: 10, bottom: 10 };
-
+        } else if (payload.type === 'characterController' && Object.keys(data).length === 0) {
+             data = { speed: 5, jumpForce: 10 };
         }
 
         world.addComponent(rawEntity, payload.type as any, data);
@@ -469,6 +471,13 @@ const handleSaveCollisionMask = (payload: { vertices: { x: number, y: number }[]
                         :revision="revision"
                         @update="onComponentUpdate" 
                         @open-modal="handleOpenCollisionModal"
+                    />
+
+                    <CharacterControllerEditor 
+                        v-else-if="item.key === 'characterController'" 
+                        :controller="item.data" 
+                        :revision="revision"
+                        @update="onComponentUpdate" 
                     />
 
                     <!-- Fallback -->

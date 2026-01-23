@@ -115,6 +115,10 @@ export type Entity = {
           speed?: number;
       }>;
   };
+  characterController?: {
+      speed: number;
+      jumpForce: number;
+  };
 };
 
 // Create the unified world

@@ -77,10 +77,15 @@ export class InputManager {
 
     private onKeyDown = (e: KeyboardEvent) => {
         // Prevent default browser actions for game keys if needed (like arrow scrolling)
+        // Global Input Prevention (Stop Scrolling / Stop Native Button Clicks)
         if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', ' '].includes(e.key)) {
-            // Check if focus is on canvas (optional, but good for editor)
-             // e.preventDefault(); 
-             // EDIT: better not prevent default globally in editor
+            const target = e.target as HTMLElement;
+            // Allow typing in Inputs/Textareas
+            const isInput = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable;
+            
+            if (!isInput) {
+                e.preventDefault();
+            }
         }
         
         if (!this.keys.has(e.code)) {
@@ -122,6 +127,21 @@ export class InputManager {
 
     // --- API ---
 
+    // Configuration
+    private actions: Record<string, string[]> = {};
+    private axes: Record<string, { negative: string; positive: string; altNegative?: string; altPositive?: string; gravity: number; sensitivity: number; dead: number }> = {};
+    
+    // Axis State (for smoothing) - TODO: Implement gravity/sensitivity
+    // For now we use raw Digital input for Axes until time delta is threaded through Input or updated.
+
+    public loadConfig(config: { actions: Record<string, string[]>, axes: Record<string, any> }) {
+        this.actions = config.actions || {};
+        this.axes = config.axes || {};
+        console.log('[InputManager] Configuration loaded', this.actions, this.axes);
+    }
+
+    // --- API ---
+
     // Keys (e.code preferred: "Space", "KeyW", "ArrowUp")
     public isKeyDown(keyCode: string): boolean {
         return this.keys.has(keyCode);
@@ -133,6 +153,51 @@ export class InputManager {
 
     public isKeyReleased(keyCode: string): boolean {
         return this.keysUp.has(keyCode);
+    }
+
+    public get activeKeys(): string[] {
+        return Array.from(this.keys);
+    }
+
+    // Actions
+    public isActionPressed(actionName: string): boolean {
+        const keys = this.actions[actionName];
+        if (!keys) return false;
+        return keys.some(k => this.isKeyDown(k) || (k.startsWith('Mouse') && this.checkMouseAction(k)));
+    }
+    
+    public isActionJustPressed(actionName: string): boolean {
+        const keys = this.actions[actionName];
+        if (!keys) return false;
+        return keys.some(k => this.isKeyPressed(k) || (k.startsWith('Mouse') && this.checkMouseActionJust(k)));
+    }
+
+    public isActionJustReleased(actionName: string): boolean {
+        const keys = this.actions[actionName];
+        if (!keys) return false;
+        return keys.some(k => this.isKeyReleased(k) || (k.startsWith('Mouse') && this.checkMouseActionUp(k)));
+    }
+
+    // Helper for Mouse Strings (Mouse0, MouseLeft, etc)
+    private checkMouseAction(key: string): boolean {
+        if (key === 'MouseLeft' || key === 'Mouse0') return this.mouseButtons.has(0);
+        if (key === 'MouseMiddle' || key === 'Mouse1') return this.mouseButtons.has(1);
+        if (key === 'MouseRight' || key === 'Mouse2') return this.mouseButtons.has(2);
+        return false;
+    }
+    
+    private checkMouseActionJust(key: string): boolean {
+        if (key === 'MouseLeft' || key === 'Mouse0') return this.mouseButtonsDown.has(0);
+        if (key === 'MouseMiddle' || key === 'Mouse1') return this.mouseButtonsDown.has(1);
+        if (key === 'MouseRight' || key === 'Mouse2') return this.mouseButtonsDown.has(2);
+        return false;
+    }
+
+    private checkMouseActionUp(key: string): boolean {
+        if (key === 'MouseLeft' || key === 'Mouse0') return this.mouseButtonsUp.has(0);
+        if (key === 'MouseMiddle' || key === 'Mouse1') return this.mouseButtonsUp.has(1);
+        if (key === 'MouseRight' || key === 'Mouse2') return this.mouseButtonsUp.has(2);
+        return false;
     }
 
     // Mouse (0: Left, 1: Middle, 2: Right)
@@ -156,16 +221,23 @@ export class InputManager {
         return this.mouseWheel;
     }
 
-    // Helpers
-    public getAxis(axis: 'Horizontal' | 'Vertical'): number {
+    // Axes
+    public getAxis(axisName: string): number {
+        const config = this.axes[axisName];
+        if (!config) return 0;
+
         let value = 0;
-        if (axis === 'Horizontal') {
-            if (this.isKeyDown('ArrowRight') || this.isKeyDown('KeyD')) value += 1;
-            if (this.isKeyDown('ArrowLeft') || this.isKeyDown('KeyA')) value -= 1;
-        } else if (axis === 'Vertical') {
-            if (this.isKeyDown('ArrowDown') || this.isKeyDown('KeyS')) value += 1;
-            if (this.isKeyDown('ArrowUp') || this.isKeyDown('KeyW')) value -= 1;
+        
+        // Positive
+        if (this.isKeyDown(config.positive) || (config.altPositive && this.isKeyDown(config.altPositive))) {
+            value += 1;
         }
+        
+        // Negative
+        if (this.isKeyDown(config.negative) || (config.altNegative && this.isKeyDown(config.altNegative))) {
+            value -= 1;
+        }
+
         return value;
     }
 }

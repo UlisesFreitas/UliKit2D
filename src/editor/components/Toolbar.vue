@@ -9,6 +9,8 @@ const tilemapStore = useTilemapStore();
 <template>
     <div class="flex items-center">
         <button 
+            tabindex="-1"
+            @mousedown.prevent
             @click="(!tilemapStore.isPaintMode) && (editorStore.isPlaying ? editorStore.stopGame() : editorStore.playGame())"
             :disabled="tilemapStore.isPaintMode"
             class="group relative flex items-center justify-center px-6 py-1.5 rounded-full font-bold text-sm transition-all duration-300 shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
