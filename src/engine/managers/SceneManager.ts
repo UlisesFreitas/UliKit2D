@@ -31,7 +31,7 @@ export class SceneManager {
             name: 'Base Layer', 
             visible: true, 
             locked: false, 
-            color: '#',
+            color: '#333333',
             type: 'default',
             tileData: {},
             gridSize: { x: 32, y: 32 },
@@ -171,13 +171,13 @@ export class SceneManager {
         }, null, 2);
     }
 
-    static loadScene(json: string, name: string = 'Untitled Scene') {
+    static loadScene(dataOrJson: string | any, name: string = 'Untitled Scene') {
         world.clear();
         this._activeSceneName = name;
         this._layers = []; // Clear current
         
         try {
-            const data = JSON.parse(json);
+            const data = typeof dataOrJson === 'string' ? JSON.parse(dataOrJson) : dataOrJson;
             
             // 1. Load Layers
             if (data.layers) {
@@ -227,60 +227,46 @@ export class SceneManager {
         }
 
         this._isDirty = false;
+        // Emit event for Runtime/UI to know scene changed immediately after synchronous load
+        eventBus.emit('scene-loaded', this._activeSceneName);
     }
 
-    static async loadSceneFromFile(path: string) {
-        // Dynamic import to avoid circular dependency
-        const { resourceManager } = await import('../resources/ResourceManager');
+    /**
+     * Runtime API to load a scene by its project-relative path.
+     * e.g. "assets/scenes/Level1.json"
+     */
+    static async loadSceneByPath(path: string) {
+        eventBus.emit('scene-change-start', path);
         
-        const data = await resourceManager.loadJSON(path);
-        
-        if (data) {
-            // Reset logic similar to loadScene but using the object directly
-            world.clear();
-            const filename = path.split(/[/\\]/).pop() || 'Loaded Scene';
-            this._activeSceneName = filename.replace('.json', '');
-
-            // 1. Layers
-            if (!Array.isArray(data) && data.layers) {
-                 this._layers = data.layers.map((l: any) => ({ 
-                    ...l, 
-                    tileData: l.tileData || {}, 
-                    gridSize: l.gridSize || { x: 32, y: 32 },
-                    _entityIds: new Set() 
-                }));
+        try {
+            // Dynamic import to avoid circular dependency
+            const { resourceManager } = await import('../resources/ResourceManager');
+            
+            const data = await resourceManager.loadJSON(path);
+            
+            if (data) {
+                const filename = path.split(/[/\\]/).pop() || 'Loaded Scene';
+                const name = filename.replace('.json', '');
+                
+                this.loadScene(data, name);
+                
+                console.log(`[SceneManager] Scene loaded from ${path}`);
+                return true;
             } else {
-                 this._layers = [];
+                console.error('[SceneManager] Failed to load scene: Invalid Data', path);
+                return false;
             }
-            if (!this._layers.find(l => l.id === 'Base Layer')) {
-                 this._layers.unshift({ 
-                     id: 'Base Layer', 
-                     name: 'Base Layer', 
-                     visible: true, 
-                     locked: false, 
-                     color: 'var(--base-layer-color)', 
-                     tileData: {},
-                     gridSize: { x: 32, y: 32 },
-                     _entityIds: new Set() 
-                });
-            }
-
-            // 2. Entities
-            const entities = Array.isArray(data) ? data : (data.entities || []);
-            for (const entity of entities) {
-                 if (!entity.layer) entity.layer = 'Base Layer';
-                 world.add(entity);
-                 this.registerEntity(entity.id!, entity.layer);
-            }
-
-            this._isDirty = false;
-            console.log(`Scene loaded from ${path}`);
-            eventBus.emit('scene-loaded', this._activeSceneName);
-            return true;
-        } else {
-            console.error('SceneManager: Failed to load scene or invalid format', path);
+        } catch (e) {
+            console.error('[SceneManager] Failed to load scene by path', path, e);
             return false;
         }
+    }
+
+    /**
+     * @deprecated Use loadSceneByPath
+     */
+    static async loadSceneFromFile(path: string) {
+        return this.loadSceneByPath(path);
     }
 
     static createDefaultScene() {

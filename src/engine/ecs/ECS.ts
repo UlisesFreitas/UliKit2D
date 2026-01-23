@@ -50,6 +50,7 @@ export type Entity = {
       volume: number;
       loop: boolean;
       playOnAwake: boolean;
+      channel?: string; // 'Music', 'SFX', etc.
   };
   label?: {
       text: string;

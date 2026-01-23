@@ -89,7 +89,10 @@
         "Implement Physics Settings (Gravity, Layers/Masks Matrix) - DONE",
         "Implement Runtime InputSystem (Map Settings to API) - DONE",
         "Implement CharacterController Component - DONE",
-        "Integrate Input with CharacterController - DONE"
+        "Integrate Input with CharacterController - DONE",
+        "Implement Runtime Audio Mixer (Buses/Channels Volume Control)",
+        "Implement Runtime Scene Loading API (loadSceneByPath)",
+        "Implement Global Game State (Persistence between scenes)"
       ]
     },
     {

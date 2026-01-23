@@ -9,6 +9,7 @@ import { EditorTilemapSystem } from '../../editor/systems/EditorTilemapSystem';
 import { Input } from '../input/InputManager';
 import { Application } from 'pixi.js';
 import { CharacterSystem } from '../systems/CharacterSystem';
+import { gameManager } from '../managers/GameManager'; // Ensure init
 
 export class Engine {
     public app: Application;
@@ -19,10 +20,11 @@ export class Engine {
     private scriptSystem: ScriptSystem;
     private audioSystem: AudioSystem;
     private animationSystem: AnimationSystem;
-    private characterSystem: CharacterSystem; // Added
+    private characterSystem: CharacterSystem; 
     public renderSystem: RenderSystem;
     public editorDebugSystem: EditorDebugSystem;
     public editorTilemapSystem: EditorTilemapSystem;
+    // GameManager is singleton, just ensuring import triggers it
 
     public onUpdate: ((deltaTime: number) => void) | null = null;
     public onRender: (() => void) | null = null;
@@ -34,10 +36,13 @@ export class Engine {
         this.scriptSystem = new ScriptSystem();
         this.audioSystem = new AudioSystem();
         this.animationSystem = new AnimationSystem();
-        this.characterSystem = new CharacterSystem(); // Added
+        this.characterSystem = new CharacterSystem();
         this.renderSystem = new RenderSystem(this.app);
         this.editorDebugSystem = new EditorDebugSystem(this.app);
         this.editorTilemapSystem = new EditorTilemapSystem(this.app);
+        
+        // Ensure Global State is ready
+        console.log('[Engine] GameManager initialized:', gameManager); 
     }
     public async init(container: HTMLElement) {
         await this.app.init({

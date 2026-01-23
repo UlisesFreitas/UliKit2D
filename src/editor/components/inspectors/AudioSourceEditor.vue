@@ -9,6 +9,7 @@ const props = defineProps<{
         volume: number;
         loop: boolean;
         playOnAwake: boolean;
+        channel?: string;
     };
 }>();
 
@@ -53,6 +54,20 @@ const onSelectAsset = (path: string | string[]) => {
              >
                 📂
              </button>
+        </div>
+
+        <!-- Channel Selector -->
+        <div class="flex items-center space-x-2">
+             <label class="text-text-secondary w-16">Channel</label>
+             <select 
+                v-model="audio.channel"
+                @change="update"
+                class="u-input flex-1 min-w-0 h-6 px-1"
+                title="Audio Mixer Channel"
+             >
+                <option value="SFX">SFX</option>
+                <option value="Music">Music</option>
+             </select>
         </div>
 
         <!-- Volume -->

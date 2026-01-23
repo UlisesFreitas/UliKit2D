@@ -4,6 +4,43 @@ import { getFileSystem } from '../../api/FileSystem';
 
 export class AudioSystem {
     private activeAudio = new Map<string, HTMLAudioElement>();
+    
+    // Default Settings
+    private settings = {
+        masterVolume: 1.0,
+        channels: {
+            'Music': { volume: 1.0, muted: false },
+            'SFX': { volume: 1.0, muted: false }
+        } as Record<string, { volume: number, muted: boolean }>
+    };
+
+    public setSettings(newSettings: any) {
+        if (!newSettings) return;
+        this.settings = newSettings;
+        this.updateVolumes();
+    }
+
+    private getChannelMultiplier(channelName?: string): number {
+        const master = this.settings.masterVolume;
+        if (!channelName) return master;
+
+        const channel = this.settings.channels[channelName];
+        if (!channel) return master; // Fallback to just master if channel not found
+        
+        if (channel.muted) return 0;
+        return master * channel.volume;
+    }
+
+    private updateVolumes() {
+        this.activeAudio.forEach((audio, entityId) => {
+            const entity = world.where(e => e.id === entityId).first;
+            if (entity && entity.audioSource) {
+                 const baseVol = Math.max(0, Math.min(1, entity.audioSource.volume));
+                 const multiplier = this.getChannelMultiplier(entity.audioSource.channel || 'SFX');
+                 audio.volume = baseVol * multiplier;
+            }
+        });
+    }
 
     // Called when Play Mode starts
     public async start() {
@@ -35,7 +72,12 @@ export class AudioSystem {
             const url = await fs.getAssetURL(path);
             
             const audio = new Audio(url);
-            audio.volume = Math.max(0, Math.min(1, entity.audioSource.volume));
+            
+            // Calculate Volume
+            const baseVol = Math.max(0, Math.min(1, entity.audioSource.volume));
+            const multiplier = this.getChannelMultiplier(entity.audioSource.channel || 'SFX');
+            audio.volume = baseVol * multiplier;
+            
             audio.loop = entity.audioSource.loop;
             
             // Track specific instance by entity ID if possible, 

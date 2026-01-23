@@ -132,6 +132,7 @@ export const useProjectSettingsStore = defineStore('projectSettings', () => {
              // Input Config
              engine.configureInput(settings.input);
              
+         
              // Time Config (New)
              // Check if engine has setTimeSettings
              if ((engine as any).setTimeSettings) {
@@ -139,6 +140,11 @@ export const useProjectSettingsStore = defineStore('projectSettings', () => {
              } else {
                  // Direct set fallback if methods missing (transitional)
                  (engine as any).timeScale = settings.time.timeScale;
+             }
+
+             // Audio Config (New)
+             if ((engine as any).audioSystem) {
+                 (engine as any).audioSystem.setSettings(settings.audio);
              }
         }
         

@@ -114,9 +114,13 @@ export class RenderSystem {
                 if (layer.color) {
                      const bg = new Graphics();
                      bg.rect(-10000, -10000, 20000, 20000);
-                     bg.fill({ color: this.resolveColor(layer.color) });
-                     bg.eventMode = 'none'; // Background should NOT block selection
-                     bg.zIndex = -1000; // Ensure it's always at the back
+                     const resolved = this.resolveColor(layer.color);
+                     // Simple hex validation or fallback
+                     if (resolved.startsWith('#') && resolved.length >= 4) {
+                         bg.fill({ color: resolved });
+                     }
+                     bg.eventMode = 'none'; 
+                     bg.zIndex = -1000;
                      container.addChildAt(bg, 0); 
                      this.layerBackgrounds.set(layer.id, bg);
                 }
@@ -134,7 +138,10 @@ export class RenderSystem {
                  if (bg) {
                      bg.clear();
                      bg.rect(-10000, -10000, 20000, 20000);
-                     bg.fill({ color: this.resolveColor(layer.color) });
+                     const resolved = this.resolveColor(layer.color);
+                     if (resolved.startsWith('#') && resolved.length >= 4) {
+                        bg.fill({ color: resolved });
+                     }
                  }
              }
 
