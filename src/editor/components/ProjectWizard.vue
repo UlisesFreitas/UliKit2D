@@ -70,6 +70,21 @@ const onCreate = async () => {
 
     await ProjectManager.createProject(fullPath);
 };
+
+const recentProjects = ref<{name: string, path: string}[]>([]);
+
+const loadProjects = async () => {
+    recentProjects.value = ProjectManager.getRecents();
+};
+
+import { onMounted } from 'vue';
+onMounted(() => {
+    loadProjects();
+});
+
+const openRecent = (name: string) => {
+    ProjectManager.openProject(name);
+};
 </script>
 
 <template>
@@ -84,12 +99,29 @@ const onCreate = async () => {
         <!-- Content -->
         <div class="flex-1 flex overflow-hidden">
             
-            <!-- Left Sidebar (Recent Projects - Mock for now) -->
+            <!-- Left Sidebar (Recent Projects) -->
             <div class="w-64 bg-bg-panel border-r border-border p-4 flex flex-col">
-                <div class="text-sm font-bold text-text-secondary mb-4 uppercase tracking-wider">Recents</div>
-                <div class="flex-1 overflow-y-auto">
-                    <!-- Placeholder Recents -->
-                    <div class="text-xs text-gray-500 italic p-2 text-center">No recent projects</div>
+                <div class="flex justify-between items-center mb-4">
+                    <div class="text-sm font-bold text-text-secondary uppercase tracking-wider">Projects</div>
+                    <button @click="loadProjects" class="text-xs text-accent hover:text-accent-hover" title="Refresh">↻</button>
+                </div>
+                
+                <div class="flex-1 overflow-y-auto space-y-1">
+                    <button 
+                        v-for="proj in recentProjects" 
+                        :key="proj.name"
+                        @click="openRecent(proj.name)"
+                        class="w-full text-left px-3 py-2 rounded hover:bg-bg-hover text-sm border border-transparent hover:border-border transition flex items-center group"
+                    >
+                        <span class="mr-2 text-lg">📁</span>
+                        <div class="flex-1 min-w-0">
+                            <div class="truncate font-medium group-hover:text-accent transition-colors">{{ proj.name }}</div>
+                        </div>
+                    </button>
+
+                    <div v-if="recentProjects.length === 0" class="text-xs text-gray-500 italic p-2 text-center">
+                        No projects found
+                    </div>
                 </div>
             </div>
 

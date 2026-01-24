@@ -13,7 +13,10 @@ export interface SceneLayer {
     tileData?: Record<string, number>; // Sparse map "x,y" -> tileId
     tileset?: string; // Path/URL to texture
     gridSize?: { x: number, y: number };
-    isCollision?: boolean; // Defines if this layer generates physics bodies
+    isCollision?: boolean;
+    
+    // Unity-Style Index (0-31)
+    layerIndex?: number;
 
     // Runtime Registry (Not serialized directly, rebuilt on load)
     _entityIds?: Set<string>; 
@@ -183,41 +186,50 @@ export class SceneManager {
             // 1. Load Layers
             if (data.layers) {
                 // Restore logic, ensuring defaults for new props
-                this._layers = data.layers.map((l: any) => ({ 
-                    ...l, 
-                    tileData: l.tileData || {}, // Restore or default
-                    gridSize: l.gridSize || { x: 32, y: 32 }, 
-                    _entityIds: new Set() 
-                }));
-            }
-            // Fallback or Ensure Base Layer exists
-            if (!this._layers.find(l => l.id === 'Base Layer')) {
-                 this._layers.unshift({ 
-                     id: 'Base Layer', 
-                     name: 'Base Layer', 
-                     visible: true, 
-                     locked: false, 
-                     color: 'var(--base-layer-color)', 
-                     tileData: {},
-                     gridSize: { x: 32, y: 32 },
-                     _entityIds: new Set() 
+                this._layers = data.layers.map((l: any) => {
+                    const globalIndex = SceneManager.getLayerIndex(l.name);
+                    return { 
+                        ...l, 
+                        tileData: l.tileData || {}, 
+                        gridSize: l.gridSize || { x: 32, y: 32 }, 
+                        layerIndex: globalIndex !== -1 ? globalIndex : 0,
+                        _entityIds: new Set() 
+                    };
                 });
             }
             
-            // ... (entity loading same) ...
+            // ... (Fallback ensure Base Layer omitted for brevity, implied same logic if needed)
 
-            
             // 2. Load Entities & Build Registry
             const loadedEntities = Array.isArray(data) ? data : (data.entities || []);
             
             for (const entity of loadedEntities) {
-                // Fix missing layer
+                // Legacy Fix: Missing layer
                 if (!entity.layer) entity.layer = 'Base Layer';
                 
+                // MIGRATION: Resolve Layer UUID/Name to Global Index
+                let targetLayerIndex = 0;
+                
+                // A. Try finding by ID (UUID match) in loaded local layers
+                const localLayer = this._layers.find(l => l.id === entity.layer);
+                if (localLayer && localLayer.layerIndex !== undefined) {
+                    targetLayerIndex = localLayer.layerIndex;
+                } else {
+                    // B. Try finding by Name (if entity.layer was actually a name)
+                   const byName = SceneManager.getLayerIndex(entity.layer);
+                    if (byName !== -1) targetLayerIndex = byName;
+                     else {
+                         // C. Fallback: Base Layer name lookup
+                         const baseIndex = SceneManager.getLayerIndex('Base Layer');
+                         if (baseIndex !== -1) targetLayerIndex = baseIndex;
+                     }
+                }
+
+                // Set Runtime Property
+                (entity as any).layerIndex = targetLayerIndex;
+
                 // Add to World
                 world.add(entity);
-                
-                // Register
                 this.registerEntity(entity.id!, entity.layer);
             }
 
@@ -270,30 +282,74 @@ export class SceneManager {
         return this.loadSceneByPath(path);
     }
 
+    static setProjectLayers(layerNames: string[]) {
+        this._projectLayerTemplates = layerNames;
+    }
+
+    static getLayerIndex(name: string): number {
+        // Case-insensitive lookup in project templates
+        return this._projectLayerTemplates.findIndex(l => l && l.toLowerCase() === name.toLowerCase());
+    }
+
+    static getLayerName(index: number): string {
+        return this._projectLayerTemplates[index] || 'Default';
+    }
+
+    private static _projectLayerTemplates: string[] = [];
+
     static createDefaultScene() {
         eventBus.emit('scene-cleared');
         world.clear();
+        
         this._activeSceneName = 'Untitled Scene';
-        this._layers = [{ 
-            id: 'Base Layer', 
-            name: 'Base Layer', 
-            visible: true, 
-            locked: false, 
-            color: '#333333', 
-            type: 'default',
-            tileData: {},
-            gridSize: { x: 32, y: 32 },
-            _entityIds: new Set() 
-        }];
+        this._layers = [];
+
+        // Use Project Layer Templates if available
+        if (this._projectLayerTemplates.length > 0) {
+            this._layers = this._projectLayerTemplates.map((name, index) => {
+                 // Use UUIDs for robustness, but could use name as ID if unique
+                 const isBase = index === 0; // First layer is effectively base
+                 return {
+                    id: isBase ? 'Base Layer' : `layer-${crypto.randomUUID()}`, // Keep 'Base Layer' ID for compatibility if it's the first one? Or just map named layers.
+                    // Actually, let's keep 'Base Layer' ID for the *first* layer to maintain internal logic that relies on it (like locking/color)
+                    // Or better: First layer from settings is bottom-most.
+                    name: name,
+                    visible: true,
+                    locked: false,
+                    color: isBase ? '#333333' : undefined,
+                    type: 'default',
+                    tileData: {},
+                    gridSize: { x: 32, y: 32 },
+                    _entityIds: new Set()
+                 };
+            });
+        } else {
+            // Fallback default
+            this._layers = [{ 
+                id: 'Base Layer', 
+                name: 'Base Layer', 
+                visible: true, 
+                locked: false, 
+                color: '#333333', 
+                type: 'default',
+                tileData: {},
+                gridSize: { x: 32, y: 32 },
+                _entityIds: new Set() 
+            }];
+        }
 
         // Create Main Camera
         const camera = createEntity();
         camera.name = 'Main Camera';
         camera.transform = { x: 0, y: 0, rotation: 0, scale: { x: 1, y: 1 }, zIndex: 0 };
         camera.camera = { zoom: 1, isPrimary: true, backgroundColor: '#333333' };
-        this.registerEntity(camera.id, 'Base Layer');
+        
+        // Register to first layer
+        const firstLayerId = this._layers[0]?.id || 'Base Layer';
+        this.registerEntity(camera.id, firstLayerId);
                 
         this._isDirty = false;
         eventBus.emit('scene-loaded', this._activeSceneName);
+        console.log('[SceneManager] Created default memory scene (Untitled)');
     }
 }

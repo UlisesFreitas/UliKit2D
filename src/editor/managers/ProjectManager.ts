@@ -1,6 +1,7 @@
 import { reactive } from 'vue';
 import { getFileSystem, type FileChangeEvent } from '../../api/FileSystem';
 import { ProjectSettingsManager } from './ProjectSettingsManager';
+import { useProjectSettingsStore } from '../../stores/useProjectSettingsStore';
 
 export const projectState = reactive({
     currentProjectPath: null as string | FileSystemDirectoryHandle | null,
@@ -10,6 +11,26 @@ export const projectState = reactive({
 
 export class ProjectManager {
     
+    static getRecents(): {name: string, path: string}[] {
+        try {
+            const stored = localStorage.getItem('ulikit_recents');
+            return stored ? JSON.parse(stored) : [];
+        } catch (e) {
+            return [];
+        }
+    }
+
+    static addToRecents(name: string) {
+        const recents = this.getRecents();
+        // Remove existing if present to move to top
+        const filtered = recents.filter(r => r.name !== name);
+        filtered.unshift({ name, path: name }); // path = name in Web/OPFS
+        // Limit to 10
+        if (filtered.length > 50) filtered.pop();
+        
+        localStorage.setItem('ulikit_recents', JSON.stringify(filtered));
+    }
+
     static async createProject(customPath?: string) {
         console.log('ProjectManager: Creating new project...', customPath ? `(Path: ${customPath})` : '(Interactive)');
         const fs = getFileSystem();
@@ -37,15 +58,30 @@ export class ProjectManager {
                  });
                  console.log('Project Created:', projectState.projectName);
 
+                 this.addToRecents(projectState.projectName);
+
+                 // INITIALIZE SETTINGS
+                 await ProjectSettingsManager.saveSettings(pathOrHandle);
+
                  // INITIALIZE SETTINGS
                  await ProjectSettingsManager.saveSettings(pathOrHandle);
 
                  // LOAD THE INITIAL SCENE
-                 // Dynamic import to avoid circular dependency issues if any
-                 const { SceneManager } = await import('../../engine/managers/SceneManager');
-                 // Create default scene directly for new projects
-                 SceneManager.createDefaultScene();
-                 (SceneManager as any)._activeSceneName = 'NewScene';
+                 try {
+                     const { SceneManager } = await import('../../engine/managers/SceneManager');
+                     
+                     // Sync Layers from Project Settings
+                     const settingsStore = useProjectSettingsStore();
+                     if (settingsStore.settings.layers && settingsStore.settings.layers.length > 0) {
+                        SceneManager.setProjectLayers(settingsStore.settings.layers);
+                     }
+
+                     // Create default scene directly for new projects
+                     SceneManager.createDefaultScene();
+                     (SceneManager as any)._activeSceneName = 'Untitled Scene';
+                 } catch (e) {
+                     console.error('[ProjectManager] Error initializing SceneManager:', e);
+                 }
                  
                  // Optional: Auto-save the initial scene?
                  // await ProjectManager.saveProject();
@@ -62,10 +98,10 @@ export class ProjectManager {
         console.log('[ProjectManager] Project closed');
     }
 
-    static async openProject() {
-        console.log('ProjectManager: Opening project...');
+    static async openProject(customPath?: string) {
+        console.log('ProjectManager: Opening project...', customPath || '(Interactive)');
         const fs = getFileSystem();
-        const pathOrHandle = await fs.selectFolder();
+        const pathOrHandle = customPath || await fs.selectFolder();
         
         if (pathOrHandle) {
             projectState.currentProjectPath = pathOrHandle;
@@ -80,12 +116,21 @@ export class ProjectManager {
             await fs.watchProject(pathOrHandle as any, (_event: FileChangeEvent) => {});
             
             console.log('Project Opened:', projectState.projectName);
+            
+            this.addToRecents(projectState.projectName);
 
             // LOAD SETTINGS
             await ProjectSettingsManager.loadSettings(pathOrHandle);
 
             // Load Initial Scene
             const { SceneManager } = await import('../../engine/managers/SceneManager');
+            
+            // Sync Layers from Project Settings
+            const settingsStore = useProjectSettingsStore();
+            if (settingsStore.settings.layers && settingsStore.settings.layers.length > 0) {
+               SceneManager.setProjectLayers(settingsStore.settings.layers);
+            }
+
                 // Check if NewScene.json exists to avoid 404/ENOENT errors
                 try {
                     const sceneFiles = await fs.readdir('assets/scenes');
@@ -103,15 +148,18 @@ export class ProjectManager {
                         } else {
                              console.warn('[ProjectManager] No JSON scenes found. Creating default.');
                              SceneManager.createDefaultScene();
+                             (SceneManager as any)._activeSceneName = 'Untitled Scene'; 
                         }
                     } else {
-                        console.warn('[ProjectManager] NewScene.json not found. Creating default scene.');
+                        console.warn('[ProjectManager] No scenes found. Creating default scene.');
                         SceneManager.createDefaultScene();
+                        (SceneManager as any)._activeSceneName = 'Untitled Scene'; 
                     }
                 } catch (e) {
                     // Start fresh if folder missing
                     console.warn('[ProjectManager] Could not read assets/scenes directory. Creating default scene.', e);
                     SceneManager.createDefaultScene();
+                    (SceneManager as any)._activeSceneName = 'Untitled Scene'; 
                 }
         }
     }

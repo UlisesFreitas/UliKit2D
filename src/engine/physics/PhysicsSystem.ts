@@ -4,6 +4,7 @@ import { SceneManager } from '../managers/SceneManager';
 
 export class PhysicsSystem {
     public engine: Matter.Engine;
+    
     constructor() {
         this.engine = Matter.Engine.create();
         this.engine.gravity.y = 1; // Default gravity
@@ -15,8 +16,65 @@ export class PhysicsSystem {
                 entity.physicsBody = undefined;
             }
         });
-    }
 
+        // @ts-ignore
+        if (typeof window !== 'undefined') {
+            // @ts-ignore
+            window.physicsSystem = this;
+
+            // @ts-ignore
+            window.UliDebug = {
+                diagnose: () => {
+                    console.group('🔍 UliKit Physics Diagnosis (Integer System)');
+                    
+                    // 1. Scene Layers
+                    console.group('1. Scene Layers (Name -> Index)');
+                    const layers = SceneManager.layers;
+                    // @ts-ignore
+                    console.table(layers.map(l => ({ name: l.name, index: l.layerIndex, isCollision: l.isCollision })));
+                    console.groupEnd();
+
+                    // 2. Physics Config
+                    console.group('2. Collision Matrix (Index -> Mask)');
+                    console.table(this.layerCollisionMatrix);
+                    console.groupEnd();
+
+                    // 3. Entity States
+                    console.group('3. Active Entities');
+                    const entities = world.with('physicsBody');
+                    const results = [];
+                    for (const ent of entities) {
+                        const body = ent.physicsBody as Matter.Body;
+                        // @ts-ignore
+                        const idx = ent.layerIndex;
+                        const name = ent.layer || 'Unknown';
+                        
+                        const expectedCat = 1 << idx;
+                        const expectedMask = this.layerCollisionMatrix[idx] ?? 0xFFFFFFFF;
+
+                        results.push({
+                            name: ent.name,
+                            layerName: name,
+                            layerIndex: idx,
+                            cat: body.collisionFilter.category,
+                            mask: body.collisionFilter.mask,
+                            EXPECTED_CAT: expectedCat,
+                            EXPECTED_MASK: expectedMask,
+                            MATCH: body.collisionFilter.category === expectedCat && body.collisionFilter.mask === expectedMask
+                        });
+                    }
+                    console.table(results);
+                    console.groupEnd();
+                    
+                    console.groupEnd();
+                    return "Diagnosis Complete";
+                }
+            };
+        }
+
+
+    }
+    
     private tileBodies: Map<string, Matter.Body> = new Map();
 
     public update(deltaTime: number) {
@@ -86,6 +144,58 @@ export class PhysicsSystem {
         };
     }
 
+    private layerCollisionMatrix: Record<number, number> = {};
+
+    public updateCollisionConfig(_layers: string[], matrix: Record<number, number>) {
+        // Store the matrix (Index -> Mask) directly
+        this.layerCollisionMatrix = matrix || {};
+        // console.log('[PhysicsSystem] Updated Collision Matrix:', JSON.parse(JSON.stringify(this.layerCollisionMatrix)));
+
+        // Update Existing Bodies
+        const entitiesWithBody = world.with('physicsBody');
+        for (const entity of entitiesWithBody) {
+             const body = entity.physicsBody as Matter.Body;
+             this.updateBodyCollisionFilter(entity, body);
+        }
+        
+        // Update Tile Bodies
+        for (const [key, body] of this.tileBodies) {
+             const parts = key.split(':');
+             // LayerID is roughly meaningless for lookup now, we need index.
+             // TileBodies need a way to know their LayerIndex.
+             // For now, we look up by Name/ID -> Index
+             const layerId = parts[0] || '';
+             const layer = SceneManager.getLayerById(layerId);
+             const layerName = layer ? layer.name : 'Default';
+             const layerIndex = SceneManager.getLayerIndex(layerName);
+             
+             const category = 1 << layerIndex;
+             const mask = this.layerCollisionMatrix[layerIndex] ?? 0xFFFFFFFF;
+             
+             if (body.collisionFilter.category !== category || body.collisionFilter.mask !== mask) {
+                 Matter.Body.set(body, 'collisionFilter', { category, mask, group: 0 });
+             }
+        }
+    }
+
+    private updateBodyCollisionFilter(entity: any, body: Matter.Body) {
+        if (typeof (entity as any).layerIndex !== 'number') {
+            const rawLayer = entity.layer || 'Default';
+            const layerName = SceneManager.getLayerById(rawLayer)?.name || rawLayer;
+            (entity as any).layerIndex = SceneManager.getLayerIndex(layerName);
+            // If still -1, default to 0 (Default Layer)
+            if ((entity as any).layerIndex === -1) (entity as any).layerIndex = 0; 
+        }
+
+        const index = entity.layerIndex;
+        const category = 1 << index;
+        const mask = this.layerCollisionMatrix[index] ?? 0xFFFFFFFF; // Default = Collide All
+
+        if (body.collisionFilter.category !== category || body.collisionFilter.mask !== mask) {
+             Matter.Body.set(body, 'collisionFilter', { category, mask, group: 0 });
+        }
+    }
+
     private syncBodies() {
         // 1. Initialize bodies for new entities
         const entitiesWithBody = world.with('transform', 'rigidBody');
@@ -107,6 +217,23 @@ export class PhysicsSystem {
                 const { x, y, rotation } = entity.transform;
                 const { isStatic, friction, restitution } = entity.rigidBody;
                 
+                // Determine Collision Filter
+                // Ensure index is resolved
+                if (typeof (entity as any).layerIndex !== 'number') {
+                    const rawLayer = entity.layer || 'Default';
+                    const layerName = SceneManager.getLayerById(rawLayer)?.name || rawLayer;
+                    (entity as any).layerIndex = SceneManager.getLayerIndex(layerName);
+                    if ((entity as any).layerIndex === -1) (entity as any).layerIndex = 0;
+                }
+                
+                const index = (entity as any).layerIndex;
+                const category = 1 << index;
+                const mask = this.layerCollisionMatrix[index] ?? 0xFFFFFFFF;
+                
+                // console.log(`[PhysicsDebug] '${entity.name}' | Index: ${index} | Cat: ${category} | Mask: ${mask}`);
+
+                const collisionFilter = { category, mask };
+
                 let body: Matter.Body | null = null;
 
                 if (entity.boxCollider) {
@@ -115,14 +242,14 @@ export class PhysicsSystem {
                     const offset = this.getBodyOffset(entity, scaledW, scaledH, rotation);
                     
                     body = Matter.Bodies.rectangle(x + offset.x, y + offset.y, scaledW, scaledH, {
-                        isStatic, angle: rotation, friction, restitution
+                        isStatic, angle: rotation, friction, restitution, collisionFilter
                     });
                 } else if (entity.circleCollider) {
                      const radius = (entity.circleCollider.radius) * Math.max(sx, sy);
                      const offset = this.getBodyOffset(entity, radius * 2, radius * 2, rotation); // Circle offset
 
                      body = Matter.Bodies.circle(x + offset.x, y + offset.y, radius, {
-                        isStatic, angle: rotation, friction, restitution
+                        isStatic, angle: rotation, friction, restitution, collisionFilter
                     });
                 } else if (entity.polygonCollider) {
                     let activeVertices = entity.polygonCollider.vertices;
@@ -141,29 +268,14 @@ export class PhysicsSystem {
                     }
 
                     if (activeVertices.length >= 3) {
-                         // Matter.Bodies.fromVertices centers the body at CoM.
-                         // Vertices are relative to (0,0).
-                         // We assume vertices are ALREADY scaled/designed in editor relative to usage.
-                         // If we want to support entity.scale on top of vertices, we'd scale them here.
-                         // For now, let's treat vertices as absolute relative to entity anchor.
-                         
-                         const cloneVerts = activeVertices.map(v => ({ x: v.x, y: v.y })); // No extra scaling applied yet?
-                         // If users expect resizing entity to resize polygon, we should apply scale.
-                         // Let's apply Scale!
+                         const cloneVerts = activeVertices.map(v => ({ x: v.x, y: v.y })); 
                          const scaledVerts = cloneVerts.map(v => ({ x: v.x * sx, y: v.y * sy }));
 
                          body = Matter.Bodies.fromVertices(x, y, [scaledVerts], {
-                            isStatic, angle: rotation, friction, restitution
+                            isStatic, angle: rotation, friction, restitution, collisionFilter
                          }, true);
 
                          if (body) {
-                            // Fix Offset: fromVertices centers body at new CoM.
-                            // We want body p to align with entity p (Anchor).
-                            // But usually users draw polygon relative to anchor.
-                            // So if vertices are around (0,0), CoM is near (0,0).
-                            // Matter moves body so CoM is at x,y.
-                            
-                            // Let's assume standard behavior for now.
                             (body as any)._lastVertices = activeVertices; 
                          }
                     }
@@ -173,7 +285,7 @@ export class PhysicsSystem {
                     (body as any)._lastScale = { x: sx, y: sy };
                     (body as any)._lastDims = { w, h };
                     
-                    // CRITICAL: Use addComponent so Miniplex updates query buckets (e.g. for CharacterSystem)
+                    // CRITICAL: Use addComponent so Miniplex updates query buckets
                     world.addComponent(entity, 'physicsBody', body);
                     Matter.World.add(this.engine.world, body);
                 }
@@ -183,18 +295,8 @@ export class PhysicsSystem {
                 // 2. Sync Physics -> ECS (Dynamic)
                 if (!entity.rigidBody.isStatic) {
                    const rotation = body.angle;
-                   // Sync Transform from Body
-                   // Note: We might need to handle offset reverse logic if we used offset
-                   // For Polygon, simple sync is usually enough if CoM is reasonable.
-                   // For Box/Circle, we have offset logic.
                    
                    if (entity.boxCollider || entity.circleCollider) {
-                       // Reverse offset logic (approximate or stored)
-                       // Simpler: Just sync?
-                       // If we used offset to Create, Body Pos != Entity Pos.
-                       // Entity Pos = Body Pos - Offset
-                       
-                       // We need current scaled dims
                        const currentSx = Math.abs(entity.transform.scale.x) || 0.001;
                        const currentSy = Math.abs(entity.transform.scale.y) || 0.001;
                        let curW = 0, curH = 0;
@@ -214,7 +316,6 @@ export class PhysicsSystem {
                     // 3. Sync ECS -> Physics (Static / Editor Updates)
                     const { x, y, rotation } = entity.transform;
 
-                    // Handling Polygon Updates (Frame Swap)
                     if (entity.polygonCollider) {
                          let targetVertices = entity.polygonCollider.vertices;
                          
@@ -233,20 +334,15 @@ export class PhysicsSystem {
 
                          const lastVerts = (body as any)._lastVertices;
                          if (lastVerts !== targetVertices) {
-                             // Update Vertices (keep current position)
-                             // Apply Scale
                              const scaledVerts = targetVertices.map(v => ({ x: v.x * sx, y: v.y * sy }));
                              Matter.Body.setVertices(body, scaledVerts);
                              (body as any)._lastVertices = targetVertices;
                          }
                          
                          Matter.Body.setAngle(body, rotation);
-                         // Matter.Body.setPosition(body, { x, y }); // Polygon offset handling needed?
-                         // If we assume CoM doesn't shift wildly, x/y is roughly center.
                          Matter.Body.setPosition(body, { x: x, y: y });
                     }
                     
-                    // Box/Circle Scale Logic
                     const lastScale = (body as any)._lastScale || { x: 1, y: 1 };
                     const lastDims = (body as any)._lastDims || { w, h };
                     
@@ -254,14 +350,12 @@ export class PhysicsSystem {
                     let reScaleY = 1;
                     let needsRescale = false;
 
-                    // A. Check for Transform Scale Change
                     if (Math.abs(sx - lastScale.x) > 0.001 || Math.abs(sy - lastScale.y) > 0.001) {
                          reScaleX = sx / lastScale.x;
                          reScaleY = sy / lastScale.y;
                          needsRescale = true;
                     }
 
-                    // B. Check for Dimension Change (Inspector Input)
                     if (Math.abs(w - lastDims.w) > 0.001 || Math.abs(h - lastDims.h) > 0.001) {
                         const dimScaleX = w / lastDims.w;
                         const dimScaleY = h / lastDims.h;
@@ -279,14 +373,11 @@ export class PhysicsSystem {
                         } else if (entity.boxCollider) {
                              Matter.Body.scale(body, reScaleX, reScaleY);
                         }
-                        // Polygon scaling usually handled by setVertices or explicit scale?
-                        // If we use setVertices above, we shouldn't scale here. Only for Box/Circle.
 
                         (body as any)._lastScale = { x: sx, y: sy };
                         (body as any)._lastDims = { w, h };
                     }
 
-                    // Position Sync
                     if (entity.boxCollider || entity.circleCollider) {
                          const scaledW = w * sx;
                          const scaledH = h * sy;

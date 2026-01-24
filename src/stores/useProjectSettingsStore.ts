@@ -2,6 +2,7 @@ import { defineStore } from 'pinia';
 import { ref, reactive } from 'vue';
 import { instance as engine } from '../engine/core/Engine';
 import { TextureStyle } from 'pixi.js';
+import { eventBus } from '../engine/core/EventBus';
 
 export interface IProjectSettings {
     general: {
@@ -19,10 +20,10 @@ export interface IProjectSettings {
     physics: {
         gravity: { x: number; y: number };
         debugDraw: boolean;
-        collisionMatrix?: Record<string, Record<string, boolean>>; // { 'Player': { 'Enemy': true } }
+        layerCollisionMatrix: Record<number, number>; // Index -> Bitmask
     };
     tags: string[];
-    layers: string[];
+    layers: string[]; // Ordered array: Index = Layer ID
     layouts: Record<string, any>;
     editor: {
         historyMaxSteps: number;
@@ -59,7 +60,7 @@ const DEFAULT_SETTINGS: IProjectSettings = {
     physics: {
         gravity: { x: 0, y: 9.81 },
         debugDraw: false,
-        collisionMatrix: {}
+        layerCollisionMatrix: {} // Will be auto-populated
     },
     input: {
         actions: {
@@ -84,7 +85,17 @@ const DEFAULT_SETTINGS: IProjectSettings = {
         }
     },
     tags: ['Player', 'Enemy', 'Ground'],
-    layers: ['Default', 'UI', 'Player', 'Background'],
+    layers: [
+        'Default', 
+        'TransparentFX', 
+        'Ignore Raycast', 
+        '', '', 
+        'UI', 
+        '', '', 
+        'Player', 
+        'Background'
+        // Slots 10-31 empty available
+    ],
     layouts: {},
     editor: {
         historyMaxSteps: 50,
@@ -99,18 +110,11 @@ export const useProjectSettingsStore = defineStore('projectSettings', () => {
     const isDirty = ref(false);
 
     // Engine Hooks
-    const applySettings = () => {
-        console.log('[ProjectSettings] Applying settings...', settings);
+    const applySettings = async () => {
+        // console.log('[ProjectSettings] applySettings()', settings.physics.layerCollisionMatrix);
         
         // 1. Display Settings
-        
-        // Pixel Art Mode (Texture Filtering)
-        // PixiJS v8 uses 'nearest' or 'linear' strings
         TextureStyle.defaultOptions.scaleMode = settings.display.pixelArt ? 'nearest' : 'linear';
-        
-        // Note: Changing defaultOptions only affects NEW textures. 
-        // Existing textures in the scene won't automatically update unless we iterate specific caches, 
-        // but for this test (adding new sprite) it is sufficient.
 
         // 2. Engine Runtime Updates
         if (engine && engine.app && engine.app.renderer) {
@@ -122,23 +126,44 @@ export const useProjectSettingsStore = defineStore('projectSettings', () => {
              }
 
              // Update Physics
-             const physics = (engine as any).physicsSystem || (engine as any)._physicsSystem;
+             let physics: any = undefined;
+             if ((engine as any).getPhysics) {
+                 physics = (engine as any).getPhysics();
+             } else {
+                 physics = (engine as any).physicsSystem || (engine as any)._physicsSystem;
+             }
              
-             if (physics && physics.world) {
-                  physics.world.gravity.x = settings.physics.gravity.x;
-                  physics.world.gravity.y = settings.physics.gravity.y;
+             try {
+                 // CRITICAL: Sync Layers to SceneManager (Integer Lookup)
+                 const { SceneManager } = await import('../engine/managers/SceneManager');
+                 if (SceneManager) {
+                     SceneManager.setProjectLayers(settings.layers);
+                 }
+             } catch (e) {
+                 console.error('[ProjectSettings] Failed to import/sync SceneManager:', e);
+             }
+
+             // Check for 'world' (via getter) OR 'engine.world'
+             const world = physics?.world || physics?.engine?.world;
+
+             if (physics && world) {
+                  world.gravity.x = settings.physics.gravity.x;
+                  world.gravity.y = settings.physics.gravity.y;
+                  
+                  // Update Collision Matrix
+                  if (physics.updateCollisionConfig) {
+                      physics.updateCollisionConfig(settings.layers, settings.physics.layerCollisionMatrix);
+                  }
              }
 
              // Input Config
              engine.configureInput(settings.input);
              
-         
-             // Time Config (New)
-             // Check if engine has setTimeSettings
+             // ... (Time/Audio omitted for brevity) ...
+              // Time Config (New)
              if ((engine as any).setTimeSettings) {
                  (engine as any).setTimeSettings(settings.time);
              } else {
-                 // Direct set fallback if methods missing (transitional)
                  (engine as any).timeScale = settings.time.timeScale;
              }
 
@@ -148,13 +173,30 @@ export const useProjectSettingsStore = defineStore('projectSettings', () => {
              }
         }
         
-        console.log(`[ProjectSettings] Settings applied. ScaleMode: ${TextureStyle.defaultOptions.scaleMode}`);
+        console.log(`[ProjectSettings] Settings applied.`);
     };
     
+    // Deep Merge Helper
+    const deepMerge = (target: any, source: any) => {
+        if (!source) return target;
+        for (const key of Object.keys(source)) {
+            const val = source[key];
+            if (val && typeof val === 'object' && !Array.isArray(val)) {
+                if (!target[key] || typeof target[key] !== 'object') {
+                    target[key] = {};
+                }
+                deepMerge(target[key], val);
+            } else {
+                target[key] = val;
+            }
+        }
+        return target;
+    };
+
     // Actions
     const setSettings = (newSettings: IProjectSettings) => {
-        // Deep merge or replace
-        Object.assign(settings, newSettings);
+        // Deep merge to preserve defaults/structure
+        deepMerge(settings, newSettings);
         isDirty.value = false;
         applySettings();
     };
@@ -168,6 +210,16 @@ export const useProjectSettingsStore = defineStore('projectSettings', () => {
         Object.assign(settings, JSON.parse(JSON.stringify(DEFAULT_SETTINGS)));
         isDirty.value = true;
     };
+
+    // Event Listeners for Dynamic Layer Updates
+    eventBus.on('scene-loaded', () => {
+        // Wait one tick for SceneManager to fully settle if needed, but usually synchronous
+        setTimeout(() => applySettings(), 0);
+    });
+    
+    eventBus.on('layer-update', () => {
+        applySettings();
+    });
 
     return {
         settings,

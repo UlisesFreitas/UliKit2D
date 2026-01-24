@@ -251,21 +251,12 @@ const onRefresh = () => {
     loadScenes();
 };
 
-// Global shortcuts (F2)
-const handleGlobalKeydown = (e: KeyboardEvent) => {
-    if (e.key === 'F2' && selectedPath.value && !isCreating.value && !renamingPath.value) {
-        const scene = scenes.value.find(s => s.path === selectedPath.value);
-        if (scene) startRename(scene);
-    }
-};
-
 onMounted(() => {
     loadScenes();
-    window.addEventListener('keydown', handleGlobalKeydown);
 });
 
 onUnmounted(() => {
-    window.removeEventListener('keydown', handleGlobalKeydown);
+    // Clean up
 });
 </script>
 

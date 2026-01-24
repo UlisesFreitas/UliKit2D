@@ -46,27 +46,37 @@ const onApply = () => {
     ui.showToast({ title: 'Settings Applied', description: 'Changes applied to runtime.' });
 };
 
-// Collision Matrix Helpers
-const getCollision = (a: string, b: string) => {
-    if (!store.settings.physics.collisionMatrix) return true; // Default true
-    if (!store.settings.physics.collisionMatrix[a]) return true;
-    // If explicit false, return false. If undefined, return true.
-    return store.settings.physics.collisionMatrix[a][b] !== false;
+// Collision Matrix Helpers (Bitwise)
+const getCollision = (rowIdx: number, colIdx: number) => {
+    const matrix = store.settings.physics.layerCollisionMatrix;
+    if (!matrix) return true;
+    
+    // Default = Collide All (0xFFFFFFFF)
+    const mask = matrix[rowIdx] ?? 0xFFFFFFFF;
+    
+    // Check bit
+    return (mask & (1 << colIdx)) !== 0;
 };
 
-const toggleCollision = (a: string, b: string) => {
-    if (!store.settings.physics.collisionMatrix) store.settings.physics.collisionMatrix = {};
+const toggleCollision = (rowIdx: number, colIdx: number) => {
+    if (!store.settings.physics.layerCollisionMatrix) store.settings.physics.layerCollisionMatrix = {};
+    const matrix = store.settings.physics.layerCollisionMatrix;
     
-    // Ensure nested objects
-    if (!store.settings.physics.collisionMatrix[a]) store.settings.physics.collisionMatrix[a] = {};
-    if (!store.settings.physics.collisionMatrix[b]) store.settings.physics.collisionMatrix[b] = {};
-
-    const current = getCollision(a, b);
-    const newValue = !current;
-
-    // Symmetric update
-    store.settings.physics.collisionMatrix[a][b] = newValue;
-    store.settings.physics.collisionMatrix[b][a] = newValue;
+    const currentMask = matrix[rowIdx] ?? 0xFFFFFFFF;
+    const targetMask = matrix[colIdx] ?? 0xFFFFFFFF;
+    
+    const isColliding = (currentMask & (1 << colIdx)) !== 0;
+    
+    if (isColliding) {
+        // TURN OFF (Clear bit)
+        // ~(1 << colIdx) creates mask where only that bit is 0, rest 1.
+        matrix[rowIdx] = currentMask & ~(1 << colIdx);
+        matrix[colIdx] = targetMask & ~(1 << rowIdx);
+    } else {
+        // TURN ON (Set bit)
+        matrix[rowIdx] = currentMask | (1 << colIdx);
+        matrix[colIdx] = targetMask | (1 << rowIdx);
+    }
     
     store.isDirty = true;
 };
@@ -333,22 +343,27 @@ const toggleCollision = (a: string, b: string) => {
                                         <thead>
                                             <tr>
                                                 <th class="p-1"></th>
-                                                <th v-for="layer in store.settings.layers" :key="'h-'+layer" class="p-1 text-center font-normal text-text-secondary rotate-45 h-16 w-8">{{ layer }}</th>
+                                                <template v-for="(layer, cIndex) in store.settings.layers" :key="'h-'+cIndex">
+                                                    <th v-if="layer" class="p-1 text-center font-normal text-text-secondary rotate-45 h-16 w-8">{{ layer }}</th>
+                                                </template>
                                             </tr>
                                         </thead>
                                         <tbody>
-                                            <tr v-for="(rowLayer, _rIndex) in store.settings.layers" :key="'r-'+rowLayer">
-                                                <td class="p-1 text-right font-bold text-text-primary px-2 whitespace-nowrap">{{ rowLayer }}</td>
-                                                <td v-for="(colLayer, _cIndex) in store.settings.layers" :key="'c-'+colLayer" class="p-1 text-center">
-                                                    <!-- Only render lower triangle or full? Full is fine -->
-                                                    <input 
-                                                        type="checkbox" 
-                                                        :checked="getCollision(rowLayer, colLayer)" 
-                                                        @change="toggleCollision(rowLayer, colLayer)"
-                                                        class="accent-accent cursor-pointer"
-                                                    />
-                                                </td>
-                                            </tr>
+                                            <template v-for="(rowLayer, rIndex) in store.settings.layers" :key="'r-'+rIndex">
+                                                <tr v-if="rowLayer">
+                                                    <td class="p-1 text-right font-bold text-text-primary px-2 whitespace-nowrap">{{ rowLayer }}</td>
+                                                    <template v-for="(colLayer, cIndex) in store.settings.layers" :key="'c-'+cIndex">
+                                                        <td v-if="colLayer" class="p-1 text-center">
+                                                            <input 
+                                                                type="checkbox" 
+                                                                :checked="getCollision(rIndex, cIndex)" 
+                                                                @change="toggleCollision(rIndex, cIndex)"
+                                                                class="accent-accent cursor-pointer"
+                                                            />
+                                                        </td>
+                                                    </template>
+                                                </tr>
+                                            </template>
                                         </tbody>
                                     </table>
                                 </div>

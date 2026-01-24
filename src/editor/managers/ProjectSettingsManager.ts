@@ -14,13 +14,24 @@ export class ProjectSettingsManager {
              let content = '';
              
              if (typeof projectPathOrHandle === 'string') {
-                 // Electron: Join path
-                 const root = projectPathOrHandle.replace(/\\/g, '/');
-                 const path = `${root}/${SETTINGS_FILENAME}`;
-                 try {
-                     content = await fs.readFile(path);
-                 } catch (e) {
-                     console.log('Settings file not found at', path);
+                 const isElectron = (fs as any).isElectron;
+                 
+                 if (isElectron) {
+                     // Electron: Join path
+                     const root = projectPathOrHandle.replace(/\\/g, '/');
+                     const path = `${root}/${SETTINGS_FILENAME}`;
+                     try {
+                         content = await fs.readFile(path);
+                     } catch (e) {
+                         console.log('Settings file not found at', path);
+                     }
+                 } else {
+                     // Web: use relative filename (FS handles context)
+                      try {
+                         content = await fs.readFile(SETTINGS_FILENAME);
+                     } catch (e) {
+                         console.log('Settings file not found (Web)');
+                     }
                  }
              } else {
                  // Web: try reading direct file

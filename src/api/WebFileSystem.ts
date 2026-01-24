@@ -156,16 +156,8 @@ export class WebFileSystem implements IFileSystem {
             
             await fs.promises.writeFile(`${projectPath}/project.json`, projectJson);
 
-            // 4. Create Initial Scene (NewScene.json)
-            const defaultScene = [
-                {
-                    "id": "main-camera-id",
-                    "name": "Main Camera",
-                    "transform": { "x": 0, "y": 0, "rotation": 0, "scale": { "x": 1, "y": 1 } },
-                    "camera": { "zoom": 1, "isPrimary": true, "backgroundColor": "#333333" }
-                }
-            ];
-            await fs.promises.writeFile(`${projectPath}/assets/scenes/NewScene.json`, JSON.stringify(defaultScene, null, 2));
+            // 4. (Removed) Do not create Initial Scene file. 
+            // The Engine will start with an "Untitled Scene" in memory.
             
             // Verification
             const verifyFiles = await fs.promises.readdir(`${projectPath}/assets`);

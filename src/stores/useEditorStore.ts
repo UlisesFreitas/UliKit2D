@@ -5,6 +5,7 @@ import type { ICommand } from '../editor/commands/ICommand';
 import { world } from '../engine/ecs/ECS';
 import { SceneManager } from '../engine/managers/SceneManager';
 import { instance as engine } from '../engine/core/Engine';
+import { useProjectSettingsStore } from './useProjectSettingsStore';
 
 export const useEditorStore = defineStore('editor', () => {
     // Selection
@@ -38,7 +39,7 @@ export const useEditorStore = defineStore('editor', () => {
     const isPlaying = ref(false);
     const sceneBackup = ref<string | null>(null);
 
-    const playGame = () => {
+    const playGame = async () => {
         if (isPlaying.value) return;
         
         console.log('[EditorStore] Starting Game...');
@@ -48,6 +49,10 @@ export const useEditorStore = defineStore('editor', () => {
         console.log(`[EditorStore] Scene Saved. Backup size: ${sceneBackup.value.length}`);
         
         isPlaying.value = true;
+        // Apply Project Settings BEFORE starting simulation to ensure Physics Matrix is latest
+        const projectSettings = useProjectSettingsStore();
+        await projectSettings.applySettings();
+        
         // Start Simulation (Physics + Scripts)
         engine.startSimulation();
     };
