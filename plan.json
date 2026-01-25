@@ -90,9 +90,9 @@
         "Implement Runtime InputSystem (Map Settings to API) - DONE",
         "Implement CharacterController Component - DONE",
         "Integrate Input with CharacterController - DONE",
-        "Implement Runtime Audio Mixer (Buses/Channels Volume Control)",
-        "Implement Runtime Scene Loading API (loadSceneByPath)",
-        "Implement Global Game State (Persistence between scenes)"
+        "Implement Runtime Audio Mixer (Buses/Channels Volume Control) - DONE",
+        "Implement Runtime Scene Loading API (loadSceneByPath) - DONE",
+        "Implement Global Game State (Persistence between scenes) - DONE"
       ]
     },
     {
