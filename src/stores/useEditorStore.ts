@@ -125,6 +125,21 @@ export const useEditorStore = defineStore('editor', () => {
         activeLayerId.value = id;
     };
 
+    // Interaction
+    // Import eventBus directly
+    import('../engine/core/EventBus').then(({ eventBus }) => {
+        eventBus.on('entities-updated', () => {
+             // Force refresh of selection to update Inspector
+             if (selectedEntityId.value) {
+                 const current = selectedEntityId.value;
+                 selectedEntityId.value = null; // Toggle off
+                 setTimeout(() => {
+                     selectedEntityId.value = current; // Toggle on
+                 }, 0);
+             }
+        });
+    });
+
     return {
         selectedEntityId,
         selectedEntityIds,

@@ -66,24 +66,38 @@ const onSelectAsset = (path: string | string[]) => {
     onUpdate();
 };
 
-const onDrop = (e: DragEvent) => {
-    const path = e.dataTransfer?.getData('text/plain');
-    if (path) {
-        // Validate Image Extension
-        if (!/\.(png|jpg|jpeg|webp|bmp|gif)$/i.test(path)) {
-            console.warn('[SpriteEditor] Ignored non-image drop:', path);
+const onDrop = async (e: DragEvent) => {
+    // --- ASSET PIPELINE 3.0 STRICT MODE ---
+    const assetJson = e.dataTransfer?.getData('application/ulikit-asset');
+    
+    if (!assetJson) {
+        console.warn('[SpriteEditor] Ignored drop: No Asset data found.');
+        return;
+    }
+
+    try {
+        const asset = JSON.parse(assetJson);
+        
+        // Strict Type Check
+        if (asset.type !== 'texture') {
+            console.warn(`[SpriteEditor] Ignored asset type '${asset.type}'. Expected 'texture'.`);
             return;
         }
 
-        const normPath = path.replace(/\\/g, '/');
-        console.log(`[SpriteEditor] Drop texture: '${normPath}'`);
+        console.log(`[SpriteEditor] Dropped Valid Asset:`, asset);
         
         stopAnimation();
 
-        props.sprite.texture = normPath;
+        // Use GUID-safe path or direct path from payload
+        // Ideally we store GUID, but for now we update the Path property in ECS
+        props.sprite.texture = asset.path;
+        
         thumbnailUrl.value = '';
         updateThumbnail();
         onUpdate();
+
+    } catch (err) {
+        console.error('[SpriteEditor] Failed to parse asset drop:', err);
     }
 };
 
@@ -158,10 +172,11 @@ onMounted(async () => {
                  <div class="flex gap-1 items-center">
                     <!-- Filename Display (Read-only) -->
                     <div 
-                        class="flex-1 text-xs text-text-primary px-2 py-1.5 bg-bg-input border border-border rounded truncate select-all"
+                        class="flex-1 text-xs text-text-primary px-2 py-1.5 bg-bg-input border border-border rounded truncate select-all cursor-default"
                         :title="sprite.texture"
                         @dragover.prevent
                         @drop.prevent="onDrop"
+                        draggable="false"
                     >
                         {{ sprite.texture ? sprite.texture.split(/[\\/]/).pop() : 'No Texture' }}
                     </div>

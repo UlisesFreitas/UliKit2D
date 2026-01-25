@@ -124,6 +124,10 @@ export class ElectronFileSystem implements IFileSystem {
         return await this.electronAPI.deleteFile(this.resolvePath(path));
     }
 
+    async renameFile(oldPath: string, newPath: string): Promise<boolean> {
+        return await this.electronAPI.renameFile(this.resolvePath(oldPath), this.resolvePath(newPath));
+    }
+
     async readdir(path: string): Promise<FileEntry[]> {
         return await this.electronAPI.readdir(this.resolvePath(path));
     }

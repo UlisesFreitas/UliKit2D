@@ -81,7 +81,7 @@
     {
       "id": "7",
       "name": "Project Architecture & Core Gameplay",
-      "status": "in-progress",
+      "status": "completed",
       "description": "Essential configuration and Runtime Systems.",
       "tasks": [
         "Implement Input Manager Editor (Map Keys to Actions) - DONE",
@@ -90,15 +90,15 @@
         "Implement Runtime InputSystem (Map Settings to API) - DONE",
         "Implement CharacterController Component - DONE",
         "Integrate Input with CharacterController - DONE",
-        "Implement Runtime Audio Mixer (Buses/Channels Volume Control)",
-        "Implement Runtime Scene Loading API (loadSceneByPath)",
-        "Implement Global Game State (Persistence between scenes)"
+        "Implement Runtime Audio Mixer (Buses/Channels Volume Control) - DONE",
+        "Implement Runtime Scene Loading API (loadSceneByPath) - DONE",
+        "Implement Global Game State (Persistence between scenes) - DONE"
       ]
     },
     {
       "id": "8",
       "name": "Asset Pipeline 2.0",
-      "status": "pending",
+      "status": "in-progress",
       "description": "Robust Asset Management with Meta files.",
       "tasks": [
         "Design Meta File Structure (.meta)",

@@ -87,6 +87,52 @@ export class ResourceManager {
     }
 
     /**
+     * Updates references in the Cache and potentially in the Active World (Entities).
+     */
+    public async notifyAssetRenamed(oldPath: string, newPath: string): Promise<number> {
+        // 1. Invalidate Cache for old path
+        this.imageManager.invalidateTexture(oldPath);
+        
+        // 2. Update all active entities in the world that use this texture
+        // This is a "Tactical Fix" until we switch to GUIDs.
+        const { world } = await import('../ecs/ECS');
+        let count = 0;
+        // Iterate all entities with 'sprite' component
+        for (const entity of world.with('sprite')) {
+            if (entity.sprite && entity.sprite.texture === oldPath) {
+                entity.sprite.texture = newPath;
+                count++;
+            }
+        }
+        
+        // Iterate all entities with 'animator' component
+        for (const entity of world.with('animator')) {
+            if (entity.animator && entity.animator.animations) {
+                for (const animName in entity.animator.animations) {
+                    const anim = entity.animator.animations[animName];
+                    if (anim && anim.frames) {
+                        for (let i = 0; i < anim.frames.length; i++) {
+                            if (anim.frames[i] === oldPath) {
+                                anim.frames[i] = newPath;
+                                count++;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        if (count > 0) {
+            console.log(`[ResourceManager] Updated ${count} entities from '${oldPath}' to '${newPath}'`);
+            
+            // Notify Editor of entity updates
+            import('../core/EventBus').then(({ eventBus }) => {
+                eventBus.emit('entities-updated'); 
+            });
+        }
+        return count;
+    }
+
+    /**
      * Preload assets.
      * Stub for now to maintain compatibility with RenderSystem.
      */

@@ -31,12 +31,25 @@ export class ResourceLoader {
                 img.crossOrigin = 'anonymous'; // Important for texture safety
                 img.src = url;
                 await img.decode();
+                
+                // VALIDATION: Reject empty images
+                if (img.width === 0 || img.height === 0) {
+                    throw new Error('Image has 0 dimensions');
+                }
+
                 texture = Texture.from(img);
 
             } catch (e) {
                 console.error(`[ResourceLoader] Error loading Image path: ${url}`, e);
                 // Fallback to Assets.load just in case?
-                texture = await Assets.load(url);
+                // texture = await Assets.load(url);
+                // Actually, if Image failed, Assets.load likely will too or return something weird.
+                // Better to return Texture.EMPTY and let RenderSystem handle it?
+                // Or let RenderSystem see the error?
+                // Let's return Texture.EMPTY but with a size?
+                // No, RenderSystem checks texture.source.
+                // Let's throw or return EMPTY.
+                texture = Texture.EMPTY; 
             }
         } else {
 

@@ -21,10 +21,10 @@ export class ResourceCache {
     public removeTexture(key: string) {
         const texture = this.textures.get(key);
         if (texture) {
-            // Optional: texture.destroy(true)? 
-            // We might just let GC handle it or destroy if we know it's unused.
-            // For live reload, destroying might be safer to free GPU memory.
-            texture.destroy(true); // Destroy base texture too
+            // FIX: Do NOT destroy texture immediately.
+            // If this texture is currently being rendered by a Sprite, destroying it causes a crash.
+            // We just remove it from the cache so future loads fetched the file again (or new cache entry).
+            // texture.destroy(true); 
             this.textures.delete(key);
         }
     }
@@ -55,7 +55,11 @@ export class ResourceCache {
     }
 
     public clear() {
-        this.textures.forEach(t => t.destroy(true));
+        console.warn('[ResourceCache] Clearing all textures!');
+        this.textures.forEach(t => {
+            // Only destroy if we are sure?
+            // t.destroy(true); 
+        });
         this.textures.clear();
         this.blobs.clear();
         this.json.clear();

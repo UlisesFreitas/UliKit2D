@@ -28,50 +28,76 @@ const updateComponent = (field: string, value: any) => {
     onUpdate();
 };
 
+// Match SpriteEditor Logic
 const updateThumbnail = async () => {
-    if (component.value && component.value.texture) {
-        thumbnailUrl.value = await getFileSystem().getAssetURL(component.value.texture);
-    } else {
+    // Access texture via component reference (proxy)
+    const rawPath = component.value?.texture;
+    if (!rawPath) {
         thumbnailUrl.value = '';
+        return;
+    }
+
+    try {
+        const { resourceManager } = await import('../../../engine/resources/ResourceManager');
+        // Force URL break cache if needed, or trust manager
+        thumbnailUrl.value = await resourceManager.getUrl(rawPath);
+    } catch (e) {
+        console.error('[NineSliceEditor] Failed to resolve thumbnail:', e);
+        thumbnailUrl.value = rawPath;
     }
 };
 
-watch(() => component.value?.texture, () => {
+// Deep watch like SpriteEditor
+watch(() => props.nineSlice, () => {
     updateThumbnail();
-}, { immediate: true });
+}, { deep: true, immediate: true });
 
-onMounted(() => {
+onMounted(async () => {
     updateThumbnail();
+    
+    // Live Refreshes
+    const { eventBus } = await import('../../../engine/core/EventBus');
+    eventBus.on('asset-changed', (path: string) => {
+        if (component.value?.texture === path || component.value?.texture?.endsWith(path)) {
+             console.log('[NineSliceEditor] Asset changed, refreshing thumbnail:', path);
+             updateThumbnail(); // Trigger re-fetch
+        }
+    });
 });
 
 const onSelectAsset = (path: string | string[]) => {
-    // Handle array case
     const singlePath = Array.isArray(path) ? path[0] : path;
     if (!singlePath) return;
 
-    // Normalize path
     const normPath = singlePath.replace(/\\/g, '/');
     updateComponent('texture', normPath);
-    isPickerOpen.value = false;
+    
+    // Visual Feedback
+    thumbnailUrl.value = '';
+    updateThumbnail();
 };
 
 const onDropTexture = async (event: DragEvent) => {
-    const data = event.dataTransfer?.getData('application/json');
-    if (data) {
+    // 1. Strict Protocol Check
+    const assetJson = event.dataTransfer?.getData('application/ulikit-asset');
+    if (assetJson) {
          try {
-            const payload = JSON.parse(data);
-             if (payload.type === 'asset' && payload.assetType === 'image') {
-                updateComponent('texture', payload.path.replace(/\\/g, '/'));
+            const payload = JSON.parse(assetJson);
+            if (['texture', 'image', 'unknown'].includes(payload.type)) {
+                
+                const normPath = payload.path.replace(/\\/g, '/');
+                updateComponent('texture', normPath);
+                
+                // Visual Update
+                thumbnailUrl.value = '';
+                updateThumbnail();
+                
+            } else {
+                console.warn('[NineSliceEditor] Dropped non-texture asset:', payload.type);
             }
-        } catch (e) { console.error(e); }
-        return;
-    }
-    
-    const path = event.dataTransfer?.getData('text/plain');
-    if (path) {
-        // Normalize path
-        const normPath = path.replace(/\\/g, '/');
-        updateComponent('texture', normPath);
+        } catch (e) { 
+            console.error('[NineSliceEditor] Failed to parse drop', e); 
+        }
     }
 };
 

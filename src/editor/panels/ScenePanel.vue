@@ -404,9 +404,34 @@ const onPointerUp = async (e: PointerEvent) => {
     areaSelectionManager.endDrag(e.shiftKey, e.ctrlKey);
 };
 
-const onDrop = (e: DragEvent) => {
-    const path = e.dataTransfer?.getData('text/plain');
+const onDrop = async (e: DragEvent) => {
+    // 1. Try Asset Protocol (Phase 3.0 Strict)
+    const assetJson = e.dataTransfer?.getData('application/ulikit-asset');
+    let path = e.dataTransfer?.getData('text/plain');
+
+    if (assetJson) {
+        try {
+            const asset = JSON.parse(assetJson);
+            // We can trust this path or GUID
+            path = asset.path;
+            console.log('[ScenePanel] Dropped Asset Object:', asset);
+        } catch (err) {
+            console.error('[ScenePanel] Failed to parse asset drop', err);
+        }
+    } else {
+        // Fallback or Legacy GUID check
+        const guid = e.dataTransfer?.getData('application/ulikit-guid'); // Legacy
+        if (guid) {
+            const { MetaManager } = await import('../managers/MetaManager');
+            const resolvedPath = MetaManager.getAssetPath(guid);
+            if (resolvedPath) path = resolvedPath;
+        }
+    }
+    
     if (!path) return;
+    
+    // Normalize path just in case
+    path = path.replace(/\\/g, '/');
     
     // Use Global Screen Coords
     const screenX = e.clientX;
@@ -421,7 +446,7 @@ const onDrop = (e: DragEvent) => {
             id: crypto.randomUUID(),
             name: 'New Sprite',
             transform: { x: worldX, y: worldY, rotation: 0, scale: { x: 1, y: 1 } },
-            sprite: { texture: path }
+            sprite: { texture: path } // We still use Path for now in the ECS
         });
     }
 };

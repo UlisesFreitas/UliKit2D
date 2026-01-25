@@ -71,8 +71,6 @@ export class PhysicsSystem {
                 }
             };
         }
-
-
     }
     
     private tileBodies: Map<string, Matter.Body> = new Map();

@@ -111,8 +111,6 @@ export const useProjectSettingsStore = defineStore('projectSettings', () => {
 
     // Engine Hooks
     const applySettings = async () => {
-        // console.log('[ProjectSettings] applySettings()', settings.physics.layerCollisionMatrix);
-        
         // 1. Display Settings
         TextureStyle.defaultOptions.scaleMode = settings.display.pixelArt ? 'nearest' : 'linear';
 

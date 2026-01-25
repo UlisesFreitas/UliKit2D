@@ -26,7 +26,23 @@ export const useAssetStore = defineStore('assets', () => {
                 files.value = []; // Clear current files
                 currentPath.value = ''; // Reset navigation
                 
+                import('../editor/managers/AssetDatabase').then(({ AssetDatabase }) => {
+                     // In 3.0, we just register files as they come in? or Refresh all?
+                     // For 'initial' load, we can refresh.
+                     AssetDatabase.instance.refreshDatabase(); // Initial Scan
+                });
+
                 await fs.watchProject(newPath as any, (event: FileChangeEvent) => {
+                    // Notify Database
+                    import('../editor/managers/AssetDatabase').then(({ AssetDatabase }) => {
+                        if (event.event === 'add' || event.event === 'change') {
+                             if (event.path && !event.path.endsWith('.meta')) {
+                                 AssetDatabase.instance.registerAsset(event.path);
+                             }
+                        } else if (event.event === 'unlink') {
+                             if (event.path) AssetDatabase.instance.deleteAsset(event.path);
+                        }
+                    });
                     // Notify Resource Manager of Content Changes
                     if (event.event === 'change' && event.path) {
                         // Normalize path to ensure it matches what RenderSystem uses (usually relative)
@@ -55,10 +71,12 @@ export const useAssetStore = defineStore('assets', () => {
                         console.log('AssetStore: Received bulk update', event.files.length, 'files');
                         files.value = event.files.map(f => ({
                             name: f.name,
-                            path: f.path,
-                            fullPath: f.path, // In web, path IS the relative path we use
+                            path: f.path, // relative
+                            fullPath: f.path, 
                             type: f.type
                         }));
+                        
+                        // 3.0: AssetDatabase handles initial scan and meta creation.
                     } else {
                         // Incremental updates (Electron usually)
                         handleFileEvent(event.event, event.path, event.fullPath || event.path);
@@ -76,19 +94,23 @@ export const useAssetStore = defineStore('assets', () => {
                 fullPath: fullPath,
                 type: event === 'addDir' ? 'directory' : 'file'
             };
-            // Ideally we insert into a proper tree. For now just push to list.
+            
             // Check existence
             if (!files.value.find(f => f.path === relativePath)) {
                 files.value.push(node);
             }
+            
+            // 3.0: AssetDatabase handles Meta creation via registerAsset.
+            // Removed legacy MetaManager call to prevent WRITE RACE CONDITION.
+
         } else if (event === 'unlink' || event === 'unlinkDir') {
             files.value = files.value.filter(f => f.path !== relativePath);
+            
+            // 3.0: AssetDatabase handles Meta deletion.
         }
     };
 
-    const normalizedCurrentPath = computed(() => {
-        return normalizePath(currentPath.value);
-    });
+
 
     const currentPath = ref<string>('');
 
@@ -148,6 +170,9 @@ export const useAssetStore = defineStore('assets', () => {
                    return false;
                }
             }
+            
+            // CHANGE: Hide .meta files
+            if (file.name.endsWith('.meta')) return false;
 
             return true;
         });
@@ -185,6 +210,48 @@ export const useAssetStore = defineStore('assets', () => {
         searchQuery.value = ''; // Clear search on navigation
     };
 
+    const renameAsset = async (oldPath: string, newName: string) => {
+        const fs = getFileSystem();
+        const parts = oldPath.split('/');
+        parts.pop();
+        const dir = parts.join('/');
+        const newPath = dir ? `${dir}/${newName}` : newName;
+
+        if (oldPath === newPath) return;
+
+        // 1. Move Meta First (Preserve GUID via AssetDatabase)
+        const { AssetDatabase } = await import('../editor/managers/AssetDatabase');
+        await AssetDatabase.instance.moveAsset(oldPath, newPath);
+
+        // 2. Rename File
+        await fs.renameFile(oldPath, newPath);
+        
+        // 3. Notify Engine (Update Entities)
+        const { resourceManager } = await import('../engine/resources/ResourceManager');
+        const count = await resourceManager.notifyAssetRenamed(oldPath, newPath);
+
+        // 4. If entities were updated, SAVE the scene to persist changes (avoid broken links on reload)
+        if (count > 0) {
+            const { SceneManager } = await import('../engine/managers/SceneManager');
+            const sceneJson = SceneManager.saveScene();
+            // Assuming current scene is "MainScene" or using activeSceneName?
+            // SceneManager._activeSceneName might be "MainScene" (no ext) or "Untitled Scene"
+            // We should ideally track the file path of the open scene.
+            // For now, let's assume it lives in 'assets/scenes/{ActiveName}.json'
+            
+            let sceneName = SceneManager.activeSceneName;
+            if (!sceneName.endsWith('.json')) sceneName += '.json';
+             // If it's "Untitled Scene", we probably shouldn't auto-save to a file?
+             // But if we are renaming assets, we are likely in a saved project state.
+             
+            if (sceneName !== 'Untitled Scene.json') {
+                const scenePath = `assets/scenes/${sceneName}`;
+                await fs.writeFile(scenePath, sceneJson);
+                console.log(`[AssetStore] Auto-Saved scene '${scenePath}' after asset rename.`);
+            }
+        }
+    };
+
     return {
         files,
         currentPath,
@@ -197,6 +264,7 @@ export const useAssetStore = defineStore('assets', () => {
         changeDirectory,
         goUp,
         setZoom,
-        toggleFolder
+        toggleFolder,
+        renameAsset
     };
 });

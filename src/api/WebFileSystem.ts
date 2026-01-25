@@ -210,8 +210,8 @@ export class WebFileSystem implements IFileSystem {
                     results = results.concat(subResults);
                 }
             }
-        } catch (e) {
-            console.error(`[WebFileSystem] Scan failed for ${dir}`, e);
+        } catch (e: any) {
+            console.error(`[WebFileSystem] Scan failed for ${dir}`, e?.message || e);
         }
         return results;
     }
@@ -272,6 +272,34 @@ export class WebFileSystem implements IFileSystem {
             return true;
         } catch (e) {
             console.error('[WebFileSystem] delete failed', e);
+            return false;
+        }
+    }
+
+    async renameFile(oldPath: string, newPath: string): Promise<boolean> {
+        await this.ensureInit();
+        if (!this.currentProject) return false;
+        
+        try {
+            const fullOld = `/${this.currentProject}/${oldPath}`;
+            const fullNew = `/${this.currentProject}/${newPath}`;
+            
+            await fs.promises.rename(fullOld, fullNew);
+            
+            // Trigger Watcher Manually
+            if (this.watcherCallback) {
+                this._scanRecursive('').then(files => {
+                    if (this.watcherCallback) {
+                        // We emit two events or just one? Usually unlink + add. 
+                        // But let's just emit change/refresh
+                         this.watcherCallback({ event: 'unlink', path: oldPath, files }); // Cleanup old views
+                         this.watcherCallback({ event: 'add', path: newPath, files });
+                    }
+                });
+            }
+            return true;
+        } catch (e) {
+            console.error('[WebFileSystem] rename failed', e);
             return false;
         }
     }

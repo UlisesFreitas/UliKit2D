@@ -418,26 +418,37 @@ export class RenderSystem {
                 this.pendingUpdates.delete(entity.id!); // Clear flag
 
                 resourceManager.loadTexture(texturePath).then((texture) => {
+                    const currentSprite = this.spriteCache.get(entity.id!);
+                    if (!currentSprite) return;
 
-                    if (texture && sprite) {
-                        // Verify race condition: did path change while loading?
-                        if ((sprite as any)._currentPath === texturePath) {
-                            sprite.texture = texture;
-                            // Update ECS dimensions if needed
-                            if (entity.sprite) {
-                                entity.sprite.width = texture.width;
-                                entity.sprite.height = texture.height;
-                            }
-                            
-                            // Ensure parenting is correct/refreshed
-                            const layerId = entity.layer || 'Base Layer';
-                            const container = this.layerContainers.get(layerId);
-                             if (container) {
-                                if (sprite.parent !== container) {
-                                    container.addChild(sprite);
-                                }
-                            }
+                    // Verify race condition
+                    if ((currentSprite as any)._currentPath !== texturePath) return;
+
+                    // Validate Texture Source
+                    if (texture && texture.source) {
+                        currentSprite.texture = texture;
+                        
+                        // Auto-size if not manually overridden (logic could be refined)
+                        if (entity.sprite) {
+                            entity.sprite.width = texture.width;
+                            entity.sprite.height = texture.height;
                         }
+                    } else {
+                        console.warn(`[RenderSystem] Invalid texture source for '${texturePath}'. Using fallback.`);
+                        currentSprite.texture = Texture.WHITE; // Fallback
+                        currentSprite.tint = 0xFF00FF; // Magenta to indicate error
+                        
+                        if (entity.sprite) {
+                            entity.sprite.width = 64;
+                            entity.sprite.height = 64;
+                        }
+                    }
+                    
+                    // Maintain Parent
+                    const layerId = entity.layer || 'Base Layer';
+                    const container = this.layerContainers.get(layerId);
+                    if (container && currentSprite.parent !== container) {
+                        container.addChild(currentSprite);
                     }
                 });
             }

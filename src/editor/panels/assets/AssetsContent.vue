@@ -47,20 +47,29 @@
         </div>
 
         <!-- Custom Context Menu -->
-        <div v-if="menuState.visible" 
-             class="fixed bg-bg-panel border border-border shadow-lg rounded z-[9999] py-1 min-w-[140px]"
-             :style="{ top: menuState.y + 'px', left: menuState.x + 'px' }">
-             <div class="px-3 py-1 text-[10px] font-bold text-text-secondary truncate max-w-[200px]">{{ menuState.file?.name }}</div>
-             <div class="h-[1px] bg-border my-1"></div>
-            <button 
-                v-if="menuState.file?.path !== 'assets'"
-                @click="deleteAsset" 
-                class="w-full text-left px-3 py-1.5 hover:bg-bg-selection hover:text-accent-danger text-xs text-accent-danger transition-colors"
-            >
-                Delete
-            </button>
-             <!-- More options can go here like Rename, Show in Explorer -->
-        </div>
+        <Teleport to="body">
+            <div v-if="menuState.visible && activeFile" 
+                 class="fixed bg-bg-panel border border-border shadow-lg rounded z-[9999] py-1 min-w-[140px]"
+                 :style="menuStyle">
+                 <div class="px-3 py-1 text-[10px] font-bold text-text-secondary truncate max-w-[200px]">{{ activeFile.name }}</div>
+                 <div class="h-[1px] bg-border my-1"></div>
+                <button 
+                    v-if="activeFile.path !== 'assets'"
+                    @click="startRename" 
+                    class="w-full text-left px-3 py-1.5 hover:bg-bg-selection hover:text-text-primary text-xs text-text-secondary transition-colors"
+                >
+                    Rename
+                </button>
+                <button 
+                    v-if="activeFile.path !== 'assets'"
+                    @click="deleteAsset" 
+                    class="w-full text-left px-3 py-1.5 hover:bg-bg-selection hover:text-accent-danger text-xs text-accent-danger transition-colors"
+                >
+                    Delete
+                </button>
+                 <!-- More options can go here like Rename, Show in Explorer -->
+            </div>
+        </Teleport>
     </div>
 </template>
 
@@ -69,6 +78,7 @@ import { ref, onMounted, onUnmounted, watch, computed } from 'vue';
 import { useAssetStore, type FileNode } from '../../../stores/useAssetStore';
 import { useUIStore } from '../../../stores/useUIStore';
 import { getFileSystem } from '../../../api/FileSystem';
+import { AssetDatabase } from '../../managers/AssetDatabase';
 import { projectState } from '../../managers/ProjectManager';
 
 const assetStore = useAssetStore();
@@ -80,7 +90,30 @@ const menuState = ref({
     visible: false,
     x: 0,
     y: 0,
-    file: null as any
+    bindBottom: false,
+    filePath: ''
+});
+
+// Computed Active File (Live from Store)
+const activeFile = computed(() => {
+    if (!menuState.value.filePath) return null;
+    return assetStore.visibleFiles.find(f => f.path === menuState.value.filePath) || null;
+});
+
+const menuStyle = computed(() => {
+    const { x, y, bindBottom } = menuState.value;
+    if (bindBottom) {
+        return {
+            left: `${x}px`,
+            bottom: `${window.innerHeight - y}px`,
+            top: 'auto'
+        };
+    }
+    return {
+        left: `${x}px`,
+        top: `${y}px`,
+        bottom: 'auto'
+    };
 });
 
 // Grid Classes based on Zoom
@@ -129,16 +162,67 @@ const closeContextMenu = () => {
 
 const showContextMenu = (e: MouseEvent, file: any) => {
     e.preventDefault();
-    menuState.value = {
-        visible: true,
-        x: e.clientX,
-        y: e.clientY,
-        file: file
-    };
+    
+    // Smart Positioning
+    // If we are near the bottom (arbitrary safety threshold, e.g. 150px), anchor to BOTTOM.
+    const threshold = 150; 
+    const windowHeight = window.innerHeight;
+    const spaceBelow = windowHeight - e.clientY;
+    
+    const isFlipUp = spaceBelow < threshold;
+
+    // Force close first to trigger re-mount (Clears rendering artifacts/ghosting)
+    menuState.value.visible = false;
+    
+    // Use nextTick equivalent to re-open
+    setTimeout(() => {
+        menuState.value = {
+            visible: true,
+            x: e.clientX,
+            y: e.clientY,
+            bindBottom: isFlipUp, // New flag
+            filePath: file.path
+        };
+    }, 0);
+};
+
+const startRename = async () => {
+    const file = activeFile.value;
+    if (!file) return;
+
+    // Logic Fix: Forbid renaming the root 'assets' folder
+    if (file.name === 'assets' && (file.path === 'assets' || file.path === '/assets')) {
+         ui.showToast({ title: 'Protected', description: 'The root assets folder cannot be renamed.', type: 'warning' });
+         closeContextMenu();
+         return;
+    }
+    
+    closeContextMenu();
+
+    const oldExt = file.name.includes('.') ? '.' + file.name.split('.').pop()! : '';
+    let newNameInput = await ui.prompt({
+        title: 'Rename Asset',
+        message: 'Enter new name:',
+        defaultValue: file.name
+    });
+
+    if (newNameInput) {
+        // Validation: Append extension if user cleared it?
+        // E.g. User types "foo", we make it "foo.png" if it was "bar.png"
+        // Unless user explicitly types an extension?
+        // Simple logic: If input has no extension, append old extension.
+        if (oldExt && !newNameInput.includes('.')) {
+            newNameInput += oldExt;
+        }
+
+        if (newNameInput !== file.name) {
+            await assetStore.renameAsset(file.path, newNameInput);
+        }
+    }
 };
 
 const deleteAsset = async () => {
-    const file = menuState.value.file;
+    const file = activeFile.value;
     if (!file) return;
     closeContextMenu();
 
@@ -172,7 +256,35 @@ const onDoubleClick = (file: FileNode) => {
 
 const onDragStart = (e: DragEvent, file: FileNode) => {
     if (e.dataTransfer) {
+        // 1. Text/Plain Support (Legacy & Scene View fallback)
         e.dataTransfer.setData('text/plain', file.path);
+
+        // 2. Strict Asset Protocol (Synchronous)
+        const db = AssetDatabase.instance;
+        const guid = db.getAssetGuid(file.path);
+        
+        if (guid) {
+            const payload = {
+                guid: guid,
+                type: db.getAsset(guid)?.type || 'unknown',
+                path: file.path
+            };
+            
+            e.dataTransfer.setData('application/ulikit-asset', JSON.stringify(payload));
+            console.log('[Drag] Started Asset:', payload);
+        } else {
+             // If DB doesn't have it (e.g. just added), we can try to guess or just rely on path.
+             // But usually DB is up to date since AssetStore updates driven by it.
+             if (file.type === 'file') {
+                 // Fallback payload without GUID? Or just skip?
+                 // Let's send path-only payload if strict mode requires it.
+                 /*
+                 const payload = { guid: '', type: 'unknown', path: file.path };
+                 e.dataTransfer.setData('application/ulikit-asset', JSON.stringify(payload));
+                 */
+             }
+        }
+        
         e.dataTransfer.effectAllowed = 'copy';
     }
 };
