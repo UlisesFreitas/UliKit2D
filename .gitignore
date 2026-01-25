@@ -11,6 +11,10 @@ dist
 dist-ssr
 *.local
 
+# Assets
+src/resources/default_assets/*
+
+# Test projects
 TestProject2
 BrowserTestProject
 ct-js-reference
