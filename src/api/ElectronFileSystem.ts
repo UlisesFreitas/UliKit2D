@@ -52,29 +52,37 @@ export class ElectronFileSystem implements IFileSystem {
         // 2. Normalize slashes
         let texturePath = relPath.replace(/\\/g, '/');
         
+        // Helper to safe encode: use encodeURI but patch characters that break URLs (#, ?)
+        const safeEncode = (p: string) => {
+             return encodeURI(p).replace(/#/g, '%23').replace(/\?/g, '%3F');
+        };
+
+        let finalUrl = '';
+
         // 2. Handle Absolute Paths (Windows Drive Letter)
         if (/^[a-zA-Z]:\//.test(texturePath)) {
-            // Use file:// protocol for Electron (requires webSecurity: false)
-            return encodeURI('file:///' + texturePath);
+            finalUrl = 'asset:///' + safeEncode(texturePath);
         }
         
         // 3. Handle Already Prefixed Paths
-        if (texturePath.startsWith('file://')) {
-            return encodeURI(texturePath);
+        else if (texturePath.startsWith('file://')) {
+            finalUrl = texturePath.replace('file://', 'asset://');
         }
 
         // 4. Handle Relative Paths (Project Assets)
-        if (projectState.currentProjectPath && typeof projectState.currentProjectPath === 'string') {
+        else if (projectState.currentProjectPath && typeof projectState.currentProjectPath === 'string') {
             const projectRoot = projectState.currentProjectPath.replace(/\\/g, '/');
             // Remove leading slash if present in relative path
             const cleanRelPath = texturePath.startsWith('/') ? texturePath.slice(1) : texturePath;
             
-            // Construct full path: file:/// + ProjectRoot + / + RelativePath
-            return encodeURI(`file:///${projectRoot}/${cleanRelPath}`);
+            // Construct full path: asset:/// + ProjectRoot + / + RelativePath
+            finalUrl = `asset:///${safeEncode(projectRoot)}/${safeEncode(cleanRelPath)}`;
+        } else {
+            // Fallback
+             finalUrl = 'asset:///' + safeEncode(texturePath);
         }
-
-        // Fallback
-        return encodeURI(texturePath);
+        
+        return finalUrl;
     }
 
     async watchProject(path: string, onEvent: (event: FileChangeEvent) => void): Promise<() => void> {
@@ -143,7 +151,16 @@ export class ElectronFileSystem implements IFileSystem {
 
     // Asset Management
     async importFile(sourcePath: string, destDir: string, customFilename?: string): Promise<{success: boolean, path?: string, error?: string}> {
-        return await this.electronAPI.importFile(sourcePath, destDir, customFilename);
+        // Resolve absolute destination path to ensure file is copied to project folder, not CWD
+        let finalDestDir = destDir;
+        if (projectState.currentProjectPath && typeof projectState.currentProjectPath === 'string') {
+             // If relative (no drive letter)
+             if (!/^[a-zA-Z]:/.test(destDir) && !destDir.startsWith('/')) {
+                  const projectRoot = projectState.currentProjectPath.replace(/\\/g, '/');
+                  finalDestDir = `${projectRoot}/${destDir}`;
+             }
+        }
+        return await this.electronAPI.importFile(sourcePath, finalDestDir, customFilename);
     }
 
     getPathForFile(file: File): string {

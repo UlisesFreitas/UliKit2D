@@ -1,7 +1,12 @@
 <template>
     <div 
         class="assets-content flex-1 h-full overflow-y-auto bg-bg-base p-2" 
-        @click.self="closeContextMenu"
+        @click.self="() => {
+             // If simple click on background (and not end of drag), clear
+             if (!dragState.isSelecting) assetStore.clearSelection();
+        }"
+        @mousedown="onMouseDown"
+        @contextmenu.self.prevent="() => { /* Context menu on background? Future feature */ }"
         @dragover.prevent 
         @drop.prevent="onDrop"
     >
@@ -15,13 +20,16 @@
                 class="file-item select-none"
                 :class="{
                     'is-folder text-accent-color': file.type === 'directory',
+                    'is-selected': assetStore.selectedPaths.has(file.path),
                     'list-row': assetStore.zoomLevel === 0,
                     'grid-card': assetStore.zoomLevel > 0
                 }"
                 draggable="true"
                 @dragstart="onDragStart($event, file)"
+                @click.stop="onFileClick($event, file)"
                 @dblclick="onDoubleClick(file)"
                 @contextmenu="showContextMenu($event, file)"
+                :data-path="file.path"
             >
                 <!-- ICON -->
                 <div class="icon-container flex items-center justify-center shrink-0">
@@ -41,6 +49,17 @@
             </div>
         </div>
         
+        <!-- Selection Rect -->
+        <div v-if="dragState.isSelecting" 
+             class="fixed border border-accent-color bg-accent-color/20 pointer-events-none z-50"
+             :style="{
+                 left: Math.min(dragState.startX, dragState.currentX) + 'px',
+                 top: Math.min(dragState.startY, dragState.currentY) + 'px',
+                 width: Math.abs(dragState.currentX - dragState.startX) + 'px',
+                 height: Math.abs(dragState.currentY - dragState.startY) + 'px'
+             }"
+        ></div>
+
         <!-- Empty State -->
         <div v-if="assetStore.visibleFiles.length === 0" class="w-full text-center text-text-disabled mt-10">
             {{ assetStore.searchQuery ? 'No results found' : 'Empty Folder' }}
@@ -52,29 +71,30 @@
                  ref="contextMenuRef"
                  class="fixed bg-bg-panel border border-border shadow-lg rounded z-[9999] py-1 min-w-[140px]"
                  :style="menuStyle">
-                 <div class="px-3 py-1 text-[10px] font-bold text-text-secondary truncate max-w-[200px]">{{ menuState.file?.name }}</div>
+                 
+                 <!-- Header: Show Selection Count if > 1 -->
+                 <div class="px-3 py-1 text-[10px] font-bold text-text-secondary truncate max-w-[200px]">
+                    {{ assetStore.selectedPaths.size > 1 ? `${assetStore.selectedPaths.size} items` : menuState.file?.name }}
+                 </div>
                  <div class="h-[1px] bg-border my-1"></div>
+                
+                <!-- Rename (Single Only) -->
                 <button 
+                    v-if="assetStore.selectedPaths.size <= 1"
                     @click="promptRename" 
                     class="w-full text-left px-3 py-1.5 hover:bg-bg-selection text-xs hover:text-text-primary transition-colors"
                 >
                     Rename
                 </button>
-                 <div class="h-[1px] bg-border my-1"></div>
+                 <div class="h-[1px] bg-border my-1" v-if="assetStore.selectedPaths.size <= 1"></div>
+                
+                <!-- Delete (Batch) -->
                 <button 
-                    v-if="menuState.file?.type !== 'directory'"
-                    class="w-full text-left px-3 py-1.5 hover:bg-bg-selection text-xs text-text-disabled cursor-not-allowed transition-colors"
-                    title="Not implemented yet"
-                >
-                    Edit in external editor
-                </button>
-                 <div class="h-[1px] bg-border my-1"></div>
-                <button 
-                    v-if="menuState.file?.path !== 'assets'"
-                    @click="deleteAsset" 
+                    v-if="canDeleteSelection"
+                    @click="deleteSelection" 
                     class="w-full text-left px-3 py-1.5 hover:bg-bg-selection hover:text-accent-danger text-xs text-accent-danger transition-colors"
                 >
-                    Delete
+                    Delete {{ assetStore.selectedPaths.size > 1 ? `(${assetStore.selectedPaths.size})` : '' }}
                 </button>
             </div>
         </Teleport>
@@ -82,7 +102,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, watch, computed, nextTick } from 'vue';
+import { ref, onMounted, onUnmounted, watch, computed, nextTick, reactive } from 'vue';
 import { useAssetStore, type FileNode } from '../../../stores/useAssetStore';
 import { useUIStore } from '../../../stores/useUIStore';
 import { getFileSystem } from '../../../api/FileSystem';
@@ -98,6 +118,14 @@ const menuState = ref({
     x: 0,
     y: 0,
     file: null as any
+});
+
+const dragState = reactive({
+    isSelecting: false,
+    startX: 0,
+    startY: 0,
+    currentX: 0,
+    currentY: 0
 });
 
 // Grid Classes based on Zoom
@@ -149,9 +177,15 @@ const closeContextMenu = () => {
 
 const showContextMenu = async (e: MouseEvent, file: any) => {
     e.preventDefault();
-    e.stopPropagation(); // Stop bubbling (fixes some event issues)
+    e.stopPropagation();
     
-    // 1. Initial State (Visible but maybe wrong pos)
+    // Select if not selected (Right click should select)
+    // If clicking on an already selected item in multi-select, keep selection!
+    if (!assetStore.selectedPaths.has(file.path)) {
+        assetStore.select(file.path);
+    }
+    
+    // 1. Initial State
     menuState.value = {
         visible: true,
         x: e.clientX,
@@ -159,10 +193,8 @@ const showContextMenu = async (e: MouseEvent, file: any) => {
         file: file
     };
     
-    // 2. Wait for Render
     await nextTick();
     
-    // 3. Measure and Adjust
     if (contextMenuRef.value) {
         const menuRect = contextMenuRef.value.getBoundingClientRect();
         const winWidth = window.innerWidth;
@@ -171,25 +203,134 @@ const showContextMenu = async (e: MouseEvent, file: any) => {
         let x = e.clientX;
         let y = e.clientY;
         
-        // Flip X if too close to right
-        if (x + menuRect.width > winWidth) {
-            x -= menuRect.width;
-        }
+        if (x + menuRect.width > winWidth) x -= menuRect.width;
+        if (y + menuRect.height > winHeight) y -= menuRect.height;
         
-        // Flip Y if too close to bottom
-        if (y + menuRect.height > winHeight) {
-             y -= menuRect.height;
-        }
+        menuStyle.value = { top: `${y}px`, left: `${x}px` };
+    }
+};
+
+const onFileClick = (e: MouseEvent, file: FileNode) => {
+    if (e.ctrlKey || e.metaKey) {
+        assetStore.toggleSelection(file.path);
+    } else if (e.shiftKey) {
+        assetStore.selectRange(file.path);
+    } else {
+        assetStore.select(file.path);
+    }
+};
+
+const onDoubleClick = (file: FileNode) => {
+    if (file.type === 'directory') {
+        assetStore.changeDirectory(file.path);
+    } else {
+        console.log('Open File:', file.path);
+    }
+};
+
+// Drag Selection Logic
+let selectionStartElement: HTMLElement | null = null;
+
+const onMouseDown = (e: MouseEvent) => {
+    // Only left click and on background (not if target is file-item)
+    // Actually, identifying if we clicked a file-item is tricky if bubbling.
+    // We used @click.stop on file-item, so this won't fire for file clicks if we rely on bubbling?
+    // Wait, onFileClick has .stop
+    
+    if (e.button !== 0) return;
+    if ((e.target as HTMLElement).closest('.file-item')) return; // Should be handled by .stop, but safety.
+    
+    // Clear selection if simple click on BG
+    if (!e.ctrlKey && !e.metaKey && !e.shiftKey) {
+        assetStore.clearSelection();
+    }
+    
+    dragState.isSelecting = true;
+    dragState.startX = e.clientX;
+    dragState.startY = e.clientY;
+    dragState.currentX = e.clientX;
+    dragState.currentY = e.clientY;
+    
+    document.addEventListener('mousemove', onMouseMove);
+    document.addEventListener('mouseup', onMouseUp);
+};
+
+const onMouseMove = (e: MouseEvent) => {
+    if (!dragState.isSelecting) return;
+    dragState.currentX = e.clientX;
+    dragState.currentY = e.clientY;
+    
+    // Optional: Real-time selection update (expensive?)
+    // Or just visualize box
+};
+
+const onMouseUp = (e: MouseEvent) => {
+    if (!dragState.isSelecting) return;
+    dragState.isSelecting = false;
+    document.removeEventListener('mousemove', onMouseMove);
+    document.removeEventListener('mouseup', onMouseUp);
+    
+    // Calculate Selection
+    const r = {
+        x: Math.min(dragState.startX, dragState.currentX),
+        y: Math.min(dragState.startY, dragState.currentY),
+        w: Math.abs(dragState.currentX - dragState.startX),
+        h: Math.abs(dragState.currentY - dragState.startY)
+    };
+    
+    // If box is tiny, treat as click and done (already cleared above)
+    if (r.w < 5 && r.h < 5) return;
+
+    // Find overlapping elements
+    const fileItems = document.querySelectorAll('.file-item');
+    const newSelection = new Set<string>();
+    
+    // If ctrl held, we ADD to selection, else we replace? 
+    // Usually Drag Select implies "Select these". 
+    // If Ctrl held, merge.
+    if (e.ctrlKey || e.metaKey) {
+        assetStore.selectedPaths.forEach(p => newSelection.add(p));
+    }
+
+    fileItems.forEach((el) => {
+        const rect = el.getBoundingClientRect();
         
-        menuStyle.value = {
-            top: `${y}px`,
-            left: `${x}px`
-        };
+        // Check Intersection
+        const overlaps = !(rect.right < r.x || 
+                           rect.left > r.x + r.w || 
+                           rect.bottom < r.y || 
+                           rect.top > r.y + r.h);
+                           
+        if (overlaps) {
+             // Find path from... key? vue loop?
+             // Accessing vue data from DOM is hacking.
+             // Better: Iterate visibleFiles and assume order matches DOM or use data attribute.
+             // We can put data-path on element
+             const path = (el as HTMLElement).getAttribute('data-path');
+             if (path) {
+                 if (e.ctrlKey || e.metaKey) {
+                    // Toggle behavior in box select? Or Just Add? Usually Add.
+                    newSelection.add(path);
+                 } else {
+                    newSelection.add(path);
+                 }
+             }
+        }
+    });
+    
+    // Commit
+    assetStore.selectedPaths = newSelection;
+    if (newSelection.size > 0) {
+        assetStore.lastSelectedPath = Array.from(newSelection).pop() || null;
     }
 };
 
 const promptRename = async () => {
-    const file = menuState.value.file;
+    // Only valid for single selection
+    if (assetStore.selectedPaths.size !== 1) return;
+    const path = Array.from(assetStore.selectedPaths)[0];
+    const file = assetStore.files.find(f => f.path === path);
+    
     if (!file) return;
     closeContextMenu();
 
@@ -211,41 +352,87 @@ const promptRename = async () => {
     }
 };
 
-const deleteAsset = async () => {
-    const file = menuState.value.file;
-    if (!file) return;
-    closeContextMenu();
+const canDeleteSelection = computed(() => {
+    // Cannot delete if any selected path is 'assets'
+    // or if selection is empty
+    if (assetStore.selectedPaths.size === 0) return false;
+    return !assetStore.selectedPaths.has('assets');
+});
 
-    if (file.name === 'assets' && file.path === 'assets') {
-        ui.showToast({ title: 'Protected', description: 'The assets folder cannot be deleted.', type: 'warning' });
-        return;
-    }
+const deleteSelection = async () => {
+    if (!canDeleteSelection.value) return;
+    closeContextMenu();
+    
+    const count = assetStore.selectedPaths.size;
+    const message = count === 1 
+        ? `Delete '${Array.from(assetStore.selectedPaths)[0].split('/').pop()}'?` 
+        : `Delete ${count} items?`;
 
     if (await ui.confirm({
-        title: 'Delete Asset',
-        message: `Delete '${file.name}'?`,
+        title: 'Delete Assets',
+        message: message,
         confirmText: 'Delete',
         isDanger: true
     })) {
-        await ProjectManager.deleteAsset(file.path);
+        // Batch Delete
+        const paths = Array.from(assetStore.selectedPaths);
+        // Sort paths to potentially delete children before parents? 
+        // Actually ProjectManager.deleteAsset handles recursive, so order usually fine unless nested selected.
+        // If we select "A" and "A/B", deleting A kills B. Deleting B then fails.
+        // Filter out paths that are descendants of other selected paths.
+        
+        const sorted = paths.sort(); // Lexicographical sort puts parents before children
+        const toDelete: string[] = [];
+        
+        for (const p of sorted) {
+            // If any existing toDelete is a parent of p, skip p
+            // e.g. "assets/A" is in toDelete. p is "assets/A/B".
+            // "assets/A/B".startsWith("assets/A/") is true.
+            const isDescendant = toDelete.some(parent => p.startsWith(parent + '/'));
+            if (!isDescendant) {
+                toDelete.push(p);
+            }
+        }
+        
+        // Delete remaining
+        for (const p of toDelete) {
+             await ProjectManager.deleteAsset(p);
+        }
+        
+        assetStore.clearSelection();
     }
 };
 
-const onDoubleClick = (file: FileNode) => {
-    if (file.type === 'directory') {
-        assetStore.changeDirectory(file.path);
-    } else {
-        // Future: Open file in appropriate editor
-        console.log('Open File:', file.path);
-    }
-};
+// --- DRAG STUFF ---
 
 const onDragStart = (e: DragEvent, file: FileNode) => {
     if (e.dataTransfer) {
-        e.dataTransfer.setData('text/plain', file.path);
-        e.dataTransfer.effectAllowed = 'copy';
+        // If dragging a selected item, move ALL selected items
+        // If dragging an unselected item, select it first (handled by click/mousedown usually, but dragstart might be faster)
+        
+        let paths = Array.from(assetStore.selectedPaths);
+        
+        if (!assetStore.selectedPaths.has(file.path)) {
+            // Dragging an unselected item -> Select it exclusively
+            assetStore.select(file.path);
+            paths = [file.path];
+        }
+        
+        // We can only put string data. JSON encode list?
+        // Or standard is usually list of files if native.
+        // For internal, we can put a custom JSON.
+        
+        const dragData = JSON.stringify(paths);
+        e.dataTransfer.setData('application/ulikit-assets', dragData);
+        e.dataTransfer.setData('text/plain', file.path); // Fallback for single
+        e.dataTransfer.effectAllowed = 'copyMove';
+        
+        // Custom Drag Image?
+        // e.dataTransfer.setDragImage(...)
     }
 };
+
+// ... onDrop (keep existing logic + support internal moves if needed later) ...
 
 const onDrop = async (e: DragEvent) => {
     const items = e.dataTransfer?.items;
@@ -354,6 +541,10 @@ onUnmounted(() => {
 .file-item:hover {
     background-color: var(--bg-hover);
     border-color: var(--border-color);
+}
+.file-item.is-selected {
+    background-color: var(--bg-selection);
+    border-color: var(--accent-color);
 }
 
 /* GRID MODE CARD STYLE */

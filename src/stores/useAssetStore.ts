@@ -20,8 +20,60 @@ export const useAssetStore = defineStore('assets', () => {
     const searchQuery = ref<string>('');
     const sortOrder = ref<'asc' | 'desc'>('asc');
     const expandedFolders = ref<Set<string>>(new Set());
+    
+    // Selection State
+    const selectedPaths = ref<Set<string>>(new Set());
+    const lastSelectedPath = ref<string | null>(null);
 
     // --- Actions ---
+
+    const clearSelection = () => {
+        selectedPaths.value.clear();
+        lastSelectedPath.value = null;
+    };
+
+    const select = (path: string, exclusive = true) => {
+        if (exclusive) selectedPaths.value.clear();
+        selectedPaths.value.add(path);
+        lastSelectedPath.value = path;
+    };
+
+    const toggleSelection = (path: string) => {
+        if (selectedPaths.value.has(path)) {
+            selectedPaths.value.delete(path);
+            if (lastSelectedPath.value === path) lastSelectedPath.value = null;
+        } else {
+            selectedPaths.value.add(path);
+            lastSelectedPath.value = path;
+        }
+    };
+
+    const selectRange = (toPath: string) => {
+        if (!lastSelectedPath.value) {
+            select(toPath);
+            return;
+        }
+
+        const startIdx = visibleFiles.value.findIndex(f => f.path === lastSelectedPath.value);
+        const endIdx = visibleFiles.value.findIndex(f => f.path === toPath);
+
+        if (startIdx === -1 || endIdx === -1) {
+            select(toPath);
+            return;
+        }
+
+        const min = Math.min(startIdx, endIdx);
+        const max = Math.max(startIdx, endIdx);
+
+        // Don't clear existing if ctrl is held? Usually Shift+Click clears others unless mixed.
+        // Standard behavior: Shift+Click extends selection from Anchor to Target, clearing others usually.
+        // We will assume standard exclusive range select for now.
+        selectedPaths.value.clear();
+        
+        for (let i = min; i <= max; i++) {
+            selectedPaths.value.add(visibleFiles.value[i].path);
+        }
+    };
 
     /**
      * Rebuilds the File Tree from the AssetDatabase.
@@ -76,6 +128,14 @@ export const useAssetStore = defineStore('assets', () => {
             files.value = Array.from(newFiles.values());
             console.log(`[AssetStore] Refreshed from DB. Total Nodes: ${files.value.length}`);
             
+            // Validate Selection
+            // Remove selected paths that no longer exist
+            const validPaths = new Set<string>();
+            for (const p of selectedPaths.value) {
+                if (newFiles.has(p)) validPaths.add(p);
+            }
+            selectedPaths.value = validPaths;
+
         } catch (e) {
             console.error('[AssetStore] Failed to refresh from DB:', e);
         }
@@ -121,19 +181,8 @@ export const useAssetStore = defineStore('assets', () => {
                 // Must not have more slashes (immediate child)
                 return !relative.includes('/');
             } else {
-                // Root Level: Expect 'assets' BUT HIDE IT if the user wants Master Folder behavior?
-                // Actually, if we are at Root level (currentPath=''), we normally see 'assets'.
-                // If we force currentPath='assets', we see children of assets.
-                // The issue: "visibleFiles" implementation shows children of currentPath.
-                // If currentPath is 'assets', we see arrows, board, etc. 
-                // BUT we don't want to see 'assets' ITSELF inside 'assets' (which is impossible unless recursive).
-                // If currentPath is empty, we see 'assets'.
-                // If the user starts at 'assets', they see children.
-                // WE JUST NEED TO ENSURE default 'currentPath' IS 'assets'.
-                
-                // However, just in case "assets" folder node leaked into the children list (self-reference?), prevent it.
+                // Root Level
                 if (normPath === 'assets' && normCurrent === 'assets') return false; 
-                
                 return !normPath.includes('/');
             }
         });
@@ -151,6 +200,7 @@ export const useAssetStore = defineStore('assets', () => {
         currentPath.value = path;
         searchQuery.value = '';
         expandedFolders.value.add(path);
+        clearSelection(); // Clear selection on nav? Probably yes.
     };
 
     const goUp = () => {
@@ -159,6 +209,7 @@ export const useAssetStore = defineStore('assets', () => {
         parts.pop();
         currentPath.value = parts.join('/');
         searchQuery.value = ''; 
+        clearSelection();
     };
 
     return {
@@ -169,6 +220,14 @@ export const useAssetStore = defineStore('assets', () => {
         searchQuery,
         sortOrder,
         expandedFolders,
+        // Selection
+        selectedPaths,
+        lastSelectedPath,
+        select,
+        toggleSelection,
+        clearSelection,
+        selectRange,
+        
         refreshFromDatabase,
         loadAssets, // Deprecated stub
         changeDirectory,

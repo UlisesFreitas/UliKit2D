@@ -54,17 +54,30 @@ export class ProjectManager {
                     projectState.projectName = (pathOrHandle as FileSystemDirectoryHandle).name;
                  }
 
-                 // 1. Initialize Manifest (project.json)
+                 // 1. Load Initial Manifest (Created by Main Process)
                  const { ProjectManifestManager } = await import('./ProjectManifestManager');
-                 ProjectManifestManager.createDefault(projectState.projectName);
                  
-                 // 2. Save Manifest
-                 // Ensure project.json is written
-                 await ProjectManifestManager.saveProject('project.json');
+                 // Try to load the manifest that main.ts just wrote (populated with default assets)
+                 const loaded = await ProjectManifestManager.loadProject('project.json');
+                 
+                 if (!loaded) {
+                     console.warn('[ProjectManager] project.json missing after creation? Fallback to default.');
+                     ProjectManifestManager.createDefault(projectState.projectName);
+                     await ProjectManifestManager.saveProject('project.json');
+                 }
 
-                 // 3. Hydrate DB (Empty)
-                 const { AssetDatabase } = await import('./AssetDatabase');
-                 AssetDatabase.instance.hydrate([]);
+                 // 2. Hydrate DB (Already handled by loadProject, but ensuring)
+                 // Note: loadProject calls AssetDatabase.instance.hydrate(data.resources)
+                 
+                 // If we had to create default, we need to hydrate empty
+                 if (!loaded) {
+                      const { AssetDatabase } = await import('./AssetDatabase');
+                      AssetDatabase.instance.hydrate([]);
+                 }
+
+                 // 3. Hydrate DB (Handled above by loadProject)
+                 // const { AssetDatabase } = await import('./AssetDatabase');
+                 // AssetDatabase.instance.hydrate([]);
 
                  // 4. Notify AssetStore
                  // @ts-ignore
