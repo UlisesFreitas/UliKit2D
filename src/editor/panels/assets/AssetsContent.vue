@@ -1,6 +1,6 @@
 <template>
     <div 
-        class="assets-content flex-1 h-full overflow-y-auto bg-bg-base p-2" 
+        class="assets-content flex-1 h-full overflow-y-auto bg-bg-base p-2 relative outline-none" 
         @click.self="() => {
              // If simple click on background (and not end of drag), clear
              if (!dragState.isSelecting) assetStore.clearSelection();
@@ -9,6 +9,8 @@
         @contextmenu.self.prevent="() => { /* Context menu on background? Future feature */ }"
         @dragover.prevent 
         @drop.prevent="onDrop"
+        @keydown="onKeyDown"
+        tabindex="0"
     >
         <div 
             class="grid-container"
@@ -51,7 +53,7 @@
         
         <!-- Selection Rect -->
         <div v-if="dragState.isSelecting" 
-             class="fixed border border-accent-color bg-accent-color/20 pointer-events-none z-50"
+             class="absolute border border-accent-color bg-accent-color/20 pointer-events-none z-50"
              :style="{
                  left: Math.min(dragState.startX, dragState.currentX) + 'px',
                  top: Math.min(dragState.startY, dragState.currentY) + 'px',
@@ -229,8 +231,6 @@ const onDoubleClick = (file: FileNode) => {
 };
 
 // Drag Selection Logic
-let selectionStartElement: HTMLElement | null = null;
-
 const onMouseDown = (e: MouseEvent) => {
     // Only left click and on background (not if target is file-item)
     // Actually, identifying if we clicked a file-item is tricky if bubbling.
@@ -246,10 +246,18 @@ const onMouseDown = (e: MouseEvent) => {
     }
     
     dragState.isSelecting = true;
-    dragState.startX = e.clientX;
-    dragState.startY = e.clientY;
-    dragState.currentX = e.clientX;
-    dragState.currentY = e.clientY;
+    
+    // Calculate Relative Start (compensate for container position + scroll)
+    const container = e.currentTarget as HTMLElement;
+    const rect = container.getBoundingClientRect();
+    
+    dragState.startX = e.clientX - rect.left + container.scrollLeft;
+    dragState.startY = e.clientY - rect.top + container.scrollTop;
+    dragState.currentX = dragState.startX;
+    dragState.currentY = dragState.startY;
+    
+    // Cache rect and initial scroll reference if needed, but we re-query container in move for scroll
+    (dragState as any).containerRect = rect;
     
     document.addEventListener('mousemove', onMouseMove);
     document.addEventListener('mouseup', onMouseUp);
@@ -257,11 +265,14 @@ const onMouseDown = (e: MouseEvent) => {
 
 const onMouseMove = (e: MouseEvent) => {
     if (!dragState.isSelecting) return;
-    dragState.currentX = e.clientX;
-    dragState.currentY = e.clientY;
     
-    // Optional: Real-time selection update (expensive?)
-    // Or just visualize box
+    const container = document.querySelector('.assets-content');
+    if (container) {
+        const r = container.getBoundingClientRect();
+        // Use fresh rect to handle window resize/scroll quirks, and fresh scrollLeft
+         dragState.currentX = e.clientX - r.left + container.scrollLeft;
+         dragState.currentY = e.clientY - r.top + container.scrollTop;
+    }
 };
 
 const onMouseUp = (e: MouseEvent) => {
@@ -282,6 +293,27 @@ const onMouseUp = (e: MouseEvent) => {
     if (r.w < 5 && r.h < 5) return;
 
     // Find overlapping elements
+    // We need to check intersection in RELATIVE coordinates or Viewport?
+    // easiest is Viewport rects.
+    // So convert our R (which is relative/absolute) back to viewport? 
+    // OR measure elements relative to container.
+    
+    // Let's use Viewport for Intersection Check (Standard API)
+    // Convert selection box back to viewport for check
+    
+    const container = document.querySelector('.assets-content');
+    if (!container) return;
+    const contRect = container.getBoundingClientRect();
+    
+    // Box in Viewport Coords:
+    // x = r.x (rel) + contRect.left - cont.scrollLeft
+    const viewR = {
+        left: r.x + contRect.left - container.scrollLeft,
+        top: r.y + contRect.top - container.scrollTop,
+        right: r.x + r.w + contRect.left - container.scrollLeft,
+        bottom: r.y + r.h + contRect.top - container.scrollTop
+    };
+
     const fileItems = document.querySelectorAll('.file-item');
     const newSelection = new Set<string>();
     
@@ -295,11 +327,11 @@ const onMouseUp = (e: MouseEvent) => {
     fileItems.forEach((el) => {
         const rect = el.getBoundingClientRect();
         
-        // Check Intersection
-        const overlaps = !(rect.right < r.x || 
-                           rect.left > r.x + r.w || 
-                           rect.bottom < r.y || 
-                           rect.top > r.y + r.h);
+        // Check Intersection (Viewport vs Viewport)
+        const overlaps = !(rect.right < viewR.left || 
+                           rect.left > viewR.right || 
+                           rect.bottom < viewR.top || 
+                           rect.top > viewR.bottom);
                            
         if (overlaps) {
              // Find path from... key? vue loop?
@@ -365,7 +397,7 @@ const deleteSelection = async () => {
     
     const count = assetStore.selectedPaths.size;
     const message = count === 1 
-        ? `Delete '${Array.from(assetStore.selectedPaths)[0].split('/').pop()}'?` 
+        ? `Delete '${(Array.from(assetStore.selectedPaths)[0]?.split('/').pop() || 'Item')}'?` 
         : `Delete ${count} items?`;
 
     if (await ui.confirm({
@@ -406,7 +438,8 @@ const deleteSelection = async () => {
 // --- DRAG STUFF ---
 
 const onDragStart = (e: DragEvent, file: FileNode) => {
-    if (e.dataTransfer) {
+    const dt = e.dataTransfer;
+    if (dt) {
         // If dragging a selected item, move ALL selected items
         // If dragging an unselected item, select it first (handled by click/mousedown usually, but dragstart might be faster)
         
@@ -423,12 +456,12 @@ const onDragStart = (e: DragEvent, file: FileNode) => {
         // For internal, we can put a custom JSON.
         
         const dragData = JSON.stringify(paths);
-        e.dataTransfer.setData('application/ulikit-assets', dragData);
-        e.dataTransfer.setData('text/plain', file.path); // Fallback for single
-        e.dataTransfer.effectAllowed = 'copyMove';
+        dt.setData('application/ulikit-assets', dragData);
+        dt.setData('text/plain', file.path); // Fallback for single
+        dt.effectAllowed = 'copyMove';
         
         // Custom Drag Image?
-        // e.dataTransfer.setDragImage(...)
+        // dt.setDragImage(...)
     }
 };
 
@@ -505,6 +538,92 @@ const onDrop = async (e: DragEvent) => {
     
     // Use Centralized Import Logic with Structured Data
     await ProjectManager.importAssets(allFiles, currentRelPath);
+};
+
+// --- KEYBOARD NAV ---
+const onKeyDown = (e: KeyboardEvent) => {
+    if (assetStore.visibleFiles.length === 0) return;
+    
+    const isGrid = assetStore.zoomLevel > 0;
+    const container = document.querySelector('.assets-content');
+    const cols = (isGrid && container) 
+        ? Math.floor(container.clientWidth / (assetStore.zoomLevel === 1 ? 76 : assetStore.zoomLevel === 2 ? 106 : 136)) || 1 
+        : 1; 
+    
+    let index = -1;
+    if (assetStore.lastSelectedPath && assetStore.selectedPaths.size > 0) {
+        // Must find index in VISIBLE files, not raw files
+        index = assetStore.visibleFiles.findIndex(f => f.path === assetStore.lastSelectedPath);
+    }
+    
+    // If no selection, select first
+    if (index === -1) {
+        if (e.key === 'ArrowDown' || e.key === 'ArrowRight' || e.key === 'ArrowUp' || e.key === 'ArrowLeft') {
+            index = 0;
+            selectIndex(index);
+        }
+        return;
+    }
+    
+    let handled = false;
+    
+    // If List View (cols=1), ArrowRight acts like Down, ArrowLeft acts like Up (optional, or just do nothing)
+    // But standard is: Right/Left move 1, Up/Down move 1 (in list) OR move row (in grid)
+    
+    if (e.key === 'ArrowDown') {
+        const next = index + (isGrid ? cols : 1);
+        if (next < assetStore.visibleFiles.length) selectIndex(next);
+        else selectIndex(assetStore.visibleFiles.length - 1); // Clamp
+        handled = true;
+    } else if (e.key === 'ArrowUp') {
+        const prev = index - (isGrid ? cols : 1);
+        if (prev >= 0) selectIndex(prev);
+        else selectIndex(0); // Clamp
+        handled = true;
+    } else if (e.key === 'ArrowRight') {
+        if (isGrid) {
+            const next = index + 1;
+            if (next < assetStore.visibleFiles.length) selectIndex(next);
+            handled = true;
+        } else {
+             // In list view, Right might expand folder? Left collapse?
+             // For now, let's make Right = Down, Left = Up? Or just Ignore?
+             // User typical expectation: standard list navigates with Up/Down. Right/Left might do nothing or expand.
+             // We'll leave Right/Left for Grid only or make them traverse 1 by 1.
+             // "saltar del primero al ultimo" happened because index was wrong.
+             // Let's safe guard Right/Left to +1/-1
+             const next = index + 1;
+             if (next < assetStore.visibleFiles.length) selectIndex(next);
+             handled = true;
+        }
+    } else if (e.key === 'ArrowLeft') {
+        if (isGrid) {
+            const prev = index - 1;
+            if (prev >= 0) selectIndex(prev);
+            handled = true;
+        } else {
+             const prev = index - 1;
+             if (prev >= 0) selectIndex(prev);
+             handled = true;
+        }
+    }
+    
+    if (handled) {
+        e.preventDefault();
+    }
+};
+
+const selectIndex = (i: number) => {
+    const file = assetStore.visibleFiles[i];
+    if (file) {
+        assetStore.select(file.path);
+        // Scroll into view
+        // Need nextTick for DOM update
+        nextTick(() => {
+            const el = document.querySelector(`[data-path="${CSS.escape(file.path)}"]`);
+            if (el) el.scrollIntoView({ block: 'nearest' });
+        });
+    }
 };
 
 // --- GLOBAL CLICK LISTENER ---

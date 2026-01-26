@@ -362,6 +362,18 @@ ipcMain.handle('fs:deleteFile', async (_event, filePath: string) => {
     }
 });
 
+ipcMain.handle('fs:renameFile', async (_event, oldPath: string, newPath: string) => {
+    const fs = await import('fs/promises');
+    console.log(`[Main] fs:renameFile ${oldPath} -> ${newPath}`);
+    try {
+        await fs.rename(oldPath, newPath);
+        return true;
+    } catch (e: any) {
+        console.error(`[Main] Rename failed: ${e.message}`);
+        throw new Error(e.message);
+    }
+});
+
 app.whenReady().then(() => {
     // Register Protocol Handler
     protocol.handle('asset', async (request) => {

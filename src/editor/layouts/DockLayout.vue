@@ -168,8 +168,7 @@ onMounted(async () => {
                                 {
                                     type: 'branch',
                                     data: [
-                                        { type: 'leaf', data: { views: ['assets'], id: 'group-assets' }, size: 50 },
-                                        { type: 'leaf', data: { views: ['console'], id: 'group-console' }, size: 50 }
+                                        { type: 'leaf', data: { views: ['assets'], id: 'group-assets' }, size: 200 },
                                     ],
                                     size: 200
                                 }
@@ -180,7 +179,7 @@ onMounted(async () => {
                             type: 'branch',
                             data: [
                                 { type: 'leaf', data: { views: ['inspector'], id: 'group-inspector' }, size: 500 },
-                                { type: 'leaf', data: { views: ['history'], id: 'group-history' }, size: 200 } 
+                                { type: 'leaf', data: { views: ['history', 'console'], id: 'group-history' }, size: 200 } 
                             ],
                             size: 305
                         }
