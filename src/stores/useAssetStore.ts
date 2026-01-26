@@ -1,180 +1,156 @@
-
 import { defineStore } from 'pinia';
-import { ref, computed, watch } from 'vue';
-import { projectState } from '../editor/managers/ProjectManager';
-import { getFileSystem, type FileChangeEvent } from '../api/FileSystem';
+import { ref, computed } from 'vue';
+import { AssetDatabase } from '../editor/managers/AssetDatabase';
 
 export interface FileNode {
     name: string;
-    path: string; // Relative path
-    fullPath: string; // Absolute path
+    path: string; // Relative path (e.g. assets/foo.png)
+    fullPath: string; // Same as path for web, or absolute for local
     type: 'file' | 'directory';
     children?: FileNode[];
 }
 
 export const useAssetStore = defineStore('assets', () => {
-    // Tree structure of files
+    // Flat list of all known files/folders (Derived from DB + inferred folders)
     const files = ref<FileNode[]>([]);
-
-    const initWatcher = async () => {
-        const fs = getFileSystem();
-
-        // Watch Project State
-        watch(() => projectState.currentProjectPath, async (newPath) => {
-            if (newPath) {
-                console.log('AssetStore: Switching project to', newPath);
-                files.value = []; // Clear current files
-                currentPath.value = ''; // Reset navigation
-                
-                await fs.watchProject(newPath as any, (event: FileChangeEvent) => {
-                    // Notify Resource Manager of Content Changes
-                    if (event.event === 'change' && event.path) {
-                        // Normalize path to ensure it matches what RenderSystem uses (usually relative)
-                        const normPath = event.path.replace(/\\/g, '/');
-                        // If path is absolute (starts with project path), make it relative
-                        // But wait, event.path from watcher might vary.
-                        // Ideally ResourceManager handles path normalization/matching.
-                        // For now, pass as is, let ResourceManager decide or verify.
-                        // Actually, better to strip project path here if possible.
-                        const projPath = (typeof projectState.currentProjectPath === 'string') 
-                            ? projectState.currentProjectPath.replace(/\\/g, '/') 
-                            : '';
-                        let relPath = normPath;
-                        if (projPath && normPath.startsWith(projPath)) {
-                             relPath = normPath.slice(projPath.length + 1);
-                        }
-                        
-                        // We use the Engine's ResourceManager singleton
-                        import('../engine/resources/ResourceManager').then(({ resourceManager }) => {
-                             resourceManager.notifyAssetChanged(relPath);
-                        });
-                    }
-
-                    // Handle bulk updates (initial or manual re-scan)
-                    if ((event.event === 'initial' || event.event === 'change') && event.files) {
-                        console.log('AssetStore: Received bulk update', event.files.length, 'files');
-                        files.value = event.files.map(f => ({
-                            name: f.name,
-                            path: f.path,
-                            fullPath: f.path, // In web, path IS the relative path we use
-                            type: f.type
-                        }));
-                    } else {
-                        // Incremental updates (Electron usually)
-                        handleFileEvent(event.event, event.path, event.fullPath || event.path);
-                    }
-                });
-            }
-        }, { immediate: true });
-    };
-
-    const handleFileEvent = (event: string, relativePath: string, fullPath: string) => {
-        if (event === 'add' || event === 'addDir') {
-            const node: FileNode = {
-                name: relativePath.split(/[\\/]/).pop() || '',
-                path: relativePath,
-                fullPath: fullPath,
-                type: event === 'addDir' ? 'directory' : 'file'
-            };
-            // Ideally we insert into a proper tree. For now just push to list.
-            // Check existence
-            if (!files.value.find(f => f.path === relativePath)) {
-                files.value.push(node);
-            }
-        } else if (event === 'unlink' || event === 'unlinkDir') {
-            files.value = files.value.filter(f => f.path !== relativePath);
-        }
-    };
-
-    const normalizedCurrentPath = computed(() => {
-        return normalizePath(currentPath.value);
-    });
-
-    const currentPath = ref<string>('');
-
-    // State for View Options
-    const zoomLevel = ref<number>(1); // 0=List, 1=Small, 2=Medium, 3=Large
+    
+    // Default to 'assets' folder so user starts inside the Master Folder
+    const currentPath = ref<string>('assets'); 
+    const zoomLevel = ref<number>(1); 
     const searchQuery = ref<string>('');
     const sortOrder = ref<'asc' | 'desc'>('asc');
     const expandedFolders = ref<Set<string>>(new Set());
 
-    const toggleFolder = (path: string) => {
-        if (expandedFolders.value.has(path)) {
-            expandedFolders.value.delete(path);
-        } else {
-            expandedFolders.value.add(path);
+    // --- Actions ---
+
+    /**
+     * Rebuilds the File Tree from the AssetDatabase.
+     * This is the "Source of Truth" sync.
+     */
+    const refreshFromDatabase = async () => {
+        try {
+            const db = AssetDatabase.instance;
+            const registry = db.exportRegistry();
+            
+            const newFiles = new Map<string, FileNode>();
+            
+            // 1. Process Files
+            for (const entry of registry) {
+                if (!entry || !entry.path) continue;
+                const p = entry.path as string;
+                
+                const node: FileNode = {
+                    name: p.split(/[\\/]/).pop() || '',
+                    path: p.replace(/\\/g, '/'),
+                    fullPath: p,
+                    type: entry.type === 'directory' ? 'directory' : 'file'
+                };
+                newFiles.set(node.path, node);
+                
+                // 2. Infer Directories
+                const parts = node.path.split('/');
+                let currentDir = '';
+                
+                for (let i = 0; i < parts.length - 1; i++) {
+                    const segment = parts[i] || '';
+                    if (!segment) continue;
+                    const dirPath: string = currentDir ? `${currentDir}/${segment}` : segment;
+                    
+                    if (!newFiles.has(dirPath)) {
+                        newFiles.set(dirPath, {
+                            name: segment,
+                            path: dirPath,
+                            fullPath: dirPath,
+                            type: 'directory'
+                        });
+                    }
+                    currentDir = dirPath;
+                }
+            }
+            
+            // Ensure implicit 'assets' folder if empty?
+            if (newFiles.size === 0 || !newFiles.has('assets')) {
+                 newFiles.set('assets', { name: 'assets', path: 'assets', fullPath: 'assets', type: 'directory' });
+            }
+
+            files.value = Array.from(newFiles.values());
+            console.log(`[AssetStore] Refreshed from DB. Total Nodes: ${files.value.length}`);
+            
+        } catch (e) {
+            console.error('[AssetStore] Failed to refresh from DB:', e);
         }
+    };
+    
+    // Stub for compatibility if needed, but we try to use refreshFromDatabase directly.
+    const loadAssets = async (_path: any) => {
+         console.warn('[AssetStore] loadAssets is deprecated. Using refreshFromDatabase.');
+         await refreshFromDatabase();
+    };
+
+    // --- View Logic (Unchanged mostly) ---
+
+    const toggleFolder = (path: string) => {
+        if (expandedFolders.value.has(path)) expandedFolders.value.delete(path);
+        else expandedFolders.value.add(path);
     }
 
     const setZoom = (level: number) => {
         zoomLevel.value = Math.max(0, Math.min(3, level));
     }
 
-    // Computed: visibleFiles
-    // We filter `files` to show only those in `currentPath`
-    // We assume paths use '/' or '\' separators. We normalize to '/'.
+    const normalizePath = (p: string) => p.replace(/\\/g, '/');
+
     const visibleFiles = computed(() => {
         const normCurrent = normalizePath(currentPath.value);
         const query = searchQuery.value.toLowerCase().trim();
         
+        // Dynamically filter the FLat List 'files' to show children of currentPath
         let result = files.value.filter(file => {
             const normPath = normalizePath(file.path);
             
-            // SEARCH MODE
             if (query) {
-                // In search mode, match filename against query regardless of folder
                 return file.type === 'file' && file.name.toLowerCase().includes(query);
             }
 
-            // NORMAL NAVIGATION MODE
-            
-            // Filter 1: Must start with current path (if current is not empty)
-            if (normCurrent && !normPath.startsWith(normCurrent + '/')) {
-                return false;
+            // Must be direct child
+            if (normCurrent) {
+                // Must start with parent + /
+                if (!normPath.startsWith(normCurrent + '/')) return false;
+                // Cut off parent
+                const relative = normPath.slice(normCurrent.length + 1);
+                // Must not have more slashes (immediate child)
+                return !relative.includes('/');
+            } else {
+                // Root Level: Expect 'assets' BUT HIDE IT if the user wants Master Folder behavior?
+                // Actually, if we are at Root level (currentPath=''), we normally see 'assets'.
+                // If we force currentPath='assets', we see children of assets.
+                // The issue: "visibleFiles" implementation shows children of currentPath.
+                // If currentPath is 'assets', we see arrows, board, etc. 
+                // BUT we don't want to see 'assets' ITSELF inside 'assets' (which is impossible unless recursive).
+                // If currentPath is empty, we see 'assets'.
+                // If the user starts at 'assets', they see children.
+                // WE JUST NEED TO ENSURE default 'currentPath' IS 'assets'.
+                
+                // However, just in case "assets" folder node leaked into the children list (self-reference?), prevent it.
+                if (normPath === 'assets' && normCurrent === 'assets') return false; 
+                
+                return !normPath.includes('/');
             }
-
-            // Filter 2: Must not have further separators after the current path
-            const relative = normCurrent ? normPath.slice(normCurrent.length + 1) : normPath;
-            
-            // If relative is empty, it IS the current directory itself (don't show self)
-            if (!relative) return false;
-
-            // Immediate children only (no slashes in relative part)
-            if (relative.includes('/')) return false;
-
-            // SPECIAL RULE: If at Root level, ONLY show 'assets' folder
-            if (!normCurrent) {
-               if (relative.toLowerCase() !== 'assets') {
-                   return false;
-               }
-            }
-
-            return true;
         });
 
-        // SORTING
+        // Sort
         result.sort((a, b) => {
-            // Folders always first
-            if (a.type !== b.type) {
-                return a.type === 'directory' ? -1 : 1;
-            }
-            // Then Sort by Name
-            const nameA = a.name.toLowerCase();
-            const nameB = b.name.toLowerCase();
-            if (nameA < nameB) return sortOrder.value === 'asc' ? -1 : 1;
-            if (nameA > nameB) return sortOrder.value === 'asc' ? 1 : -1;
-            return 0;
+            if (a.type !== b.type) return a.type === 'directory' ? -1 : 1;
+            return a.name.localeCompare(b.name);
         });
 
         return result;
     });
 
-    const normalizePath = (p: string) => p.replace(/\\/g, '/');
-
     const changeDirectory = (path: string) => {
         currentPath.value = path;
-        searchQuery.value = ''; // Clear search on navigation
-        expandedFolders.value.add(path); // Auto-expand current
+        searchQuery.value = '';
+        expandedFolders.value.add(path);
     };
 
     const goUp = () => {
@@ -182,7 +158,7 @@ export const useAssetStore = defineStore('assets', () => {
         const parts = normalizePath(currentPath.value).split('/');
         parts.pop();
         currentPath.value = parts.join('/');
-        searchQuery.value = ''; // Clear search on navigation
+        searchQuery.value = ''; 
     };
 
     return {
@@ -193,7 +169,8 @@ export const useAssetStore = defineStore('assets', () => {
         searchQuery,
         sortOrder,
         expandedFolders,
-        initWatcher,
+        refreshFromDatabase,
+        loadAssets, // Deprecated stub
         changeDirectory,
         goUp,
         setZoom,

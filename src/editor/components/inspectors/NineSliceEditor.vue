@@ -5,8 +5,13 @@ import AssetPickerModal from '../modals/AssetPickerModal.vue';
 
 const props = defineProps<{
     nineSlice: any;
-    entity?: any; // Added to match SpriteEditor pattern potentially
+    entity?: any;
+    revision?: number;
 }>();
+
+watch(() => props.revision, () => {
+    updateThumbnail();
+});
 
 const emit = defineEmits(['update']);
 const isPickerOpen = ref(false);

@@ -352,4 +352,83 @@ export class SceneManager {
         eventBus.emit('scene-loaded', this._activeSceneName);
         console.log('[SceneManager] Created default memory scene (Untitled)');
     }
+
+    static removeAssetReferences(path: string) {
+        let changed = false;
+        const normalize = (p: string) => p.replace(/\\/g, '/');
+        const targetPath = normalize(path);
+        const isFolder = !targetPath.includes('.'); // Simple extension check, or passed from caller
+        
+        // Helper to check if value matches target or is inside target folder
+        const matches = (value: string | undefined) => {
+             if (!value) return false;
+             const valNorm = normalize(value);
+             if (valNorm === targetPath) return true;
+             if (isFolder && valNorm.startsWith(targetPath + '/')) return true;
+             return false;
+        };
+
+        for (const entity of world) {
+            let entityChanged = false;
+
+            // 1. Sprite
+            if (entity.sprite && matches(entity.sprite.texture)) {
+                entity.sprite.texture = ''; // Or default?
+                entityChanged = true;
+            }
+
+            // 2. NineSlice
+            if (entity.nineSliceSprite && matches(entity.nineSliceSprite.texture)) {
+                entity.nineSliceSprite.texture = '';
+                entityChanged = true;
+            }
+
+            // 3. Audio
+            if (entity.audioSource && matches(entity.audioSource.clip)) {
+                entity.audioSource.clip = '';
+                entityChanged = true;
+            }
+
+            // 4. BitmapText (Font Texture)
+            if (entity.bitmapText && matches(entity.bitmapText.fontTexture)) {
+                entity.bitmapText.fontTexture = undefined;
+                entityChanged = true;
+            }
+
+            // 5. Scripts
+            if (entity.script) {
+                const initialLen = entity.script.length;
+                entity.script = entity.script.filter(s => !matches(s.path));
+                if (entity.script.length !== initialLen) {
+                    entityChanged = true;
+                }
+            }
+
+            // 6. Animator
+            if (entity.animator && entity.animator.animations) {
+                 for (const animName in entity.animator.animations) {
+                     const anim = entity.animator.animations[animName];
+                     if (anim && anim.frames) {
+                         const originalCount = anim.frames.length;
+                         anim.frames = anim.frames.filter(frame => !matches(frame));
+                         if (anim.frames.length !== originalCount) {
+                             entityChanged = true;
+                         }
+                     }
+                 }
+            }
+            
+            if (entityChanged) {
+                // Force update?
+                // eventBus.emit('entity-updated', entity.id); // If generic update needed
+                changed = true;
+            }
+        }
+
+        if (changed) {
+            this._isDirty = true;
+            eventBus.emit('scene-updated'); // Notify UI to refresh Inspector/Scene
+            console.log(`[SceneManager] Removed references to ${path}`);
+        }
+    }
 }

@@ -5,7 +5,12 @@ import AssetPickerModal from '../modals/AssetPickerModal.vue';
 const props = defineProps<{
     sprite: any;
     entity?: any;
+    revision?: number;
 }>();
+
+watch(() => props.revision, () => {
+    updateThumbnail();
+});
 
 const emit = defineEmits(['update']);
 

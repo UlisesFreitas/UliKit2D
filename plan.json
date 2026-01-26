@@ -99,12 +99,13 @@
       "id": "8",
       "name": "Asset Pipeline 2.0",
       "status": "pending",
-      "description": "Robust Asset Management with Meta files.",
+      "description": "High-Performance Manifest-Based Asset System (GDevelop Architecture).",
       "tasks": [
-        "Design Meta File Structure (.meta)",
-        "Implement Asset Importers (Texture, Audio, Script)",
-        "Implement File Watcher & Auto-Import",
-        "Refactor AssetBrowser to use Meta Database"
+        "Design `project.json` Structure (Settings + Resources + Scenes)",
+        "Implement `ProjectManager` to load/save `project.json` (Single Source of Truth)",
+        "Refactor `AssetDatabase` to hydrate from Manifest (Instant Load, No Scan)",
+        "Implement Import Workflow (Copy to assets -> Update Manifest)",
+        "Optimize Watcher (Only detect external intrusions, no valid-flow flood)"
       ]
     },
     {

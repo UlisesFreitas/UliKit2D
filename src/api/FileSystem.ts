@@ -15,6 +15,7 @@ export interface FileChangeEvent {
 export interface IFileSystem {
     // Project Management
     selectFolder(): Promise<string | FileSystemDirectoryHandle | null>;
+    openProject(pathOrHandle: string): Promise<void>;
     createProject(pathOrHandle: string | FileSystemDirectoryHandle): Promise<{success: boolean, error?: string}>;
     
     // Watcher (returns cleanup function)

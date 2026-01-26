@@ -44,6 +44,31 @@
              />
         </div>
 
+        <!-- IMPORT -->
+        <button 
+             class="p-1 rounded hover:bg-bg-hover text-text-secondary flex items-center gap-1"
+             @click="triggerImport"
+             title="Import Assets"
+        >
+             <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+        </button>
+        
+        <!-- NEW FOLDER -->
+        <button 
+             class="p-1 rounded hover:bg-bg-hover text-text-secondary flex items-center gap-1"
+             @click="createNewFolder"
+             title="New Folder"
+        >
+             <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path><line x1="12" y1="11" x2="12" y2="17"></line><line x1="9" y1="14" x2="15" y2="14"></line></svg>
+        </button>
+        <input 
+            ref="fileInputRef"
+            type="file" 
+            multiple 
+            class="hidden" 
+            @change="onFileSelected"
+        />
+
         <!-- SORT (Dropdown) -->
         <div class="relative">
             <button 
@@ -72,19 +97,49 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 import { useAssetStore } from '../../../stores/useAssetStore';
+import { ProjectManager } from '../../managers/ProjectManager';
 
 const assetStore = useAssetStore();
+const fileInputRef = ref<HTMLInputElement | null>(null);
+
+const triggerImport = () => {
+    fileInputRef.value?.click();
+};
+
+const createNewFolder = async () => {
+    const currentPath = assetStore.currentPath || 'assets';
+    await ProjectManager.createFolder(currentPath);
+};
+
+const onFileSelected = async (e: Event) => {
+    const input = e.target as HTMLInputElement;
+    if (input.files && input.files.length > 0) {
+        const files = Array.from(input.files);
+        const currentPath = assetStore.currentPath || '';
+        await ProjectManager.importAssets(files, currentPath);
+        
+        // Reset input so same file can be selected again
+        input.value = '';
+    }
+};
 
 const pathParts = computed(() => {
     if (!assetStore.currentPath) return [];
-    return assetStore.currentPath.replace(/\\/g, '/').split('/');
+    const parts = assetStore.currentPath.replace(/\\/g, '/').split('/');
+    if (parts[0] === 'assets') parts.shift();
+    return parts;
 });
 
 const navigateToIndex = (index: number) => {
-    const parts = pathParts.value;
-    const newPath = parts.slice(0, index + 1).join('/');
+    // Reconstruct path: 'assets' + parts logic
+    // But easier: take the full current path parts, and slice based on visual index
+    const fullParts = assetStore.currentPath.replace(/\\/g, '/').split('/'); // [assets, player, sprite]
+    let sliceIndex = index;
+    if (fullParts[0] === 'assets') sliceIndex += 1; // Shifted
+    
+    const newPath = fullParts.slice(0, sliceIndex + 1).join('/');
     assetStore.changeDirectory(newPath);
 };
 

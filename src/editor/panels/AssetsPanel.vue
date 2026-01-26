@@ -18,14 +18,9 @@
 import AssetsHeader from './assets/AssetsHeader.vue';
 import AssetsSidebar from './assets/AssetsSidebar.vue';
 import AssetsContent from './assets/AssetsContent.vue';
-import { onMounted } from 'vue';
-import { useAssetStore } from '../../stores/useAssetStore';
 
-const assetStore = useAssetStore();
 
-onMounted(() => {
-    assetStore.initWatcher();
-});
+
 </script>
 
 <style scoped>

@@ -43,16 +43,22 @@ const handleSceneCleared = () => {
     revision.value++;
 };
 
+const handleSceneUpdated = () => {
+    revision.value++;
+};
+
 onMounted(() => {
     eventBus.on('entity-updated', handleEntityUpdate);
     eventBus.on('entity-change', handleEntityUpdate);
     eventBus.on('scene-cleared', handleSceneCleared);
+    eventBus.on('scene-updated', handleSceneUpdated);
 });
 
 onUnmounted(() => {
     eventBus.off('entity-updated', handleEntityUpdate);
     eventBus.off('entity-change', handleEntityUpdate);
-    eventBus.on('scene-cleared', handleSceneCleared);
+    eventBus.off('scene-cleared', handleSceneCleared);
+    eventBus.off('scene-updated', handleSceneUpdated);
 });
 
 // Polling for live updates when game is playing
@@ -410,6 +416,7 @@ const handleSaveCollisionMask = (payload: { vertices: { x: number, y: number }[]
                         v-else-if="item.key === 'sprite'" 
                         :sprite="item.data"
                         :entity="selectedEntity"
+                        :revision="revision"
                         @update="onComponentUpdate" 
                     />        
                     <CameraEditor 

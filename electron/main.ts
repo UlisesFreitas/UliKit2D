@@ -271,6 +271,16 @@ ipcMain.handle('fs:readdir', async (_event, dirPath: string) => {
     }
 });
 
+ipcMain.handle('fs:createFolder', async (_event, dirPath: string) => {
+    const fs = await import('fs/promises');
+    try {
+        await fs.mkdir(dirPath, { recursive: true });
+        return true;
+    } catch (e: any) {
+        throw new Error(e.message);
+    }
+});
+
 ipcMain.handle('fs:deleteFile', async (_event, filePath: string) => {
     const fs = await import('fs/promises');
     try {

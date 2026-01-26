@@ -99,15 +99,43 @@ export const useUIStore = defineStore('ui', () => {
         });
     };
 
+    const isLoading = ref(false);
+    const loadingMessage = ref('');
+    const progressValue = ref(0);
+    const progressMode = ref<'indeterminate' | 'determinate'>('indeterminate');
+    const progressDetail = ref('');
+    
+    const setLoading = (active: boolean, message: string = 'Loading...', mode: 'indeterminate' | 'determinate' = 'indeterminate') => {
+        isLoading.value = active;
+        loadingMessage.value = message;
+        progressMode.value = mode;
+        if (!active) {
+            progressValue.value = 0;
+            progressDetail.value = '';
+        }
+    };
+
+    const setProgress = (value: number, detail?: string) => {
+        progressValue.value = value;
+        if (detail) progressDetail.value = detail;
+    };
+
     return {
         modals,
         toasts,
+        isLoading,
+        loadingMessage,
         openModal,
         closeModal,
         closeAllModals,
         showToast,
         removeToast,
         confirm,
-        prompt
+        prompt,
+        setLoading,
+        setProgress,
+        progressValue,
+        progressMode,
+        progressDetail
     };
 });

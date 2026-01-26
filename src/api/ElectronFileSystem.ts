@@ -10,6 +10,11 @@ export class ElectronFileSystem implements IFileSystem {
         return await this.electronAPI.selectFolder();
     }
 
+    async openProject(path: string): Promise<void> {
+        // Electron handles context via absolute paths in ProjectManager, but we can log for debugging.
+        console.log('[ElectronFileSystem] Opening project context:', path);
+    }
+
     async createProject(path: string): Promise<{ success: boolean; error?: string }> {
         try {
             // 1. Create Directories via IPC
@@ -126,6 +131,10 @@ export class ElectronFileSystem implements IFileSystem {
 
     async readdir(path: string): Promise<FileEntry[]> {
         return await this.electronAPI.readdir(this.resolvePath(path));
+    }
+
+    async createFolder(path: string): Promise<boolean> {
+        return await this.electronAPI.createFolder(this.resolvePath(path));
     }
 
     // Asset Management

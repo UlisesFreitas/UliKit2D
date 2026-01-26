@@ -6,6 +6,10 @@
     "resolveJsonModule": true,
     "esModuleInterop": true,
 
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["./src/*"]
+    },
     /* Linting */
     "strict": true,
     "noUnusedLocals": true,

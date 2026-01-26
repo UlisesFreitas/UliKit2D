@@ -69,7 +69,7 @@ import { ref, onMounted, onUnmounted, watch, computed } from 'vue';
 import { useAssetStore, type FileNode } from '../../../stores/useAssetStore';
 import { useUIStore } from '../../../stores/useUIStore';
 import { getFileSystem } from '../../../api/FileSystem';
-import { projectState } from '../../managers/ProjectManager';
+import { projectState, ProjectManager } from '../../managers/ProjectManager';
 
 const assetStore = useAssetStore();
 const ui = useUIStore();
@@ -153,11 +153,7 @@ const deleteAsset = async () => {
         confirmText: 'Delete',
         isDanger: true
     })) {
-        const fs = getFileSystem();
-        const success = await fs.deleteFile(file.path);
-        if (!success) {
-            ui.showToast({ title: 'Error', description: 'Failed to delete file', type: 'error' });
-        }
+        await ProjectManager.deleteAsset(file.path);
     }
 };
 
@@ -178,29 +174,76 @@ const onDragStart = (e: DragEvent, file: FileNode) => {
 };
 
 const onDrop = async (e: DragEvent) => {
-    const files = e.dataTransfer?.files;
-    if (!files || files.length === 0) return;
+    const items = e.dataTransfer?.items;
+    if (!items || items.length === 0) return;
     if (!projectState.currentProjectPath) return;
 
-    const fs = getFileSystem();
-    const currentRelPath = assetStore.currentPath || '';
-    
-    // Reuse logic from previous implementation
-     for (let i = 0; i < files.length; i++) {
-        const file = files[i]!;
-        const destPath = currentRelPath ? `${currentRelPath}/${file.name}` : file.name;
-        
-        if (fs.isElectron) {
-            const sourcePath = fs.getPathForFile(file);
-            if (sourcePath) {
-                const destFolder = projectState.currentProjectPath as string;
-                const finalDestFolder = currentRelPath ? `${destFolder}/${currentRelPath}` : destFolder;
-                await fs.importFile(sourcePath, finalDestFolder);
+    // Recursive Scan Helper
+    const scanFiles = async (item: any, path: string): Promise<{ file: File, path: string }[]> => {
+        if (item.isFile) {
+            return new Promise((resolve) => {
+                item.file((file: File) => {
+                    resolve([{ file: file, path: path + file.name }]);
+                });
+            });
+        } else if (item.isDirectory) {
+            const reader = item.createReader();
+            const entries: any[] = await new Promise((resolve) => {
+                 const allEntries: any[] = [];
+                 const readEntries = () => {
+                     reader.readEntries((result: any[]) => {
+                         if (result.length === 0) resolve(allEntries);
+                         else {
+                             allEntries.push(...result);
+                             readEntries();
+                         }
+                     });
+                 };
+                 readEntries();
+            });
+            
+            let results: { file: File, path: string }[] = [];
+            for (const entry of entries) {
+                results = results.concat(await scanFiles(entry, path + item.name + '/'));
             }
+            return results;
+        }
+        return [];
+    };
+
+    // Collect all files
+    const allFiles: { file: File, path: string }[] = [];
+    
+    // 1. Synchronously capture entries to prevent DataTransfer list invalidation
+    const entries: any[] = [];
+    for (let i = 0; i < items.length; i++) {
+        const itemData = items[i];
+        if (!itemData) continue;
+        // @ts-ignore
+        const entry = itemData.webkitGetAsEntry ? itemData.webkitGetAsEntry() : null;
+        if (entry) {
+            entries.push(entry);
         } else {
-            await fs.writeFile(destPath, file);
+             // Fallback
+             const file = itemData.getAsFile();
+             if (file) entries.push(file); // Push File object treating as entry for logic below or handle separate
         }
     }
+
+    // 2. Process Entries Async
+    for (const entry of entries) {
+        if (entry instanceof File) {
+             allFiles.push({ file: entry, path: entry.name });
+        } else {
+             const results = await scanFiles(entry, '');
+             allFiles.push(...results);
+        }
+    }
+
+    const currentRelPath = assetStore.currentPath || '';
+    
+    // Use Centralized Import Logic with Structured Data
+    await ProjectManager.importAssets(allFiles, currentRelPath);
 };
 
 // --- GLOBAL CLICK LISTENER ---

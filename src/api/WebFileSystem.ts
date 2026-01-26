@@ -88,6 +88,12 @@ export class WebFileSystem implements IFileSystem {
          }
     }
 
+    async openProject(path: string): Promise<void> {
+        await this.ensureInit();
+        this.currentProject = path;
+        console.log(`[WebFileSystem] Context set to project: ${path}`);
+    }
+
     async createProject(path: string): Promise<{ success: boolean; error?: string }> {
         await this.ensureInit();
         this.currentProject = path;
@@ -262,7 +268,15 @@ export class WebFileSystem implements IFileSystem {
         
         try {
             const fullPath = `/${this.currentProject}/${path}`;
-            await fs.promises.unlink(fullPath);
+            const stat = await fs.promises.stat(fullPath);
+            
+            if (stat.isDirectory()) {
+                // Recursive delete
+                await fs.promises.rm(fullPath, { recursive: true, force: true });
+            } else {
+                await fs.promises.unlink(fullPath);
+            }
+
              // Trigger Watcher Manually
              if (this.watcherCallback) {
                 this._scanRecursive('').then(files => {
@@ -273,6 +287,27 @@ export class WebFileSystem implements IFileSystem {
         } catch (e) {
             console.error('[WebFileSystem] delete failed', e);
             return false;
+        }
+    }
+
+    async createFolder(path: string): Promise<boolean> {
+        await this.ensureInit();
+        if (!this.currentProject) return false;
+        
+        try {
+            const fullPath = `/${this.currentProject}/${path}`;
+            await fs.promises.mkdir(fullPath, { recursive: true });
+            
+            // Trigger Watcher Manually
+            if (this.watcherCallback) {
+                this._scanRecursive('').then(files => {
+                    if (this.watcherCallback) this.watcherCallback({ event: 'change', path, files });
+                });
+            }
+            return true;
+        } catch (e) {
+             console.error('[WebFileSystem] createFolder failed', e);
+             return false;
         }
     }
 
@@ -423,17 +458,33 @@ export class WebFileSystem implements IFileSystem {
             const stat = await fs.promises.stat(fullPath);
             if (stat.isFile()) {
                 const content = await fs.promises.readFile(fullPath);
+                // console.log(`[WebFS Debug] Loading ${fullPath}, Size: ${content.length}`);
+
                 // Convert Buffer to Uint8Array for Blob compatibility
-                const bufferContent = new Uint8Array(content);
+                const bufferContent = new Uint8Array(content as any);
                 
+                // Debug Header
+                const header = Array.from(bufferContent.slice(0, 8)).map(b => b.toString(16).padStart(2,'0')).join(' ');
+                console.log(`[WebFS Debug] Header: ${header}`);
+
+                // If small, log as text to see if it's an error
+                if (bufferContent.length < 500) {
+                    try {
+                        const text = new TextDecoder().decode(bufferContent);
+                        console.log(`[WebFS Debug] Small Content Text: ${text}`);
+                    } catch (e) { /* ignore */ }
+                }
+
                 // Assume image or octet-stream?
                 // We can guess mime type from extension
                 const ext = cleanPath.split('.').pop()?.toLowerCase();
                 let params: BlobPropertyBag = {};
                 if (ext === 'png') params.type = 'image/png';
                 else if (ext === 'jpg' || ext === 'jpeg') params.type = 'image/jpeg';
-                else if (ext === 'js' || ext === 'mjs') params.type = 'application/javascript';
+                else if (ext === 'webp') params.type = 'image/webp';
+                else if (ext === 'svg') params.type = 'image/svg+xml';
                 else if (ext === 'json') params.type = 'application/json';
+                else if (ext === 'js' || ext === 'mjs') params.type = 'application/javascript';
 
                 const blob = new Blob([bufferContent], params);
                 return URL.createObjectURL(blob);

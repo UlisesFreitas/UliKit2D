@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { useUIStore } from '../../../stores/useUIStore';
 import BaseToast from '../ui/BaseToast.vue';
+import GlobalProgressModal from './GlobalProgressModal.vue';
 import { ToastProvider, ToastViewport } from 'radix-vue';
 
 const uiStore = useUIStore();
@@ -8,10 +9,10 @@ const uiStore = useUIStore();
 
 <template>
     <div class="z-[9999] relative">
+        <!-- Blocking Progress Modal -->
+        <GlobalProgressModal v-if="uiStore.isLoading" />
+
         <!-- Render Modals -->
-        <!-- Note: We render them dynamically. 
-             Since they use DialogPortal, they will teleport to body anyway, 
-             so simpler is just to iterate them. -->
         <component 
             v-for="modal in uiStore.modals" 
             :key="modal.id" 
