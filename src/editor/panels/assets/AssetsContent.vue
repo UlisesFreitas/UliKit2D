@@ -47,25 +47,28 @@
         </div>
 
         <!-- Custom Context Menu -->
-        <div v-if="menuState.visible" 
-             class="fixed bg-bg-panel border border-border shadow-lg rounded z-[9999] py-1 min-w-[140px]"
-             :style="{ top: menuState.y + 'px', left: menuState.x + 'px' }">
-             <div class="px-3 py-1 text-[10px] font-bold text-text-secondary truncate max-w-[200px]">{{ menuState.file?.name }}</div>
-             <div class="h-[1px] bg-border my-1"></div>
-            <button 
-                v-if="menuState.file?.path !== 'assets'"
-                @click="deleteAsset" 
-                class="w-full text-left px-3 py-1.5 hover:bg-bg-selection hover:text-accent-danger text-xs text-accent-danger transition-colors"
-            >
-                Delete
-            </button>
-             <!-- More options can go here like Rename, Show in Explorer -->
-        </div>
+        <Teleport to="body">
+            <div v-if="menuState.visible" 
+                 ref="contextMenuRef"
+                 class="fixed bg-bg-panel border border-border shadow-lg rounded z-[9999] py-1 min-w-[140px]"
+                 :style="menuStyle">
+                 <div class="px-3 py-1 text-[10px] font-bold text-text-secondary truncate max-w-[200px]">{{ menuState.file?.name }}</div>
+                 <div class="h-[1px] bg-border my-1"></div>
+                <button 
+                    v-if="menuState.file?.path !== 'assets'"
+                    @click="deleteAsset" 
+                    class="w-full text-left px-3 py-1.5 hover:bg-bg-selection hover:text-accent-danger text-xs text-accent-danger transition-colors"
+                >
+                    Delete
+                </button>
+                 <!-- More options can go here like Rename, Show in Explorer -->
+            </div>
+        </Teleport>
     </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, watch, computed } from 'vue';
+import { ref, onMounted, onUnmounted, watch, computed, nextTick } from 'vue';
 import { useAssetStore, type FileNode } from '../../../stores/useAssetStore';
 import { useUIStore } from '../../../stores/useUIStore';
 import { getFileSystem } from '../../../api/FileSystem';
@@ -123,18 +126,52 @@ watch(() => assetStore.visibleFiles, () => {
 
 // --- INTERACTION HANDLERS ---
 
+const contextMenuRef = ref<HTMLElement | null>(null);
+const menuStyle = ref({ top: '0px', left: '0px' });
+
 const closeContextMenu = () => {
     menuState.value.visible = false;
 };
 
-const showContextMenu = (e: MouseEvent, file: any) => {
+const showContextMenu = async (e: MouseEvent, file: any) => {
     e.preventDefault();
+    e.stopPropagation(); // Stop bubbling (fixes some event issues)
+    
+    // 1. Initial State (Visible but maybe wrong pos)
     menuState.value = {
         visible: true,
         x: e.clientX,
         y: e.clientY,
         file: file
     };
+    
+    // 2. Wait for Render
+    await nextTick();
+    
+    // 3. Measure and Adjust
+    if (contextMenuRef.value) {
+        const menuRect = contextMenuRef.value.getBoundingClientRect();
+        const winWidth = window.innerWidth;
+        const winHeight = window.innerHeight;
+        
+        let x = e.clientX;
+        let y = e.clientY;
+        
+        // Flip X if too close to right
+        if (x + menuRect.width > winWidth) {
+            x -= menuRect.width;
+        }
+        
+        // Flip Y if too close to bottom
+        if (y + menuRect.height > winHeight) {
+             y -= menuRect.height;
+        }
+        
+        menuStyle.value = {
+            top: `${y}px`,
+            left: `${x}px`
+        };
+    }
 };
 
 const deleteAsset = async () => {

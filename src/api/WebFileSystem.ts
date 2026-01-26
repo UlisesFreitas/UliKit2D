@@ -471,7 +471,7 @@ export class WebFileSystem implements IFileSystem {
                 if (bufferContent.length < 500) {
                     try {
                         const text = new TextDecoder().decode(bufferContent);
-                        console.log(`[WebFS Debug] Small Content Text: ${text}`);
+                        //console.log(`[WebFS Debug] Small Content Text: ${text}`);
                     } catch (e) { /* ignore */ }
                 }
 
