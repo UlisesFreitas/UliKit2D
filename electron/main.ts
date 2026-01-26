@@ -163,19 +163,6 @@ ipcMain.handle('project:create', async (_event, folderPath: string) => {
             JSON.stringify(projectConfig, null, 4)
         );
 
-        // Create Initial Scene
-        const defaultScene = [
-            {
-                "id": "main-camera-id",
-                "name": "Main Camera",
-                "transform": { "x": 0, "y": 0, "rotation": 0, "scale": { "x": 1, "y": 1 } },
-                "camera": { "zoom": 1, "isPrimary": true, "backgroundColor": "#333333" }
-            }
-        ];
-        await fs.writeFile(
-            path.join(scenesPath, 'NewScene.json'),
-            JSON.stringify(defaultScene, null, 2)
-        );
 
         // -------- DEFAULT ASSETS --------
         // Copy from src/resources/default_assets
