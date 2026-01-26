@@ -353,6 +353,107 @@ export class SceneManager {
         console.log('[SceneManager] Created default memory scene (Untitled)');
     }
 
+    static updateAssetReferences(oldPath: string, newPath: string) {
+        let changed = false;
+        const normalize = (p: string) => p.replace(/\\/g, '/');
+        const targetOld = normalize(oldPath);
+        const targetNew = normalize(newPath);
+        const isFolder = !targetOld.includes('.'); // Heuristic
+        
+        // Helper to replace path if it matches or is inside folder
+        const replaceIfMatch = (val: string | undefined): string | null => {
+            if (!val) return null;
+            const valNorm = normalize(val);
+            
+            if (valNorm === targetOld) return targetNew;
+            
+            if (isFolder && valNorm.startsWith(targetOld + '/')) {
+                return targetNew + valNorm.slice(targetOld.length);
+            }
+            return null;
+        };
+
+        for (const entity of world) {
+            let entityChanged = false;
+
+            // 1. Sprite
+            if (entity.sprite) {
+                const newVal = replaceIfMatch(entity.sprite.texture);
+                if (newVal) {
+                    entity.sprite.texture = newVal;
+                    entityChanged = true;
+                }
+            }
+
+            // 2. NineSlice
+            if (entity.nineSliceSprite) {
+                const newVal = replaceIfMatch(entity.nineSliceSprite.texture);
+                if (newVal) {
+                    entity.nineSliceSprite.texture = newVal;
+                    entityChanged = true;
+                }
+            }
+
+            // 3. Audio
+            if (entity.audioSource) {
+                 const newVal = replaceIfMatch(entity.audioSource.clip);
+                 if (newVal) {
+                     entity.audioSource.clip = newVal;
+                     entityChanged = true;
+                 }
+            }
+
+            // 4. BitmapText
+            if (entity.bitmapText) {
+                // Actually bitmap font often uses `fontName` (alias) not path directly in component usually?
+                // But if we store texture path:
+                if (entity.bitmapText.fontTexture) {
+                    const newApp = replaceIfMatch(entity.bitmapText.fontTexture);
+                    if (newApp) {
+                        entity.bitmapText.fontTexture = newApp;
+                        entityChanged = true;
+                    }
+                }
+            }
+            
+            // 5. Scripts
+            if (entity.script) {
+                entity.script.forEach(s => {
+                    const newVal = replaceIfMatch(s.path);
+                    if (newVal) {
+                        s.path = newVal;
+                        entityChanged = true;
+                    }
+                });
+            }
+            
+            // 6. Animator
+            if (entity.animator && entity.animator.animations) {
+                for (const animName in entity.animator.animations) {
+                    const anim = entity.animator.animations[animName];
+                    if (anim && anim.frames) {
+                         const newFrames = anim.frames.map(f => replaceIfMatch(f) || f);
+                         // Check diff?
+                         if (JSON.stringify(newFrames) !== JSON.stringify(anim.frames)) {
+                             anim.frames = newFrames;
+                             entityChanged = true;
+                         }
+                    }
+                }
+            }
+
+            if (entityChanged) {
+                changed = true;
+            }
+        }
+
+        if (changed) {
+            this._isDirty = true;
+            eventBus.emit('scene-updated');
+            console.log(`[SceneManager] Updated references: ${oldPath} -> ${newPath}`);
+        }
+    }
+
     static removeAssetReferences(path: string) {
         let changed = false;
         const normalize = (p: string) => p.replace(/\\/g, '/');
@@ -419,8 +520,6 @@ export class SceneManager {
             }
             
             if (entityChanged) {
-                // Force update?
-                // eventBus.emit('entity-updated', entity.id); // If generic update needed
                 changed = true;
             }
         }

@@ -105,7 +105,11 @@
         "Implement `ProjectManager` to load/save `project.json` (Single Source of Truth)",
         "Refactor `AssetDatabase` to hydrate from Manifest (Instant Load, No Scan)",
         "Implement Import Workflow (Copy to assets -> Update Manifest)",
-        "Optimize Watcher (Only detect external intrusions, no valid-flow flood)"
+        "Optimize Watcher (Only detect external intrusions, no valid-flow flood)",
+        "Implement Context Menu 'Rename' (Folders, Assets)",
+        "Implement Context Menu 'Edit in external editor' (Placeholder for non-folders)",
+        "Implement Multi-selection Logic (Shift + Click, Drag Rect)",
+        "Update Context Menu actions to support Multi-Selection (Batch Delete, Batch Rename?)"
       ]
     },
     {

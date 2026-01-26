@@ -291,16 +291,28 @@ export class WebFileSystem implements IFileSystem {
     }
 
     async createFolder(path: string): Promise<boolean> {
+        console.log(`[WebFileSystem] Request createFolder: ${path}`);
         await this.ensureInit();
-        if (!this.currentProject) return false;
+        if (!this.currentProject) {
+            console.error('[WebFileSystem] No current project');
+            return false;
+        }
         
         try {
-            const fullPath = `/${this.currentProject}/${path}`;
+            const normalize = (p: string) => p.replace(/\\/g, '/').replace(/\/+/g, '/');
+            const cleanPath = normalize(path).replace(/^\//, '');
+            const fullPath = `/${this.currentProject}/${cleanPath}`;
+
+            console.log(`[WebFileSystem] Creating folder at full path: '${fullPath}'`);
+            
             await fs.promises.mkdir(fullPath, { recursive: true });
+            console.log('[WebFileSystem] mkdir successful');
             
             // Trigger Watcher Manually
             if (this.watcherCallback) {
+                console.log('[WebFileSystem] Triggering scan for watcher...');
                 this._scanRecursive('').then(files => {
+                    console.log(`[WebFileSystem] Scan complete (count: ${files.length}). Firing watcher callback.`);
                     if (this.watcherCallback) this.watcherCallback({ event: 'change', path, files });
                 });
             }
@@ -308,6 +320,94 @@ export class WebFileSystem implements IFileSystem {
         } catch (e) {
              console.error('[WebFileSystem] createFolder failed', e);
              return false;
+        }
+    }
+
+    async rename(oldPath: string, newPath: string): Promise<boolean> {
+        console.log(`[WebFileSystem] Request Rename: ${oldPath} -> ${newPath}`);
+        await this.ensureInit();
+        if (!this.currentProject) {
+            console.error('[WebFileSystem] No current project set');
+            return false;
+        }
+
+        const normalize = (p: string) => p.replace(/\\/g, '/').replace(/\/+/g, '/');
+        
+        // Ensure paths don't start with / if they are relative, but we construct full path manually
+        const cleanOld = normalize(oldPath).replace(/^\//, '');
+        const cleanNew = normalize(newPath).replace(/^\//, '');
+
+        const oldFullPath = `/${this.currentProject}/${cleanOld}`;
+        const newFullPath = `/${this.currentProject}/${cleanNew}`;
+
+        console.log(`[WebFileSystem] Full Paths: '${oldFullPath}' -> '${newFullPath}'`);
+
+        try {
+            // Check if source is file or directory
+            let stat;
+            try {
+                stat = await fs.promises.stat(oldFullPath);
+            } catch (statError) {
+                console.error(`[WebFileSystem] Source not found: ${oldFullPath}`, statError);
+                
+                // DEBUG: List parent to see what exists
+                const parentDir = oldFullPath.split('/').slice(0, -1).join('/');
+                console.log(`[WebFileSystem] Listing parent '${parentDir}':`);
+                try {
+                    const params = await fs.promises.readdir(parentDir);
+                    console.log('Entries:', params);
+                } catch (e) { console.error('Failed to list parent:', e); }
+
+                return false;
+            }
+            
+            if (stat.isDirectory()) {
+                console.log('[WebFileSystem] Source is Directory. Performing recursive copy-delete.');
+                // Recursive Copy + Delete
+                // 1. Create new dir
+                await fs.promises.mkdir(newFullPath, { recursive: true });
+                
+                // 2. Recursive Copy
+                const copyRecursive = async (src: string, dest: string) => {
+                    const entries = await fs.promises.readdir(src, { withFileTypes: true });
+                    for (const entry of entries) {
+                        const srcPath = `${src}/${entry.name}`;
+                        const destPath = `${dest}/${entry.name}`;
+                        if (entry.isDirectory()) {
+                            await fs.promises.mkdir(destPath, { recursive: true });
+                            await copyRecursive(srcPath, destPath);
+                        } else {
+                            const content = await fs.promises.readFile(srcPath);
+                            await fs.promises.writeFile(destPath, content);
+                        }
+                    }
+                };
+                await copyRecursive(oldFullPath, newFullPath);
+
+                // 3. Delete old
+                await fs.promises.rm(oldFullPath, { recursive: true, force: true });
+            } else {
+                console.log('[WebFileSystem] Source is File.');
+                // File Copy + Delete
+                const content = await fs.promises.readFile(oldFullPath);
+                await fs.promises.writeFile(newFullPath, content);
+                await fs.promises.unlink(oldFullPath);
+            }
+
+            console.log('[WebFileSystem] Rename successful.');
+
+            // Trigger Watcher
+            if (this.watcherCallback) {
+                this._scanRecursive('').then(files => {
+                    if (this.watcherCallback) this.watcherCallback({ event: 'change', path: '', files });
+                });
+            }
+
+            return true;
+
+        } catch (e: any) {
+            console.error('[WebFileSystem] Rename failed:', e);
+            return false;
         }
     }
 
@@ -471,7 +571,9 @@ export class WebFileSystem implements IFileSystem {
                 if (bufferContent.length < 500) {
                     try {
                         const text = new TextDecoder().decode(bufferContent);
-                        //console.log(`[WebFS Debug] Small Content Text: ${text}`);
+                        // Using text to suppress warning if needed, or just let it compile out
+                        if (false) console.log(text); 
+                        // console.log(`[WebFS Debug] Small Content Text: ${text}`);
                     } catch (e) { /* ignore */ }
                 }
 

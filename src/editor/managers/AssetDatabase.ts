@@ -125,14 +125,37 @@ export class AssetDatabase {
     }
     
     public moveAsset(oldPath: string, newPath: string) {
+        // 1. Move the Main Asset (if registered)
         const guid = this.pathToGuid.get(oldPath);
-        if (!guid) return;
+        if (guid) {
+            const record = this.assets.get(guid)!;
+            this.pathToGuid.delete(oldPath);
+            this.pathToGuid.set(newPath, guid);
+            record.path = newPath;
+        }
+
+        // 2. Move Children (Recursive for directory)
+        // Find all paths starting with oldPath + '/'
+        const prefix = oldPath + '/';
+        const moves: { old: string, new: string, guid: string }[] = [];
+
+        for (const [path, childGuid] of this.pathToGuid) {
+            if (path.startsWith(prefix)) {
+                const relative = path.substring(prefix.length);
+                const newChildPath = `${newPath}/${relative}`;
+                moves.push({ old: path, new: newChildPath, guid: childGuid });
+            }
+        }
+
+        // Apply moves
+        for (const m of moves) {
+            this.pathToGuid.delete(m.old);
+            this.pathToGuid.set(m.new, m.guid);
+            const r = this.assets.get(m.guid);
+            if (r) r.path = m.new;
+        }
         
-        const record = this.assets.get(guid)!;
-        
-        this.pathToGuid.delete(oldPath);
-        this.pathToGuid.set(newPath, guid);
-        record.path = newPath;
+        console.log(`[AssetDatabase] Moved asset ${oldPath} -> ${newPath} (Children: ${moves.length})`);
     }
 
     public exportRegistry(): IResourceEntry[] {

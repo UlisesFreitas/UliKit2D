@@ -25,7 +25,9 @@ export interface IFileSystem {
     readFile(path: string): Promise<string>;
     writeFile(path: string, content: string | Blob | Uint8Array): Promise<boolean>;
     deleteFile(path: string): Promise<boolean>;
+    rename(oldPath: string, newPath: string): Promise<boolean>;
     readdir(path: string): Promise<FileEntry[]>;
+    createFolder(path: string): Promise<boolean>;
     
     // Asset Management
     importFile(sourcePath: string, destDir: string, customFilename?: string): Promise<{success: boolean, path?: string, error?: string}>;

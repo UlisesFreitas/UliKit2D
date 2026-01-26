@@ -137,6 +137,10 @@ export class ElectronFileSystem implements IFileSystem {
         return await this.electronAPI.createFolder(this.resolvePath(path));
     }
 
+    async rename(oldPath: string, newPath: string): Promise<boolean> {
+         return await this.electronAPI.renameFile(this.resolvePath(oldPath), this.resolvePath(newPath));
+    }
+
     // Asset Management
     async importFile(sourcePath: string, destDir: string, customFilename?: string): Promise<{success: boolean, path?: string, error?: string}> {
         return await this.electronAPI.importFile(sourcePath, destDir, customFilename);

@@ -398,27 +398,79 @@ export class ProjectManager {
 
         console.log(`[ProjectManager] Creating folder: ${finalPath}`);
         
-        // @ts-ignore
+        // Actual folder creation logic
         if (fs.createFolder) {
-             // @ts-ignore
-             const success = await fs.createFolder(finalPath);
-             if (success) {
-                 // Register in DB so it shows up even if empty
-                 const { AssetDatabase } = await import('./AssetDatabase');
-                 const { ProjectManifestManager } = await import('./ProjectManifestManager');
-                 
-                 AssetDatabase.instance.registerAsset(finalPath, 'directory');
-                 await ProjectManifestManager.saveProject('project.json');
-                 
-                 ui.showToast({ title: 'Success', description: `Created ${name}`, type: 'success' });
-                 
-                 // Refresh
-                 await useAssetStore().refreshFromDatabase();
-             } else {
-                 ui.showToast({ title: 'Error', description: 'Failed to create folder.', type: 'error' });
-             }
+            const success = await fs.createFolder(finalPath);
+            if (success) {
+                const { AssetDatabase } = await import('./AssetDatabase');
+                AssetDatabase.instance.registerAsset(finalPath, 'directory');
+                
+                const { ProjectManifestManager } = await import('./ProjectManifestManager');
+                await ProjectManifestManager.saveProject('project.json'); // Save manifest to reflect new folder
+                await useAssetStore().refreshFromDatabase(); // Refresh UI
+                ui.showToast({ title: 'Success', description: `Folder "${name}" created.`, type: 'success' });
+            } else {
+                ui.showToast({ title: 'Error', description: `Failed to create folder "${name}".`, type: 'error' });
+            }
         } else {
             console.error('fs.createFolder not implemented');
+            ui.showToast({ title: 'Error', description: 'File system does not support folder creation.', type: 'error' });
+        }
+    }
+
+    static async renameAsset(oldPath: string, newName: string) {
+        console.log(`[ProjectManager] Renaming ${oldPath} to ${newName}`);
+        const fs = getFileSystem();
+        const ui = useUIStore();
+        
+        // 1. Calculate New Path
+        const parts = oldPath.split('/');
+        parts.pop(); // Remove old name
+        const newPath = [...parts, newName].join('/');
+        
+        if (oldPath === newPath) return; // No change
+
+        // 2. Validate Existence (TODO: Check if newPath exists)
+
+        // @ts-ignore
+        if (ui.setLoading) ui.setLoading(true, 'Renaming...', 'indeterminate');
+
+        try {
+            // 3. Move File Logic
+            // HACK: Use Node/Electron IPC directly if we can, or add rename to interface.
+            // Check if FS has rename
+            // @ts-ignore
+            if (fs.rename) {
+                 // @ts-ignore
+                 const success = await fs.rename(oldPath, newPath);
+                 if (!success) throw new Error('FS rename failed');
+            } else {
+                // Fallback for missing rename: Error out for now
+                throw new Error('FileSystem does not support rename yet. Please implement fs.rename.');
+            }
+
+            // 4. Update Database
+            const { AssetDatabase } = await import('./AssetDatabase');
+            AssetDatabase.instance.moveAsset(oldPath, newPath);
+            
+            // 5. Update References in Scene
+            const { SceneManager } = await import('../../engine/managers/SceneManager');
+            SceneManager.updateAssetReferences(oldPath, newPath);
+            
+            // 6. Save Manifest
+            const { ProjectManifestManager } = await import('./ProjectManifestManager');
+            await ProjectManifestManager.saveProject('project.json');
+            
+            // 7. Refresh UI
+            await useAssetStore().refreshFromDatabase();
+            ui.showToast({ title: 'Success', description: 'Renamed successfully', type: 'success' });
+
+        } catch (e: any) {
+            console.error('Rename failed:', e);
+            ui.showToast({ title: 'Error', description: e.message || 'Rename failed', type: 'error' });
+        } finally {
+            // @ts-ignore
+            if (ui.setLoading) ui.setLoading(false);
         }
     }
 }

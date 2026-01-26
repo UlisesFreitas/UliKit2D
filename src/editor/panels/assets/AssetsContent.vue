@@ -55,13 +55,27 @@
                  <div class="px-3 py-1 text-[10px] font-bold text-text-secondary truncate max-w-[200px]">{{ menuState.file?.name }}</div>
                  <div class="h-[1px] bg-border my-1"></div>
                 <button 
+                    @click="promptRename" 
+                    class="w-full text-left px-3 py-1.5 hover:bg-bg-selection text-xs hover:text-text-primary transition-colors"
+                >
+                    Rename
+                </button>
+                 <div class="h-[1px] bg-border my-1"></div>
+                <button 
+                    v-if="menuState.file?.type !== 'directory'"
+                    class="w-full text-left px-3 py-1.5 hover:bg-bg-selection text-xs text-text-disabled cursor-not-allowed transition-colors"
+                    title="Not implemented yet"
+                >
+                    Edit in external editor
+                </button>
+                 <div class="h-[1px] bg-border my-1"></div>
+                <button 
                     v-if="menuState.file?.path !== 'assets'"
                     @click="deleteAsset" 
                     class="w-full text-left px-3 py-1.5 hover:bg-bg-selection hover:text-accent-danger text-xs text-accent-danger transition-colors"
                 >
                     Delete
                 </button>
-                 <!-- More options can go here like Rename, Show in Explorer -->
             </div>
         </Teleport>
     </div>
@@ -171,6 +185,29 @@ const showContextMenu = async (e: MouseEvent, file: any) => {
             top: `${y}px`,
             left: `${x}px`
         };
+    }
+};
+
+const promptRename = async () => {
+    const file = menuState.value.file;
+    if (!file) return;
+    closeContextMenu();
+
+    if (file.path === 'assets') {
+         ui.showToast({ title: 'Error', description: 'Cannot rename root assets folder.', type: 'error' });
+         return;
+    }
+
+    const newName = await ui.prompt({
+        title: 'Rename Asset',
+        message: `Enter new name for ${file.name}:`,
+        defaultValue: file.name,
+        confirmText: 'Rename',
+        placeholder: 'New Name'
+    });
+
+    if (newName && newName !== file.name) {
+        await ProjectManager.renameAsset(file.path, newName);
     }
 };
 
