@@ -148,9 +148,13 @@ import { useUIStore } from '../../stores/useUIStore';
 import { useLayoutStore } from '../../stores/useLayoutStore';
 import { useEditorStore } from '../../stores/useEditorStore';
 
+import { useProjectSettingsStore } from '../../stores/useProjectSettingsStore';
+import { eventBus } from '../../engine/core/EventBus';
+
 const uiStore = useUIStore();
 const layoutStore = useLayoutStore();
 const editorStore = useEditorStore();
+const settingsStore = useProjectSettingsStore();
 
 const selectedLayerId = ref<string | null>(null);
 const draggingIndex = ref<number | null>(null);
@@ -173,12 +177,16 @@ const refreshLayers = () => {
 // Poll for external changes (e.g. from Scene loading)
 const intervalId = setInterval(refreshLayers, 1000);
 
+// Listen for global layer updates (from Store -> SceneManager sync)
+eventBus.on('layer-update', refreshLayers);
+
 onMounted(() => {
     refreshLayers();
 });
 
 onUnmounted(() => {
     clearInterval(intervalId);
+    eventBus.off('layer-update', refreshLayers);
 });
 
 const openTilemapSettings = (layer: SceneLayer) => {
@@ -193,15 +201,32 @@ const selectLayer = (id: string) => {
     editorStore.selectLayer(id);
 };
 
+// Helper to push layer changes to Store - DEPRECATED / REMOVED in favor of Direct Actions
+// const updateStoreLayers = ...
+
+// Helper: Get current layer names based on Scene order
+const getCurrentSystemLayers = (): string[] => {
+    // We assume SceneManager.layers reflects the correct order (sorted by index 0..N)
+    return SceneManager.layers
+        .filter(l => l.layerIndex !== undefined)
+        .sort((a, b) => (a.layerIndex || 0) - (b.layerIndex || 0))
+        .map(l => l.name);
+};
+
 const addLayer = async () => {
+    const currentLayers = getCurrentSystemLayers();
+    const nextIndex = currentLayers.length;
+    
+    // Ask for name
     const name = await uiStore.prompt({
         title: 'New Layer Name',
         message: 'Enter layer name:',
-        defaultValue: 'Layer ' + (layers.value.length + 1)
+        defaultValue: 'Layer ' + (nextIndex + 1)
     });
+    
     if (name) {
-        SceneManager.addLayer(name);
-        refreshLayers();
+        // Use Store Action
+        settingsStore.addLayer(name);
     }
 };
 
@@ -211,8 +236,12 @@ const deleteLayer = async (layer: SceneLayer) => {
         message: `Delete layer "${layer.name}"? Entities inside will move to Base Layer.`,
         isDanger: true
     })) {
-        SceneManager.removeLayer(layer.id);
-        refreshLayers();
+        const currentLayers = getCurrentSystemLayers();
+        const index = currentLayers.indexOf(layer.name);
+        
+        if (index > -1) {
+            settingsStore.removeLayer(index);
+        }
     }
 };
 
@@ -231,8 +260,13 @@ const toggleCollision = (layer: SceneLayer) => {
     SceneManager.setDirty(true);
 };
 
-const onNameChange = (_layer: SceneLayer) => { // Fixed unused param issue with underscore
-    SceneManager.setDirty(true);
+const onNameChange = (layer: SceneLayer) => {
+    // Sync rename to Store
+    // We need the ORIGINAL index.
+    // layer.layerIndex is the reliable source here.
+    if (layer.layerIndex !== undefined) {
+         settingsStore.renameLayer(layer.layerIndex, layer.name);
+    }
 };
 
 const resolveColor = (color: string | undefined): string => {
@@ -289,21 +323,9 @@ const onDrop = (_e: DragEvent, dropIndex: number) => { // dropIndex is visual in
     // Validate drag (should generally not happen if I hid the handle for Base Layer)
     if (fromIndex === baseVisualIndex) return; // Can't move Base Layer
 
-    // Validate drop: Cannot drop AFTER Base Layer (index > baseVisualIndex? No, list ends at it)
-    // If dropIndex == baseVisualIndex, we are dropping ON Base Layer? Which inserts before it?
-    // In reordering logic: splice(from), splice(to, 0, item).
-    
-    // If dropIndex == baseVisualIndex, we are inserting AT that position.
-    // If I drop at position X, items shift.
-    // If I drop at Last Position, the new item becomes Last. Base Layer moves to Last-1?
-    // We must ensure Base Layer remains LAST (index N-1).
+    // Validate drop
     if (dropIndex === baseVisualIndex || dropIndex >= visualOrder.length) {
-        // Correct to insert just BEFORE Base Layer
-        // Actually, if we use splice on the visual array:
-        // Case 1: Dragging something FROM above Base to Base position.
-        // We move it to bottom. We want Base to BE bottom. So we must put it at Index N-2?
-        
-        // Simpler: Perform the move on visualOrder. THEN Force Fix Base Layer.
+        // Handle logic handled by splicing below + fix
     }
     
     const item = visualOrder.splice(fromIndex, 1)[0];
@@ -323,8 +345,12 @@ const onDrop = (_e: DragEvent, dropIndex: number) => { // dropIndex is visual in
     // So Model = Visual.reverse()
     const newModelLayers = [...visualOrder].reverse();
 
-    SceneManager.reorderLayers(newModelLayers);
-    refreshLayers();
+    // Map to Names for Store
+    const newLayerNames = newModelLayers.map(l => l.name);
+    
+    // Push to Store via Action
+    settingsStore.reorderLayers(newLayerNames);
+
     draggingIndex.value = null;
 };
 </script>

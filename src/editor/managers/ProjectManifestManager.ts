@@ -40,22 +40,26 @@ export class ProjectManifestManager {
     }
 
     static async saveProject(path: string) {
-        if (!this._manifest) return;
-        this._manifest.lastModified = Date.now();
+        // Ensure we have a manifest to save
+        if (!this._manifest) {
+            console.warn('[ProjectManifest] WARN: Manifest was null during save. Reconstructing from current memory state.');
+            this.createDefault('Untitled Project');
+        }
+        
+        const manifest = this._manifest!;
+
+        manifest.lastModified = Date.now();
         
         // Sync latest settings from Store
         const settingsStore = useProjectSettingsStore();
-        this._manifest.settings = settingsStore.settings;
+        manifest.settings = settingsStore.settings;
         
-        // Sync resources from AssetDatabase (if db has newer in-memory state)
-        // For now, AssetDatabase updates Manifest directly? 
-        // Or Manifest is Source of Truth?
-        // Let's make Manifest Manger the serializer.
+        // Sync resources from AssetDatabase
         const resources = AssetDatabase.instance.exportRegistry();
-        this._manifest.resources = resources;
+        manifest.resources = resources;
 
         const fs = getFileSystem();
-        const jsonContent = JSON.stringify(this._manifest, null, 2);
+        const jsonContent = JSON.stringify(manifest, null, 2);
         
         // Ensure path ends with project.json
         const fullPath = path.endsWith('project.json') ? path : `${path}/project.json`;
@@ -74,7 +78,7 @@ export class ProjectManifestManager {
             
             // 1. Hydrate Settings
             const settingsStore = useProjectSettingsStore();
-            settingsStore.setSettings(data.settings);
+            await settingsStore.setSettings(data.settings);
             
             // 2. Hydrate AssetDatabase
             // We pass the RAW resource list. DB is passive now.

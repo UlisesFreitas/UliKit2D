@@ -278,8 +278,10 @@ export class WebFileSystem implements IFileSystem {
     async readFile(path: string): Promise<string> {
         await this.ensureInit();
         if (!this.currentProject) throw new Error('No project');
+
+        const cleanPath = this._normalizePath(path);
+        const fullPath = `/${this.currentProject}/${cleanPath}`;
         
-        const fullPath = `/${this.currentProject}/${path}`;
         const content = await fs.promises.readFile(fullPath, 'utf8');
         return content;
     }
@@ -288,8 +290,11 @@ export class WebFileSystem implements IFileSystem {
         await this.ensureInit();
         if (!this.currentProject) return false;
         
-        const fullPath = `/${this.currentProject}/${path}`;
+        const cleanPath = this._normalizePath(path);
+        const fullPath = `/${this.currentProject}/${cleanPath}`;
         
+        // console.log(`[WebFileSystem] writeFile: '${path}' -> '${fullPath}'`);
+
         try {
             let data: Uint8Array | string;
             if (content instanceof Blob) {
@@ -304,13 +309,13 @@ export class WebFileSystem implements IFileSystem {
              // Trigger Watcher Manually
              if (this.watcherCallback) {
                 this._scanRecursive('').then(files => {
-                    if (this.watcherCallback) this.watcherCallback({ event: 'change', path, files });
+                    if (this.watcherCallback) this.watcherCallback({ event: 'change', path: cleanPath, files });
                 });
             }
 
             return true;
-        } catch (e) {
-            console.error('[WebFileSystem] write failed', e);
+        } catch (e: any) {
+            console.error(`[WebFileSystem] write failed for '${fullPath}'`, e);
             return false;
         }
     }
@@ -320,7 +325,9 @@ export class WebFileSystem implements IFileSystem {
         if (!this.currentProject) return false;
         
         try {
-            const fullPath = `/${this.currentProject}/${path}`;
+            const cleanPath = this._normalizePath(path);
+            const fullPath = `/${this.currentProject}/${cleanPath}`;
+            
             const stat = await fs.promises.stat(fullPath);
             
             if (stat.isDirectory()) {
@@ -333,7 +340,7 @@ export class WebFileSystem implements IFileSystem {
              // Trigger Watcher Manually
              if (this.watcherCallback) {
                 this._scanRecursive('').then(files => {
-                    if (this.watcherCallback) this.watcherCallback({ event: 'unlink', path, files });
+                    if (this.watcherCallback) this.watcherCallback({ event: 'unlink', path: cleanPath, files });
                 });
             }
             return true;
@@ -341,6 +348,22 @@ export class WebFileSystem implements IFileSystem {
             console.error('[WebFileSystem] delete failed', e);
             return false;
         }
+    }
+
+    // Helper to strip Project Prefix if present
+    private _normalizePath(path: string): string {
+        if (!this.currentProject) return path;
+        
+        // Handle windows style
+        let clean = path.replace(/\\/g, '/');
+        
+        if (clean.startsWith(`${this.currentProject}/`)) {
+            return clean.substring(this.currentProject.length + 1);
+        }
+        if (clean === this.currentProject) {
+            return '';
+        }
+        return clean;
     }
 
     async createFolder(path: string): Promise<boolean> {

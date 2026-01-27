@@ -420,6 +420,7 @@ const onDrop = (e: DragEvent) => {
         world.add({
             id: crypto.randomUUID(),
             name: 'New Sprite',
+            layer: store.activeLayerId || 'Base Layer', // Use active layer!
             transform: { x: worldX, y: worldY, rotation: 0, scale: { x: 1, y: 1 } },
             sprite: { texture: path }
         });

@@ -194,11 +194,11 @@ export const useProjectSettingsStore = defineStore('projectSettings', () => {
     };
 
     // Actions
-    const setSettings = (newSettings: IProjectSettings) => {
+    const setSettings = async (newSettings: IProjectSettings) => {
         // Deep merge to preserve defaults/structure
         deepMerge(settings, newSettings);
         isDirty.value = false;
-        applySettings();
+        await applySettings();
     };
 
     const updateSetting = <K extends keyof IProjectSettings>(category: K, value: IProjectSettings[K]) => {
@@ -221,12 +221,64 @@ export const useProjectSettingsStore = defineStore('projectSettings', () => {
         applySettings();
     });
 
+    // Helper: Save Mechanism (Dynamic Import to avoid cycles)
+    const saveToManifest = async () => {
+        try {
+            const { projectState } = await import('../editor/managers/ProjectManager');
+            const { ProjectManifestManager } = await import('../editor/managers/ProjectManifestManager');
+            
+            let path = 'project.json'; 
+            if (projectState.currentProjectPath && typeof projectState.currentProjectPath === 'string') {
+                 path = projectState.currentProjectPath;
+            }
+             
+             await ProjectManifestManager.saveProject(path);
+             console.log('[ProjectSettings] Auto-saved manifest for layer changes.');
+        } catch (e) {
+            console.error('[ProjectSettings] Failed to auto-save manifest:', e);
+        }
+    };
+
     return {
         settings,
         isDirty,
         setSettings,
         updateSetting,
         applySettings,
-        resetDefaults
+        resetDefaults,
+        
+        // Layer Actions (Centralized Logic - Async & Persistent)
+        addLayer: async (name: string) => {
+            settings.layers.push(name);
+            isDirty.value = true;
+            await applySettings();
+            await saveToManifest();
+            eventBus.emit('layer-update');
+        },
+        removeLayer: async (index: number) => {
+            if (index >= 0 && index < settings.layers.length) {
+                settings.layers.splice(index, 1);
+                isDirty.value = true;
+                await applySettings();
+                await saveToManifest();
+                eventBus.emit('layer-update');
+            }
+        },
+        renameLayer: async (index: number, newName: string) => {
+             if (index >= 0 && index < settings.layers.length) {
+                settings.layers[index] = newName;
+                isDirty.value = true;
+                await applySettings();
+                await saveToManifest();
+                eventBus.emit('layer-update');
+            }
+        },
+        reorderLayers: async (newLayers: string[]) => {
+            settings.layers = newLayers;
+            isDirty.value = true;
+            await applySettings();
+            await saveToManifest();
+            eventBus.emit('layer-update');
+        }
     };
 });

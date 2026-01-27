@@ -175,30 +175,54 @@ export class SceneManager {
     }
 
     static loadScene(dataOrJson: string | any, name: string = 'Untitled Scene') {
+        console.log(`[SceneManager] loadScene called. Templates available: ${this._projectLayerTemplates.length}`, this._projectLayerTemplates);
         eventBus.emit('scene-cleared'); // Notify UI to clear immediately
         world.clear();
         this._activeSceneName = name;
-        this._layers = []; // Clear current
         
         try {
             const data = typeof dataOrJson === 'string' ? JSON.parse(dataOrJson) : dataOrJson;
             
-            // 1. Load Layers
-            if (data.layers) {
-                // Restore logic, ensuring defaults for new props
-                this._layers = data.layers.map((l: any) => {
-                    const globalIndex = SceneManager.getLayerIndex(l.name);
-                    return { 
-                        ...l, 
-                        tileData: l.tileData || {}, 
-                        gridSize: l.gridSize || { x: 32, y: 32 }, 
-                        layerIndex: globalIndex !== -1 ? globalIndex : 0,
-                        _entityIds: new Set() 
-                    };
-                });
-            }
+            // 1. Initialize Layers: Prioritize Project Templates to avoid "Sync Duplicates"
+            this._layers = [];
             
-            // ... (Fallback ensure Base Layer omitted for brevity, implied same logic if needed)
+            // A. Create Structure from Templates (Source of Truth for IDs/Indices)
+            if (this._projectLayerTemplates.length > 0) {
+                 this._layers = this._projectLayerTemplates.map((name, index) => {
+                     // Check if 'data.layers' has matching layer to restore specific props (visible, locked, color)
+                     // Match by Name first, as Templates define the Names.
+                     const savedLayer = data.layers?.find((l: any) => l.name === name); // Fallback name check
+                     
+                     const isBase = index === 0;
+                     return {
+                        id: savedLayer?.id || (isBase ? 'Base Layer' : `layer-sys-${index}-${crypto.randomUUID().split('-')[0]}`),
+                        name: name,
+                        visible: savedLayer?.visible ?? true,
+                        locked: savedLayer?.locked ?? false,
+                        color: savedLayer?.color || (isBase ? '#333333' : undefined),
+                        type: savedLayer?.type || 'default',
+                        tileData: savedLayer?.tileData || {},
+                        gridSize: savedLayer?.gridSize || { x: 32, y: 32 },
+                        _entityIds: new Set(),
+                        layerIndex: index
+                     };
+                });
+            } 
+            // B. Fallback: trusting Data if no Templates (e.g. fresh load before settings)
+            else if (data.layers) {
+                console.warn('[SceneManager] WARN: Loading scene WITHOUT Templates. Using saved layer data (risk of duplicates).');
+                this._layers = data.layers.map((l: any) => ({
+                    ...l,
+                    tileData: l.tileData || {},
+                    gridSize: l.gridSize || { x: 32, y: 32 },
+                    _entityIds: new Set(),
+                    layerIndex: l.layerIndex ?? 0
+                }));
+            }
+            // C. Ultimate Fallback
+            else {
+                 this._layers = [{ id: 'Base Layer', name: 'Base Layer', visible: true, locked: false, color: '#333333', _entityIds: new Set(), layerIndex: 0 }];
+            }
 
             // 2. Load Entities & Build Registry
             const loadedEntities = Array.isArray(data) ? data : (data.entities || []);
@@ -210,18 +234,26 @@ export class SceneManager {
                 // MIGRATION: Resolve Layer UUID/Name to Global Index
                 let targetLayerIndex = 0;
                 
-                // A. Try finding by ID (UUID match) in loaded local layers
+                // A. Try finding by ID (UUID match) in our newly built local layers
                 const localLayer = this._layers.find(l => l.id === entity.layer);
                 if (localLayer && localLayer.layerIndex !== undefined) {
                     targetLayerIndex = localLayer.layerIndex;
                 } else {
                     // B. Try finding by Name (if entity.layer was actually a name)
-                   const byName = SceneManager.getLayerIndex(entity.layer);
-                    if (byName !== -1) targetLayerIndex = byName;
-                     else {
+                    // (Handle cases where saved entity has old layer name, we map to current template index)
+                    const byName = this._layers.find(l => l.name === entity.layer);
+                    if (byName && byName.layerIndex !== undefined) {
+                        targetLayerIndex = byName.layerIndex;
+                        // IMPORTANT: Update entity to use ID for future
+                        entity.layer = byName.id;
+                    }
+                    else {
                          // C. Fallback: Base Layer name lookup
-                         const baseIndex = SceneManager.getLayerIndex('Base Layer');
-                         if (baseIndex !== -1) targetLayerIndex = baseIndex;
+                         const baseLayer = this._layers.find(l => l.layerIndex === 0);
+                         if (baseLayer) {
+                             targetLayerIndex = 0;
+                             entity.layer = baseLayer.id;
+                         }
                      }
                 }
 
@@ -238,7 +270,11 @@ export class SceneManager {
             // Emergency Recovery
              this._layers = [{ id: 'Base Layer', name: 'Base Layer', visible: true, locked: false, color: '#333333', _entityIds: new Set() }];
         }
-
+        
+        // Finalize: Sync with Project Settings and Notify
+        // (This should now be a no-op or just visual sync, no structure changes)
+        this.syncLayersWithTemplates();
+        
         this._isDirty = false;
         // Emit event for Runtime/UI to know scene changed immediately after synchronous load
         eventBus.emit('scene-loaded', this._activeSceneName);
@@ -283,7 +319,134 @@ export class SceneManager {
     }
 
     static setProjectLayers(layerNames: string[]) {
+        console.log('[SceneManager] setProjectLayers called with:', layerNames);
         this._projectLayerTemplates = layerNames;
+        this.syncLayersWithTemplates();
+    }
+
+    /**
+     * Synchronizes the active scene's layers with the Project Settings templates.
+     * Ensures that layers defined in Settings exist in the Scene and have correct names.
+     */
+    private static syncLayersWithTemplates() {
+        if (!this._projectLayerTemplates.length) return;
+
+        let changed = false;
+
+        // 0. Cleanup: Remove Runtime Layers that are NO LONGER in Templates
+        // We iterate backwards to safely splice
+        for (let i = this._layers.length - 1; i >= 0; i--) {
+            const layer = this._layers[i];
+            if (!layer) continue;
+            if (layer.id === 'Base Layer') continue; // Always keep Base Layer
+            
+            // Replaced logic with Pass 1-4 below
+        }
+
+        const claimedRuntimeIds = new Set<string>();
+        const claimedTemplateIndices = new Set<number>();
+
+        // Pass 1: Exact Match (Index AND Name)
+        this._projectLayerTemplates.forEach((name, index) => {
+            if (!name) return;
+            const runtimeLayer = this._layers.find(l => l.layerIndex === index && l.name === name);
+            if (runtimeLayer) {
+                claimedRuntimeIds.add(runtimeLayer.id);
+                claimedTemplateIndices.add(index);
+                // No changes needed
+            }
+        });
+
+        // Pass 2: Name Match (Index mismatch) -> Move Runtime Layer to correct Index
+        this._projectLayerTemplates.forEach((name, index) => {
+            if (!name) return;
+            if (claimedTemplateIndices.has(index)) return; // Already satisfied
+
+            // Find unclaimed runtime layer with matching name
+            const runtimeLayer = this._layers.find(l => l.name === name && !claimedRuntimeIds.has(l.id));
+            if (runtimeLayer) {
+                // console.log(`[SceneManager] Sync: Re-indexing "${name}"`);
+                runtimeLayer.layerIndex = index;
+                claimedRuntimeIds.add(runtimeLayer.id);
+                claimedTemplateIndices.add(index);
+                changed = true;
+            }
+        });
+
+        // Pass 3: Index Match (Name mismatch) -> Rename Runtime Layer
+        this._projectLayerTemplates.forEach((name, index) => {
+            if (!name) return;
+            if (claimedTemplateIndices.has(index)) return;
+
+            // Find unclaimed runtime layer at this index
+            const runtimeLayer = this._layers.find(l => l.layerIndex === index && !claimedRuntimeIds.has(l.id));
+            if (runtimeLayer) {
+                // console.log(`[SceneManager] Sync: Renaming Layer ${index}`);
+                runtimeLayer.name = name;
+                claimedRuntimeIds.add(runtimeLayer.id);
+                claimedTemplateIndices.add(index);
+                changed = true;
+            }
+        });
+
+        // Pass 4: Create Missing Layers
+        this._projectLayerTemplates.forEach((name, index) => {
+             if (!name) return;
+             if (claimedTemplateIndices.has(index)) return;
+
+             // Create new
+             // console.log(`[SceneManager] Sync: Creating Missing Layer ${index}`);
+             
+             const newLayer: SceneLayer = {
+                id: `layer-sys-${index}-${crypto.randomUUID().split('-')[0]}`,
+                name: name,
+                visible: true,
+                locked: false,
+                type: 'default',
+                tileData: {},
+                gridSize: { x: 32, y: 32 },
+                _entityIds: new Set(),
+                layerIndex: index
+             };
+             this._layers.push(newLayer);
+             
+             // CRITICAL FIX: Claim the new layer so it's not immediately deleted by the orphanage check below
+             claimedRuntimeIds.add(newLayer.id);
+             changed = true;
+        });
+
+        // 4. DELETE UNCLAIMED
+        for (let i = this._layers.length - 1; i >= 0; i--) {
+            const layer = this._layers[i];
+            // Ensure layer exists (TS check)
+            if (!layer) continue;
+
+            if (!claimedRuntimeIds.has(layer.id)) {
+                // console.log(`[SceneManager] Deleting Orphaned Layer: "${layer.name}"`);
+                
+                const baseLayer = this._layers.find(l => l.layerIndex === 0);
+                const baseId = baseLayer?.id || 'Base Layer';
+                
+                for (const entity of world) {
+                    if (entity.layer === layer.id) {
+                        entity.layer = baseId;
+                        this.registerEntity(entity.id!, baseId);
+                    }
+                }
+                
+                this._layers.splice(i, 1);
+                changed = true;
+            }
+        }
+
+        // 5. CRITICAL: Enforce Array Order matches Layer Index
+        // The LayersPanel relies on the array order, so we must sort it.
+        this._layers.sort((a, b) => (a.layerIndex || 0) - (b.layerIndex || 0));
+
+        if (changed) {
+            this._isDirty = true;
+            eventBus.emit('layer-update');
+        }
     }
 
     static getLayerIndex(name: string): number {
