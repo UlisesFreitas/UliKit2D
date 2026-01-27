@@ -34,6 +34,28 @@ export class WebFileSystem implements IFileSystem {
             if (e.message && e.message.includes('Mount point is already in use')) {
                 console.log('[WebFileSystem] ZenFS already configured (HMR re-init detected)');
                 this.initialized = true;
+            } else if (e.name === 'InvalidStateError' || (e.message && e.message.includes('InvalidStateError'))) {
+                 console.warn('[WebFileSystem] ZenFS state error. Verifying actual mount status...');
+                 
+                 try {
+                     // Check if it's actually working despite the error (False Positive?)
+                     await fs.promises.stat('/');
+                     console.log('[WebFileSystem] Verified: Root is accessible. Assuming operational.');
+                     this.initialized = true;
+                     return;
+                 } catch (statError) {
+                     console.error('[WebFileSystem] Verification failed: Root inaccessible.', statError);
+                 }
+
+                 console.error('[WebFileSystem] Critical State Error. Reloading to recover OPFS handle...');
+                 // Prevent infinite reload loop if possible?
+                 if (!window.location.search.includes('recovered=true')) {
+                     const url = new URL(window.location.href);
+                     url.searchParams.set('recovered', 'true');
+                     window.location.href = url.toString();
+                 } else {
+                     console.error('[WebFileSystem] Reload loop detected. Please manually refresh.');
+                 }
             } else {
                 console.error('[WebFileSystem] ZenFS config error:', e);
             }
@@ -153,17 +175,48 @@ export class WebFileSystem implements IFileSystem {
                 }
             }
 
-            // 3. Create project.json
+            // 3. Create Initial Scene (Parity with Electron main.ts)
+            // Ensure directory exists (redundant safety check)
+            try {
+                await fs.promises.mkdir(`${projectPath}/assets/scenes`, { recursive: true });
+            } catch (ignore) {}
+
+            const defaultScene = [
+                {
+                    "id": "main-camera-id",
+                    "name": "Main Camera",
+                    "transform": { "x": 0, "y": 0, "rotation": 0, "scale": { "x": 1, "y": 1 } },
+                    "camera": { "zoom": 1, "isPrimary": true, "backgroundColor": "#333333" }
+                }
+            ];
+            
+            await fs.promises.writeFile(
+                `${projectPath}/assets/scenes/NewScene.json`, 
+                JSON.stringify(defaultScene, null, 2)
+            );
+
+            // 4. Create project.json
             const projectJson = JSON.stringify({
                 name: path,
                 version: '1.0.0',
-                params: {}
+                created: Date.now(),
+                lastModified: Date.now(),
+                settings: {
+                     layers: ['Background', 'Base Layer', 'Player', 'UI'],
+                     physics: { gravity: { x: 0, y: 9.8 } }
+                },
+                scenes: [
+                    {
+                        name: 'NewScene',
+                        path: 'assets/scenes/NewScene.json',
+                        id: 'default-scene-id',
+                        updated: Date.now()
+                    }
+                ],
+                resources: []
             }, null, 4);
             
             await fs.promises.writeFile(`${projectPath}/project.json`, projectJson);
-
-            // 4. (Removed) Do not create Initial Scene file. 
-            // The Engine will start with an "Untitled Scene" in memory.
             
             // Verification
             const verifyFiles = await fs.promises.readdir(`${projectPath}/assets`);

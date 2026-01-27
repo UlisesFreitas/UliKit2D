@@ -45,22 +45,25 @@ export class AssetDatabase {
      */
     public hydrate(entries: IResourceEntry[]) {
         console.time('AssetDatabase.hydrate');
-        this.assets.clear();
-        this.pathToGuid.clear();
-        
-        for (const entry of entries) {
-            const record: AssetRecord = {
-                guid: entry.guid,
-                path: entry.path,
-                type: entry.type as AssetType,
-                meta: entry.meta || {},
-                lastModified: Date.now()
-            };
-            this.assets.set(record.guid, record);
-            this.pathToGuid.set(record.path, record.guid);
+        try {
+            this.assets.clear();
+            this.pathToGuid.clear();
+            
+            for (const entry of entries) {
+                const record: AssetRecord = {
+                    guid: entry.guid,
+                    path: entry.path,
+                    type: entry.type as AssetType,
+                    meta: entry.meta || {},
+                    lastModified: Date.now()
+                };
+                this.assets.set(record.guid, record);
+                this.pathToGuid.set(record.path, record.guid);
+            }
+            console.log(`[AssetDatabase] Hydrated ${entries.length} assets.`);
+        } finally {
+            console.timeEnd('AssetDatabase.hydrate');
         }
-        console.log(`[AssetDatabase] Hydrated ${entries.length} assets.`);
-        console.timeEnd('AssetDatabase.hydrate');
     }
 
     /**

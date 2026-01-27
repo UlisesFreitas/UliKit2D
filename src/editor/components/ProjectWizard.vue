@@ -82,8 +82,8 @@ onMounted(() => {
     loadProjects();
 });
 
-const openRecent = (name: string) => {
-    ProjectManager.openProject(name);
+const openRecent = (path: string) => {
+    ProjectManager.openProject(path);
 };
 </script>
 
@@ -110,7 +110,7 @@ const openRecent = (name: string) => {
                     <button 
                         v-for="proj in recentProjects" 
                         :key="proj.name"
-                        @click="openRecent(proj.name)"
+                        @click="openRecent(proj.path)"
                         class="w-full text-left px-3 py-2 rounded hover:bg-bg-hover text-sm border border-transparent hover:border-border transition flex items-center group"
                     >
                         <span class="mr-2 text-lg">📁</span>

@@ -6,7 +6,8 @@ import { useUIStore } from '../../stores/useUIStore';
 export const projectState = reactive({
     currentProjectPath: null as string | FileSystemDirectoryHandle | null,
     isDirty: false,
-    projectName: 'Untitled'
+    projectName: 'Untitled',
+    watcherCleanup: null as (() => void) | null
 });
 
 export class ProjectManager {
@@ -20,11 +21,12 @@ export class ProjectManager {
         }
     }
 
-    static addToRecents(name: string) {
+    static addToRecents(name: string, path?: string) {
         const recents = this.getRecents();
         // Remove existing if present to move to top
         const filtered = recents.filter(r => r.name !== name);
-        filtered.unshift({ name, path: name }); // path = name in Web/OPFS
+        const projectPath = path || name; // Use path if available (Electron), else name (Web)
+        filtered.unshift({ name, path: projectPath }); 
         // Limit to 10
         if (filtered.length > 50) filtered.pop();
         
@@ -78,21 +80,48 @@ export class ProjectManager {
                  // 3. Hydrate DB (Handled above by loadProject)
                  // const { AssetDatabase } = await import('./AssetDatabase');
                  // AssetDatabase.instance.hydrate([]);
+                 
+
 
                  // 4. Notify AssetStore
                  // @ts-ignore
                  await useAssetStore().refreshFromDatabase();
+                 
+                 // 5. Initialize Watcher
+                 await this.initProjectWatcher(fs, projectState.currentProjectPath as any);
 
                  const _pEnd = performance.now();
                  console.log(`%c ⏱️ CREATION COMPLETE: ${(_pEnd - _pStart).toFixed(2)}ms `, 'background: #bada55; color: #222; font-size: 20px;');
                  console.log('Project Created:', projectState.projectName);
 
-                 this.addToRecents(projectState.projectName);
+                 this.addToRecents(projectState.projectName, typeof pathOrHandle === 'string' ? pathOrHandle : undefined);
 
-                 // Load Default Scene
+                 // Load Initial Scene
                  try {
                      const { SceneManager } = await import('../../engine/managers/SceneManager');
-                     SceneManager.createDefaultScene();
+                     
+                     // Check if manifest has scenes (e.g. created by Electron main.ts)
+                     const manifest = ProjectManifestManager.manifest;
+                     let sceneLoaded = false;
+                     
+                     if (manifest && manifest.scenes && manifest.scenes.length > 0) {
+                         // Load the first scene
+                         const firstScene = manifest.scenes[0];
+                         if (firstScene) {
+                             console.log('[ProjectManager] Attempting to load initial scene:', firstScene.path);
+                             sceneLoaded = await SceneManager.loadSceneByPath(firstScene.path);
+                             if (!sceneLoaded) {
+                                 console.error('[ProjectManager] Failed to load initial scene. Path:', firstScene.path);
+                             } else {
+                                 console.log('[ProjectManager] Initial scene loaded successfully:', firstScene.name);
+                             }
+                         }
+                     }
+                     
+                     if (!sceneLoaded) {
+                         console.warn('[ProjectManager] No valid initial scene loaded. Creating default "Untitled Scene".');
+                         SceneManager.createDefaultScene();
+                     }
                  } catch (e) {
                      console.error('[ProjectManager] Error initializing SceneManager:', e);
                  }
@@ -115,6 +144,10 @@ export class ProjectManager {
     static closeProject() {
         projectState.currentProjectPath = null;
         projectState.projectName = 'Untitled';
+        if (projectState.watcherCleanup) {
+            projectState.watcherCleanup();
+            projectState.watcherCleanup = null;
+        }
         console.log('[ProjectManager] Project closed');
     }
 
@@ -159,7 +192,7 @@ export class ProjectManager {
                 const _pEnd = performance.now();
                 console.log(`%c ⏱️ LOAD COMPLETE: ${(_pEnd - _pStart).toFixed(2)}ms `, 'background: #00ffff; color: #222; font-size: 20px;');
                 
-                this.addToRecents(projectState.projectName);
+                this.addToRecents(projectState.projectName, typeof pathOrHandle === 'string' ? pathOrHandle : undefined);
 
                 // Load Initial Scene
                 const { SceneManager } = await import('../../engine/managers/SceneManager');
@@ -182,6 +215,9 @@ export class ProjectManager {
                 // 3. Force View to 'assets' Master Folder
                 // @ts-ignore
                 useAssetStore().changeDirectory('assets');
+                
+                // 4. Initialize Watcher
+                await this.initProjectWatcher(fs, projectState.currentProjectPath as any);
 
             } finally {
                 // @ts-ignore
@@ -208,7 +244,32 @@ export class ProjectManager {
 
              // 2. Save Manifest (project.json)
              const { ProjectManifestManager } = await import('./ProjectManifestManager');
-             // TODO: Add active scene to manifest if not present?
+             
+             // Update Scene in Manifest
+             if (ProjectManifestManager.manifest) {
+                 if (!ProjectManifestManager.manifest.scenes) {
+                     ProjectManifestManager.manifest.scenes = [];
+                 }
+                 
+                 const scenes = ProjectManifestManager.manifest.scenes;
+                 const existingIdx = scenes.findIndex(s => s.path === fullPath);
+                 
+                 if (existingIdx !== -1) {
+                    // Determine safer access
+                    const existing = scenes[existingIdx];
+                    if (existing) {
+                        existing.updated = Date.now();
+                    }
+                 } else {
+                     scenes.push({
+                         name: SceneManager.activeSceneName,
+                         path: fullPath,
+                         id: crypto.randomUUID(),
+                         updated: Date.now()
+                     });
+                 }
+             }
+             
              await ProjectManifestManager.saveProject('project.json');
              
              projectState.isDirty = false;
@@ -485,5 +546,45 @@ export class ProjectManager {
             // @ts-ignore
             if (ui.setLoading) ui.setLoading(false);
         }
+    }
+
+
+
+    private static async initProjectWatcher(fs: any, path: string | FileSystemDirectoryHandle) {
+        if (projectState.watcherCleanup) {
+            projectState.watcherCleanup();
+        }
+        
+        projectState.watcherCleanup = await fs.watchProject(path, async (event: any) => {
+            // console.log('[ProjectManager] Watcher Event:', event);
+            const { AssetDatabase } = await import('./AssetDatabase');
+            const { ProjectManifestManager } = await import('./ProjectManifestManager');
+            
+            let needsSave = false;
+
+            if (event.event === 'initial') {
+                for (const file of event.files || []) {
+                    if (file.type === 'file' && !file.name.endsWith('.meta')) {
+                         AssetDatabase.instance.registerAsset(file.path);
+                    }
+                }
+                needsSave = true;
+            } else if (event.event === 'add') {
+                 if (!event.path.endsWith('.meta')) {
+                     AssetDatabase.instance.registerAsset(event.path);
+                     needsSave = true;
+                 }
+            } else if (event.event === 'unlink') {
+                // Remove from DB? AssetDatabase needs unregister method?
+                // For now, reload DB or strict removal?
+                // AssetDatabase.instance.removeAsset(event.path);
+            }
+            
+            if (needsSave) {
+                 await ProjectManifestManager.saveProject('project.json');
+                 // Refresh UI
+                 await useAssetStore().refreshFromDatabase();
+            }
+        });
     }
 }

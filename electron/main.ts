@@ -154,7 +154,14 @@ ipcMain.handle('project:create', async (_event, folderPath: string) => {
                  layers: ['Background', 'Base Layer', 'Player', 'UI'],
                  physics: { gravity: { x: 0, y: 9.8 } }
             },
-            scenes: [],
+            scenes: [
+                {
+                    name: 'NewScene',
+                    path: 'assets/scenes/NewScene.json',
+                    id: 'default-scene-id', // We should generate a UUID here or use a fixed one for initial
+                    updated: Date.now()
+                }
+            ],
             resources: []
         };
         
@@ -176,6 +183,7 @@ ipcMain.handle('project:create', async (_event, folderPath: string) => {
             path.join(scenesPath, 'NewScene.json'),
             JSON.stringify(defaultScene, null, 2)
         );
+        
 
         // -------- DEFAULT ASSETS --------
         // Copy from src/resources/default_assets

@@ -78,9 +78,9 @@ export class ProjectManifestManager {
             
             // 2. Hydrate AssetDatabase
             // We pass the RAW resource list. DB is passive now.
-            AssetDatabase.instance.hydrate(data.resources);
+            AssetDatabase.instance.hydrate(data.resources || []);
             
-            console.log(`[ProjectManifest] Loaded project "${data.name}" with ${data.resources.length} resources.`);
+            console.log(`[ProjectManifest] Loaded project "${data.name}" with ${(data.resources || []).length} resources.`);
             return true;
         } catch (e) {
             console.error('[ProjectManifest] Failed to load:', e);

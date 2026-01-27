@@ -8,4 +8,6 @@ export interface IResourceEntry {
 export interface ISceneEntry {
     name: string;
     path: string;
+    id?: string;
+    updated?: number;
 }
