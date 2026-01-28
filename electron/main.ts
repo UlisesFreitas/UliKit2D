@@ -1,5 +1,5 @@
 import { app, BrowserWindow, ipcMain, dialog, shell, protocol, net } from 'electron';
-import crypto from 'crypto';
+
 import path from 'path';
 import { fileURLToPath, pathToFileURL } from 'url';
 import chokidar, { FSWatcher } from 'chokidar';
@@ -128,175 +128,14 @@ ipcMain.handle('project:create', async (_event, folderPath: string) => {
     const fs = await import('fs/promises');
     console.log(`[Main] project:create called for: ${folderPath}`);
     try {
-        // Create basic structure
-        const assetsPath = path.join(folderPath, 'assets');
-        console.log(`[Main] Creating assets at: ${assetsPath}`);
-        await fs.mkdir(assetsPath, { recursive: true });
-        
-        // Ensure imported folder exists
-        const importedPath = path.join(assetsPath, 'imported');
-        console.log(`[Main] Creating imported at: ${importedPath}`);
-        await fs.mkdir(importedPath, { recursive: true });
+        // ONLY Create the Root Folder.
+        // The ProjectFactory (Renderer) will handle structure, assets, and validation.
+        await fs.mkdir(folderPath, { recursive: true });
 
-        // Ensure scenes folder exists
-        const scenesPath = path.join(assetsPath, 'scenes');
-        console.log(`[Main] Creating scenes at: ${scenesPath}`);
-        await fs.mkdir(scenesPath, { recursive: true });
-        
-        const projectConfig: any = {
-            name: path.basename(folderPath),
-            version: '1.0.0',
-            engineVersion: '1.0.0',
-            created: Date.now(),
-            lastModified: Date.now(),
-            settings: {
-                 // Minimal defaults, Manager will handle rest
-                 layers: [
-                    'Base Layer',  // 0: Immortal/Bottom
-                    'Ground',      // 1
-                    'Objects',     // 2
-                    '', '', '', '', '', '', '', // 3-9
-                    'Player',      // 10
-                    '', '', '', '', '', '', '', '', '', // 11-19
-                    '', '', '', '', '', '', '', '', '', '', // 20-29
-                    'Particles',   // 30
-                    'UI'           // 31: Top Most
-                 ],
-                 physics: { gravity: { x: 0, y: 9.8 } }
-            },
-            scenes: [
-                {
-                    name: 'NewScene',
-                    path: 'assets/scenes/NewScene.json',
-                    id: 'default-scene-id', // We should generate a UUID here or use a fixed one for initial
-                    updated: Date.now()
-                }
-            ],
-            resources: []
-        };
-        
-        await fs.writeFile(
-            path.join(folderPath, 'project.json'), 
-            JSON.stringify(projectConfig, null, 4)
-        );
-
-        // Create Initial Scene
-        const defaultScene = [
-            {
-                "id": "main-camera-id",
-                "name": "Main Camera",
-                "transform": { "x": 0, "y": 0, "rotation": 0, "scale": { "x": 1, "y": 1 } },
-                "camera": { "zoom": 1, "isPrimary": true, "backgroundColor": "#333333" }
-            }
-        ];
-        await fs.writeFile(
-            path.join(scenesPath, 'NewScene.json'),
-            JSON.stringify(defaultScene, null, 2)
-        );
-        
-
-        // -------- DEFAULT ASSETS --------
-        // Copy from src/resources/default_assets
-        // In dev: ../src/resources/default_assets
-        // In prod: process.resourcesPath/default_assets (need to ensure they are copied there)
-        
-        const isDev = process.env.NODE_ENV === 'development' || process.argv.includes('--dev');
-        let sourceAssetsPath = '';
-        
-        if (isDev) {
-            // Use process.cwd() which is the project root in dev
-            sourceAssetsPath = path.join(process.cwd(), 'src/resources/default_assets');
-        } else {
-            // Need to handle production path later, assuming adjacent to resources or similar
-            sourceAssetsPath = path.join(process.resourcesPath, 'default_assets'); 
-        }
-
-        try {
-            console.log(`[Main] Looking for default assets at: ${sourceAssetsPath}`);
-            
-            // Recursive Copy Helper
-            const copyRecursive = async (src: string, dest: string) => {
-                try {
-                    const stats = await fs.stat(src);
-                    if (stats.isDirectory()) {
-                        await fs.mkdir(dest, { recursive: true });
-                        const entries = await fs.readdir(src);
-                        for (const entry of entries) {
-                            await copyRecursive(path.join(src, entry), path.join(dest, entry));
-                        }
-                    } else {
-                        await fs.copyFile(src, dest);
-                    }
-                } catch(e) {
-                     console.warn(`[Main] Skipping ${src}:`, e);
-                }
-            };
-
-            await copyRecursive(sourceAssetsPath, assetsPath);
-            console.log(`[Main] Default assets copied recursively.`);
-        } catch (err) {
-            console.error('Failed to copy default assets:', err);
-        }
-        
-        // -------- ASSET SCANNING (PHASE 8 HYDRATION) --------
-        // We must populate project.json with the assets we just copied
-        const scannedResources: any[] = [];
-        
-        const getAssetType = (ext: string): string => {
-            const map: Record<string, string> = {
-                '.png': 'texture', '.jpg': 'texture', '.jpeg': 'texture',
-                '.mp3': 'audio', '.wav': 'audio', '.ogg': 'audio',
-                '.js': 'script', '.ts': 'script', '.json': 'json'
-            };
-            return map[ext.toLowerCase()] || 'unknown';
-        };
-
-        const scanAssets = async (dir: string) => {
-             const entries = await fs.readdir(dir, { withFileTypes: true });
-             for (const entry of entries) {
-                 const fullPath = path.join(dir, entry.name);
-                 if (entry.isDirectory()) {
-                     if (entry.name === 'imported') continue; // Skip imported cache if serves that purpose
-                     await scanAssets(fullPath);
-                 } else {
-                     // Start relative from project root (assets/...)
-                     // fullPath is C:/.../assets/foo.png
-                     // We want assets/foo.png
-                     // assetsPath is C:/.../assets
-                     // relative from assetsPath -> foo.png. 
-                     // relative from folderPath -> assets/foo.png
-                     const relPath = path.relative(folderPath, fullPath).replace(/\\/g, '/');
-                     const ext = path.extname(entry.name);
-                     
-                     scannedResources.push({
-                         guid: crypto.randomUUID(),
-                         path: relPath,
-                         type: getAssetType(ext),
-                         meta: {}
-                     });
-                 }
-             }
-        };
-
-        try {
-            await scanAssets(assetsPath);
-            console.log(`[Main] Scanned ${scannedResources.length} default assets.`);
-        } catch(e) {
-            console.error('[Main] Asset scan failed:', e);
-        }
-        
-        // Update the project config with resources
-        projectConfig.resources = scannedResources;
-        
-        // Rewrite the project.json with the populated resources
-        await fs.writeFile(
-            path.join(folderPath, 'project.json'), 
-            JSON.stringify(projectConfig, null, 4)
-        );
-        // ----------------------------------------------------
-        
+        console.log(`[Main] Project Directory Verified/Created at: ${folderPath}`);
         return { success: true };
     } catch (e: any) {
+        console.error('[Main] project:create failed', e);
         return { success: false, error: e.message };
     }
 });
@@ -346,14 +185,16 @@ ipcMain.handle('fs:readdir', async (_event, dirPath: string) => {
     }
 });
 
-    ipcMain.handle('fs:writeFile', async (_event, filePath: string, content: string) => {
+    ipcMain.handle('fs:writeFile', async (_event, filePath: string, content: string | Uint8Array) => {
     const fs = await import('fs/promises');
     try {
         // Ensure directory exists
         const dir = path.dirname(filePath);
         await fs.mkdir(dir, { recursive: true });
         
-        await fs.writeFile(filePath, content, 'utf-8');
+        // If content is Uint8Array (from Renderer), fs.writeFile handles it directly as Buffer.
+        // If string, it defaults to utf-8.
+        await fs.writeFile(filePath, content);
         return true;
     } catch (e: any) {
         throw new Error(e.message);

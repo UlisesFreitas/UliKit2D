@@ -138,106 +138,12 @@ export class WebFileSystem implements IFileSystem {
                 // Doesn't exist, proceed
             }
 
+            // ONLY Create the Root Folder.
+            // The ProjectFactory will handle structure, assets, and validation.
             await fs.promises.mkdir(projectPath, { recursive: true });
-            await fs.promises.mkdir(`${projectPath}/assets`, { recursive: true });
-            await fs.promises.mkdir(`${projectPath}/assets/scenes`, { recursive: true });
-            await fs.promises.mkdir(`${projectPath}/assets/imported`, { recursive: true });
-
-            // 2. Load Default Assets
-            // Use recursive glob to capture subfolders (e.g. player/)
-            const defaultAssets = import.meta.glob('../resources/default_assets/**/*.*', { query: '?url', import: 'default', eager: true });
             
-            console.log('[WebFileSystem] Default Assets Object:', defaultAssets);
-
-            for (const [key, url] of Object.entries(defaultAssets)) {
-                // Key is like "../resources/default_assets/player/sprite.png"
-                // Extract relative part: "player/sprite.png"
-                const relativePath = key.replace(/^\.\.\/resources\/default_assets\//, '');
-                
-                if (!relativePath) continue;
-                
-                console.log(`[WebFileSystem] Processing asset: ${relativePath} -> ${url}`);
-
-                try {
-                    const response = await fetch(url as string);
-                    if (!response.ok) throw new Error(`Fetch failed ${response.status}`);
-                    const blob = await response.blob();
-                    const buffer = await blob.arrayBuffer();
-                    
-                    // Determine dest path inside project
-                    const destPath = `${projectPath}/assets/${relativePath}`;
-                    
-                    // Ensure directory exists
-                    const parts = relativePath.split('/');
-                    parts.pop(); // Remove filename
-                    if (parts.length > 0) {
-                        const subDir = parts.join('/');
-                        await fs.promises.mkdir(`${projectPath}/assets/${subDir}`, { recursive: true });
-                    }
-
-                    await fs.promises.writeFile(destPath, new Uint8Array(buffer));
-                    console.log(`[WebFileSystem] Wrote ${relativePath} to assets`);
-                } catch (e) {
-                    console.error(`[WebFileSystem] Failed to load asset ${relativePath}`, e);
-                }
-            }
-
-            // 3. Create Initial Scene (Parity with Electron main.ts)
-            // Ensure directory exists (redundant safety check)
-            try {
-                await fs.promises.mkdir(`${projectPath}/assets/scenes`, { recursive: true });
-            } catch (ignore) {}
-
-            const defaultScene = [
-                {
-                    "id": "main-camera-id",
-                    "name": "Main Camera",
-                    "transform": { "x": 0, "y": 0, "rotation": 0, "scale": { "x": 1, "y": 1 } },
-                    "camera": { "zoom": 1, "isPrimary": true, "backgroundColor": "#333333" }
-                }
-            ];
-            
-            await fs.promises.writeFile(
-                `${projectPath}/assets/scenes/NewScene.json`, 
-                JSON.stringify(defaultScene, null, 2)
-            );
-
-            // 4. Create project.json
-            const projectJson = JSON.stringify({
-                name: path,
-                version: '1.0.0',
-                created: Date.now(),
-                lastModified: Date.now(),
-                settings: {
-                     layers: [
-                        'Base Layer',  // 0: Immortal/Bottom
-                        'Ground',      // 1
-                        'Objects',     // 2
-                        '', '', '', '', '', '', '', // 3-9
-                        'Player',      // 10
-                        '', '', '', '', '', '', '', '', '', // 11-19
-                        '', '', '', '', '', '', '', '', '', '', // 20-29
-                        'Particles',   // 30
-                        'UI'           // 31: Top Most
-                     ],
-                     physics: { gravity: { x: 0, y: 9.8 } }
-                },
-                scenes: [
-                    {
-                        name: 'NewScene',
-                        path: 'assets/scenes/NewScene.json',
-                        id: 'default-scene-id',
-                        updated: Date.now()
-                    }
-                ],
-                resources: []
-            }, null, 4);
-            
-            await fs.promises.writeFile(`${projectPath}/project.json`, projectJson);
-            
-            // Verification
-            const verifyFiles = await fs.promises.readdir(`${projectPath}/assets`);
-            console.log(`[WebFileSystem] Verification - Files in assets:`, verifyFiles);
+            console.log('[WebFileSystem] Project Directory created via ZenFS at', projectPath);
+            return { success: true };
             
             console.log('[WebFileSystem] Project created via ZenFS at', projectPath);
             return { success: true };
@@ -392,8 +298,7 @@ export class WebFileSystem implements IFileSystem {
         }
         
         try {
-            const normalize = (p: string) => p.replace(/\\/g, '/').replace(/\/+/g, '/');
-            const cleanPath = normalize(path).replace(/^\//, '');
+            const cleanPath = this._normalizePath(path);
             const fullPath = `/${this.currentProject}/${cleanPath}`;
 
             console.log(`[WebFileSystem] Creating folder at full path: '${fullPath}'`);

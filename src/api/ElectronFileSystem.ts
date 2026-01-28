@@ -127,10 +127,13 @@ export class ElectronFileSystem implements IFileSystem {
 
     async writeFile(path: string, content: string | Blob | Uint8Array): Promise<boolean> {
         if (content instanceof Blob) {
-            const text = await content.text();
-            return await this.electronAPI.writeFile(this.resolvePath(path), text);
+             // For standard text Blobs, or convert to buffer if binary?
+             // Assuming ProjectFactory handles binary-to-buffer conversion now.
+             // If we get a blob here, it might be safer to convert to ArrayBuffer then Uint8Array
+             const buf = await content.arrayBuffer();
+             return await this.electronAPI.writeFile(this.resolvePath(path), new Uint8Array(buf));
         }
-        return await this.electronAPI.writeFile(this.resolvePath(path), content as string);
+        return await this.electronAPI.writeFile(this.resolvePath(path), content);
     }
 
     async deleteFile(path: string): Promise<boolean> {

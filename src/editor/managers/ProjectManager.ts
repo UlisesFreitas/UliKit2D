@@ -50,93 +50,67 @@ export class ProjectManager {
             if (result.success) {
                  projectState.currentProjectPath = pathOrHandle;
                  
+                 let projectPathString = '';
                  if (typeof pathOrHandle === 'string') {
+                    projectPathString = pathOrHandle;
                     projectState.projectName = pathOrHandle.replace(/[\\/]$/, '').split(/[/\\]/).pop() || 'New Project';
                  } else {
+                    // Fallback for Handles? Assuming string for now based on current FS implementations
                     projectState.projectName = (pathOrHandle as FileSystemDirectoryHandle).name;
+                    projectPathString = projectState.projectName; 
                  }
 
-                 // 1. Load Initial Manifest (Created by Main Process / WebFileSystem)
+                 // [NEW] Use ProjectFactory to populate the empty folder
+                 const { ProjectFactory } = await import('./ProjectFactory');
+                 console.log(`[ProjectManager] Delegating initialization to ProjectFactory for path: ${projectPathString}`);
+                 
+                 const initialized = await ProjectFactory.initializeNewProject(projectPathString, projectState.projectName);
+                 
+                 if (!initialized) {
+                     throw new Error('ProjectFactory failed to initialize project structure.');
+                 }
+
+                 // -------------------------------------------------------------------------
+                 // Project Created & Verified on Disk. Now Open it in Editor Memory.
+                 // -------------------------------------------------------------------------
+
+                 // 1. Load Manifest (Should exist now)
                  const { ProjectManifestManager } = await import('./ProjectManifestManager');
-                 
-                 // Try to load the manifest that main.ts just wrote (populated with default assets)
-                 let loaded = await ProjectManifestManager.loadProject('project.json');
+                 const loaded = await ProjectManifestManager.loadProject('project.json');
                  
                  if (!loaded) {
-                     console.error('[ProjectManager] CRITICAL: project.json missing after creation. Forcing recreation.');
-                     
-                     // FORCE CREATE
-                     ProjectManifestManager.createDefault(projectState.projectName);
-                     await ProjectManifestManager.saveProject('project.json');
-                     
-                     // Verify again
-                     loaded = await ProjectManifestManager.loadProject('project.json');
-                     if (!loaded) {
-                         throw new Error('Failed to create and persist project.json. File system may be broken.');
-                     }
-                 } else {
-                     console.log('[ProjectManager] project.json verified successfully.');
+                     throw new Error('Critical: Project created but project.json cannot be read.');
                  }
 
-                 // 2. Hydrate DB (Already handled by loadProject, but ensuring)
-                 // Note: loadProject calls AssetDatabase.instance.hydrate(data.resources)
+                 // 2. Hydrate Asset Database
+                 // 2. Hydrate Asset Database
+                 // Already handled by loadProject
                  
-                 // If we had to create default, we need to hydrate empty
-                 if (!loaded) {
-                      const { AssetDatabase } = await import('./AssetDatabase');
-                      AssetDatabase.instance.hydrate([]);
-                 }
-
-                 // 3. Hydrate DB (Handled above by loadProject)
-                 // const { AssetDatabase } = await import('./AssetDatabase');
-                 // AssetDatabase.instance.hydrate([]);
-                 
-
-
-                 // 4. Notify AssetStore
+                 // 3. Notify AssetStore
                  // @ts-ignore
                  await useAssetStore().refreshFromDatabase();
                  
-                 // 5. Initialize Watcher
+                 // 4. Initialize Watcher
                  await this.initProjectWatcher(fs, projectState.currentProjectPath as any);
 
                  const _pEnd = performance.now();
                  console.log(`%c ⏱️ CREATION COMPLETE: ${(_pEnd - _pStart).toFixed(2)}ms `, 'background: #bada55; color: #222; font-size: 20px;');
-                 console.log('Project Created:', projectState.projectName);
-
+                 
                  this.addToRecents(projectState.projectName, typeof pathOrHandle === 'string' ? pathOrHandle : undefined);
 
-                 // Load Initial Scene
-                 try {
-                     const { SceneManager } = await import('../../engine/managers/SceneManager');
-                     
-                     // Check if manifest has scenes (e.g. created by Electron main.ts)
-                     const manifest = ProjectManifestManager.manifest;
-                     let sceneLoaded = false;
-                     
-                     if (manifest && manifest.scenes && manifest.scenes.length > 0) {
-                         // Load the first scene
-                         const firstScene = manifest.scenes[0];
-                         if (firstScene) {
-                             console.log('[ProjectManager] Attempting to load initial scene:', firstScene.path);
-                             sceneLoaded = await SceneManager.loadSceneByPath(firstScene.path);
-                             if (!sceneLoaded) {
-                                 console.error('[ProjectManager] Failed to load initial scene. Path:', firstScene.path);
-                             } else {
-                                 console.log('[ProjectManager] Initial scene loaded successfully:', firstScene.name);
-                             }
-                         }
-                     }
-                     
-                     if (!sceneLoaded) {
-                         console.warn('[ProjectManager] No valid initial scene loaded. Creating default "Untitled Scene".');
-                         SceneManager.createDefaultScene();
-                     }
-                 } catch (e) {
-                     console.error('[ProjectManager] Error initializing SceneManager:', e);
+                 // 5. Load Initial Scene (Generated by Factory)
+                 const { SceneManager } = await import('../../engine/managers/SceneManager');
+                 const manifest = ProjectManifestManager.manifest;
+                 
+                 if (manifest && manifest.scenes && manifest.scenes.length > 0) {
+                     const firstScene = manifest.scenes[0];
+                     if (firstScene) await SceneManager.loadSceneByPath(firstScene.path);
+                 } else {
+                     console.warn('Factory created project but no scenes found in manifest?');
+                     SceneManager.createDefaultScene();
                  }
                  
-                 // 5. Force View to 'assets'
+                 // 6. Force View to 'assets'
                  // @ts-ignore
                  useAssetStore().changeDirectory('assets');
                  
