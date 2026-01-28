@@ -98,7 +98,7 @@
     {
       "id": "8",
       "name": "Asset Pipeline 2.0",
-      "status": "pending",
+      "status": "completed",
       "description": "High-Performance Manifest-Based Asset System (GDevelop Architecture).",
       "tasks": [
         "Design `project.json` Structure (Settings + Resources + Scenes)",
@@ -115,7 +115,7 @@
     {
       "id": "9",
       "name": "Inspector Overhaul (Live Mode)",
-      "status": "pending",
+      "status": "in-progress",
       "description": "Make the editor feel alive and reactive.",
       "tasks": [
         "Implement 'Live Mode' for Inspectors (Poll values if Game Running)",
@@ -126,11 +126,32 @@
     },
     {
       "id": "10",
+      "name": "Advanced Scripting System (Scripting 2.0)",
+      "status": "pending",
+      "tasks": [
+        "Implement AST-based Script Parsing (acorn/typescript)",
+        "Strict Script Lifecycle (onEnable, onDisable, onDestroy)",
+        "Support for TypeScript Scripts & Compilation",
+        "Script Properties Decorators or Metadata"
+      ]
+    },
+    {
+      "id": "11",
+      "name": "Visual Scripting System (Event Sheets)",
+      "status": "pending",
+      "tasks": [
+        "Design Event Block Data Structure (JSON)",
+        "Create Visual Block Editor (Drag & Drop)",
+        "Implement 'Block to JS' Transpiler",
+        "Integrate Event Sheets as 'Script Components'"
+      ]
+    },
+    {
+      "id": "12",
       "name": "Advanced Features",
       "status": "pending",
       "tasks": [
         "Tilemap Chunking & Optimization",
-        "Visual Scripting (Event Sheets)",
         "Prefabs / Templates System",
         "Build/Export System (Electron Builder)"
       ]
