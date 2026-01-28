@@ -277,15 +277,29 @@ export class WebFileSystem implements IFileSystem {
     private _normalizePath(path: string): string {
         if (!this.currentProject) return path;
         
-        // Handle windows style
+        // 1. Unify separators
         let clean = path.replace(/\\/g, '/');
         
-        if (clean.startsWith(`${this.currentProject}/`)) {
-            return clean.substring(this.currentProject.length + 1);
+        // 2. Ensure leading slash for consistent comparison
+        if (!clean.startsWith('/')) clean = '/' + clean;
+        
+        const projectPrefix = this.currentProject.startsWith('/') ? this.currentProject : '/' + this.currentProject;
+
+        // 3. Check if it starts with project prefix
+        if (clean.startsWith(projectPrefix)) {
+            let res = clean.substring(projectPrefix.length);
+            // If result starts with slash, remove it for relative path
+            if (res.startsWith('/')) res = res.substring(1);
+            return res;
         }
-        if (clean === this.currentProject) {
-            return '';
-        }
+
+        // 4. Fallback: If path didn't contain project prefix but was meant to be relative? 
+        // e.g. path="assets/foo.png" -> clean="/assets/foo.png". current="/MyProj".
+        // It doesn't start with /MyProj. So we assume it IS the relative path?
+        // But the previous bug was adding the project name when it was already there.
+        // If we are here, 'clean' is likely just "/assets/foo.png" and we want "assets/foo.png"
+        
+        if (clean.startsWith('/')) return clean.substring(1);
         return clean;
     }
 
