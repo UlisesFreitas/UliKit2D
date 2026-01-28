@@ -22,16 +22,9 @@ export class WebFileSystem implements IFileSystem {
                 return;
             }
 
-            // check if already accessible (HMR case)
-            try {
-                await fs.promises.stat('/');
-                console.log('[WebFileSystem] OPFS Root already accessible (HMR). Skipping configure.');
-                this.initialized = true;
-                return;
-            } catch (ignore) {
-                // Not ready, proceed to configure
-            }
-
+            // check if already accessible (HMR case) REMOVED
+            // We MUST attempt configure to ensure Proper Backend (WebAccess), otherwise we might be writing to InMemory default.
+            
             const rootHandle = await navigator.storage.getDirectory();
             
             await configure({
@@ -42,7 +35,11 @@ export class WebFileSystem implements IFileSystem {
             this.initialized = true;
             console.log('[WebFileSystem] ZenFS initialized with WebAccess (OPFS) backend');
         } catch (e: any) {
-            console.warn('[WebFileSystem] Initialization warning:', e);
+            if (e.message && e.message.includes('already in use')) {
+                console.log('[WebFileSystem] OPFS backend already configured (HMR/Reload).');
+            } else {
+                console.warn('[WebFileSystem] Initialization warning:', e);
+            }
             
             // Final check: did it work?
             try {
@@ -115,7 +112,13 @@ export class WebFileSystem implements IFileSystem {
                 throw new Error('Path exists but is not a directory');
             }
         } catch (e) {
-            console.warn(`[WebFileSystem] Project not found: ${path}`);
+            console.warn(`[WebFileSystem] Project not found: ${projectPath}`);
+            try {
+                const rootDirs = await fs.promises.readdir('/');
+                console.log('[WebFileSystem] Debug - Available items in root:', rootDirs);
+            } catch (err) {
+                console.error('[WebFileSystem] Failed to list root:', err);
+            }
             throw new Error(`Project "${path}" not found in storage.`);
         }
 

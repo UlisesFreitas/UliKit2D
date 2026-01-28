@@ -1,19 +1,34 @@
 <script setup lang="ts">
-import { ref, onMounted, nextTick, onUnmounted } from 'vue';
+import { ref, nextTick, computed, onMounted, onUnmounted } from 'vue';
 import { getFileSystem } from '../../api/FileSystem';
 import { SceneManager } from '../../engine/managers/SceneManager';
 import { ProjectManager } from '../managers/ProjectManager';
 import { useUIStore } from '../../stores/useUIStore';
+import { useProjectStore } from '../../stores/useProjectStore';
+import { eventBus } from '../../engine/core/EventBus';
 
 const fs = getFileSystem();
 const ui = useUIStore();
+const projectStore = useProjectStore();
 
-interface SceneFile {
-    name: string;
-    path: string;
-}
+// Use Store as Source of Truth
+const scenes = computed(() => projectStore.scenes);
 
-const scenes = ref<SceneFile[]>([]);
+// Reactive Active Scene Tracker
+const activeSceneName = ref(SceneManager.activeSceneName);
+
+const updateActiveScene = (name: string) => {
+    activeSceneName.value = name;
+};
+
+onMounted(() => {
+    eventBus.on('scene-loaded', updateActiveScene);
+});
+
+onUnmounted(() => {
+    eventBus.off('scene-loaded', updateActiveScene);
+});
+
 const isLoading = ref(false);
 const isCreating = ref(false);
 const newSceneName = ref('');
@@ -30,38 +45,14 @@ const menuState = ref({
     visible: false,
     x: 0,
     y: 0,
-    scene: null as SceneFile | null
+    scene: null as any
 });
 
-const loadScenes = async () => {
-    isLoading.value = true;
-    scenes.value = [];
-    
-    try {
-        const files = await fs.readdir('assets/scenes');
-        scenes.value = files
-            .filter(f => f.name.endsWith('.json'))
-            .map(f => ({
-                name: f.name.replace('.json', ''),
-                path: f.path
-            }));
-    } catch (e: any) {
-        if (e.message && e.message.includes('ENOENT')) {
-             console.warn('Scenes directory not found, will be created on save.');
-        } else {
-            console.error('Failed to list scenes:', e);
-            ui.showToast({ title: 'Error', description: 'Failed to list scenes.', type: 'error' });
-        }
-    } finally {
-        isLoading.value = false;
-    }
-};
-
-const onSelectScene = (scene: SceneFile) => {
+const onSelectScene = (scene: any) => {
     selectedPath.value = scene.path;
 };
 
-const onOpenScene = async (scene: SceneFile) => {
+const onOpenScene = async (scene: any) => {
     if (await ui.confirm({ title: 'Load Scene', message: `Load scene "${scene.name}"? Unsaved changes will be lost.` })) {
         const success = await SceneManager.loadSceneFromFile(scene.path);
         if (success) {
@@ -71,7 +62,7 @@ const onOpenScene = async (scene: SceneFile) => {
     }
 };
 
-const showContextMenu = (e: MouseEvent, scene: SceneFile) => {
+const showContextMenu = (e: MouseEvent, scene: any) => {
     selectedPath.value = scene.path; // Auto select on right click
     menuState.value = {
         visible: true,
@@ -90,7 +81,7 @@ const showContextMenu = (e: MouseEvent, scene: SceneFile) => {
     }, 0);
 };
 
-const startRename = (scene: SceneFile) => {
+const startRename = (scene: any) => {
     renamingPath.value = scene.path;
     renameValue.value = scene.name;
     menuState.value.visible = false;
@@ -125,21 +116,28 @@ const confirmRename = async () => {
     }
 
     try {
-        // Read -> Write -> Delete (Simulate Rename)
+        // 1. Rename File on Disk
         const content = await fs.readFile(oldPath);
         const newPath = `assets/scenes/${newName}.json`;
         
         await fs.writeFile(newPath, content);
-        await fs.deleteFile(oldPath); // Only delete if write success
+        await fs.deleteFile(oldPath); 
         
-        // Update Active Scene if needed
-        if (SceneManager.activeSceneName === scene.name) {
+        // 2. Capture State BEFORE Mutation
+        const wasActive = SceneManager.activeSceneName === scene.name;
+
+        // 3. Update Manifest (This mutates scene.name via Store Reactivity)
+        await projectStore.renameScene(oldPath, newName, newPath);
+
+        // 4. Update Active Scene Runtime
+        if (wasActive) {
             SceneManager.activeSceneName = newName;
         }
 
+        await ProjectManager.saveProject(); // Persist manifest AND Save Active Scene (now with new name)
+
         ui.showToast({ title: 'Renamed', description: `Renamed to ${newName}`, type: 'success' });
         cancelRename();
-        await loadScenes();
         selectedPath.value = newPath; // Maintain selection
     } catch (e: any) {
         ui.showToast({ title: 'Error', description: 'Rename failed: ' + e.message, type: 'error' });
@@ -158,16 +156,21 @@ const onDeleteScene = async () => {
         isDanger: true
     })) {
         try {
-            const success = await fs.deleteFile(scene.path);
-            if (success) {
-                if (scene.name === SceneManager.activeSceneName) {
-                    SceneManager.createDefaultScene();
-                }
-                await loadScenes();
-                ui.showToast({ title: 'Deleted', description: `Scene ${scene.name} deleted.`, type: 'success' });
-            } else {
-                ui.showToast({ title: 'Error', description: 'Failed to delete scene.', type: 'error' });
+            // 1. Delete File
+            await fs.deleteFile(scene.path);
+            
+            // 2. Update Manifest
+            await projectStore.removeScene(scene.path);
+            await ProjectManager.saveProject();
+
+            // 3. Handle Runtime
+            if (scene.name === SceneManager.activeSceneName) {
+                SceneManager.createDefaultScene();
+                // We should probably save "NewScene" immediately or leave it as transient until user saves?
+                // For now, let's leave it transient.
             }
+            
+            ui.showToast({ title: 'Deleted', description: `Scene ${scene.name} deleted.`, type: 'success' });
         } catch (e: any) {
              ui.showToast({ title: 'Error', description: 'Error deleting scene: ' + e.message, type: 'error' });
         }
@@ -185,15 +188,19 @@ const onDuplicateScene = async () => {
         const newPath = `assets/scenes/${newName}.json`;
         
         await fs.writeFile(newPath, content);
+        
+        // Add to Manifest
+        await projectStore.addScene(newName, newPath);
+        await ProjectManager.saveProject();
+
         ui.showToast({ title: 'Duplicated', description: `Scene duplicated as ${newName}`, type: 'success' });
-        await loadScenes();
     } catch (e: any) {
         ui.showToast({ title: 'Error', description: 'Failed to duplicate scene: ' + e.message, type: 'error' });
     }
     menuState.value.visible = false;
 };
 
-const onDeleteSceneDirect = async (scene: SceneFile) => {
+const onDeleteSceneDirect = async (scene: any) => {
     menuState.value.scene = scene;
     await onDeleteScene();
 };
@@ -214,50 +221,69 @@ const cancelCreate = () => {
 
 const confirmCreate = async () => {
     if (!newSceneName.value) return;
+    
+    // Check collision in MANIFEST
     const exists = scenes.value.some(s => s.name === newSceneName.value);
     if (exists) {
-        if (!await ui.confirm({ title: 'Scene Exists', message: `Scene "${newSceneName.value}" already exists. Overwrite?`, confirmText: 'Overwrite' })) {
+        if (!await ui.confirm({ title: 'Scene Exists', message: `Scene "${newSceneName.value}" already exists.`, confirmText: 'OK', isDanger: false })) {
             return;
         }
+        return; // Don't overwrite for now, just block
     }
     
     isLoading.value = true;
     try {
         // 1. Setup new "empty" scene in memory
         SceneManager.createDefaultScene(); 
-        SceneManager.activeSceneName = newSceneName.value; // Update name match file
+        SceneManager.activeSceneName = newSceneName.value; 
         
         // 2. Save it to disk as the new file
+        const newPath = `assets/scenes/${newSceneName.value}.json`;
+        // SceneManager.saveSceneToFile writes the file, but DOES NOT update manifest automatically yet?
+        // Let's assume we do it manually here for now to be safe.
+        // Or better: write blank template?
+        // If we use SceneManager.saveSceneToFile, it performs serialization.
+        
+        // Let's just create a basic template file manually like ProjectFactory does?
+        // Or just let ProjectManager.saveProject() handle it if we are conceptually "saving the project"?
+        
+        // The safest "Create New Scene" flow:
+        // A. Create default JSON content.
+        // B. Write to disk.
+        // C. Add to Manifest.
+        // D. Save Manifest.
+        // E. Load it into SceneManager.
+
+        const defaultScene = [{
+            id: crypto.randomUUID(),
+            name: "Main Camera",
+            transform: { x: 0, y: 0, rotation: 0, scale: { x: 1, y: 1 } },
+            camera: { zoom: 1, isPrimary: true, backgroundColor: "#333333" }
+        }];
+        
+        await fs.writeFile(newPath, JSON.stringify(defaultScene, null, 2));
+        
+        // Add to Store
+        await projectStore.addScene(newSceneName.value, newPath);
         await ProjectManager.saveProject();
         
-        // 3. Update UI
+        // Load it
+        await SceneManager.loadSceneFromFile(newPath);
+
         isCreating.value = false;
-        await loadScenes();
         
-        // 4. Important: Select/Load this new scene properly to ensure everything is matched
-        // Although createDefaultScene cleared world, we want to ensure we "are" on this file path.
-        const newPath = `assets/scenes/${newSceneName.value}.json`;
         selectedPath.value = newPath;
-        
         ui.showToast({ title: 'Created', description: `Scene ${newSceneName.value} created.`, type: 'success' });
-    } catch (e) {
-        ui.showToast({ title: 'Error', description: 'Failed to create scene: ' + e, type: 'error' });
+    } catch (e: any) {
+        ui.showToast({ title: 'Error', description: 'Failed to create scene: ' + e.message, type: 'error' });
     } finally {
         isLoading.value = false;
     }
 };
 
 const onRefresh = () => {
-    loadScenes();
+    projectStore.sync(); // Sync from memory/disk if needed
 };
-
-onMounted(() => {
-    loadScenes();
-});
-
-onUnmounted(() => {
-    // Clean up
-});
 </script>
 
 <template>
@@ -319,9 +345,9 @@ onUnmounted(() => {
                 />
                 
                 <!-- Scene Name -->
-                <div v-else class="flex-1 truncate select-none" :class="{ 'font-bold': scene.name === SceneManager.activeSceneName }">
+                <div v-else class="flex-1 truncate select-none" :class="{ 'font-bold': scene.name === activeSceneName }">
                     {{ scene.name }}
-                    <span v-if="scene.name === SceneManager.activeSceneName" class="text-[9px] ml-2 text-accent uppercase tracking-widest opacity-50">(Active)</span>
+                    <span v-if="scene.name === activeSceneName" class="text-[9px] ml-2 text-accent uppercase tracking-widest opacity-50">(Active)</span>
                 </div>
                 
                 <!-- Direct Delete Button (X) -->

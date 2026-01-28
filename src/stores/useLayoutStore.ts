@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia';
 import { ref } from 'vue';
 import { useProjectSettingsStore } from './useProjectSettingsStore';
-import { ProjectSettingsManager } from '../editor/managers/ProjectSettingsManager';
+// import { ProjectSettingsManager } from '../editor/managers/ProjectSettingsManager'; // Removed
 
 const LAYOUT_KEY = 'editor-layout-v16';
 const LAYOUT_KEY_CUSTOM = 'editor-layout-custom';
@@ -60,8 +60,9 @@ export const useLayoutStore = defineStore('layout', () => {
         
         projectStore.settings.layouts[name] = json;
         
-        // Persist immediately
-        await ProjectSettingsManager.saveSettings();
+        // Persist via ProjectManager (Manifest)
+        const { ProjectManager } = await import('../editor/managers/ProjectManager');
+        await ProjectManager.saveProject();
     };
 
     const restoreNamedLayout = (name: string) => {
@@ -83,7 +84,8 @@ export const useLayoutStore = defineStore('layout', () => {
         const projectStore = useProjectSettingsStore();
         if (projectStore.settings.layouts && projectStore.settings.layouts[name]) {
             delete projectStore.settings.layouts[name];
-            await ProjectSettingsManager.saveSettings();
+            const { ProjectManager } = await import('../editor/managers/ProjectManager');
+            await ProjectManager.saveProject();
         }
     };
 

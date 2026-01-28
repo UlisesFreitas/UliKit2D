@@ -91,4 +91,39 @@ export class ProjectManifestManager {
             return false;
         }
     }
+    static addScene(name: string, path: string) {
+        if (!this._manifest) return;
+        // Avoid duplicates
+        if (this._manifest.scenes.some(s => s.path === path || s.name === name)) {
+            console.warn(`[ProjectManifest] Scene ${name} (${path}) already exists.`);
+            return;
+        }
+        this._manifest.scenes.push({
+            name,
+            path,
+            id: crypto.randomUUID(),
+            updated: Date.now()
+        });
+        this._manifest.lastModified = Date.now();
+    }
+
+    static removeScene(path: string) {
+        if (!this._manifest) return;
+        const index = this._manifest.scenes.findIndex(s => s.path === path);
+        if (index !== -1) {
+            this._manifest.scenes.splice(index, 1);
+            this._manifest.lastModified = Date.now();
+        }
+    }
+
+    static renameScene(oldPath: string, newName: string, newPath: string) {
+        if (!this._manifest) return;
+        const scene = this._manifest.scenes.find(s => s.path === oldPath);
+        if (scene) {
+            scene.name = newName;
+            scene.path = newPath;
+            scene.updated = Date.now();
+            this._manifest.lastModified = Date.now();
+        }
+    }
 }

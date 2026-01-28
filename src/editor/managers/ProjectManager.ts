@@ -78,6 +78,10 @@ export class ProjectManager {
                  const { ProjectManifestManager } = await import('./ProjectManifestManager');
                  const loaded = await ProjectManifestManager.loadProject('project.json');
                  
+                 // [NEW] Sync Reactive Store
+                 const { useProjectStore } = await import('../../stores/useProjectStore');
+                 useProjectStore().sync();
+
                  if (!loaded) {
                      throw new Error('Critical: Project created but project.json cannot be read.');
                  }

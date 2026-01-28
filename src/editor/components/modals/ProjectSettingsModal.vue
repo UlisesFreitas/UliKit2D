@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref } from 'vue';
 import { useProjectSettingsStore } from '../../../stores/useProjectSettingsStore';
-import { ProjectSettingsManager } from '../../managers/ProjectSettingsManager';
+// import { ProjectSettingsManager } from '../../managers/ProjectSettingsManager'; // Removed
 import {
   DialogRoot,
   DialogPortal,
@@ -34,8 +34,10 @@ const onClose = () => {
 };
 
 const onSave = async () => {
-    // Save to Disk
-    await ProjectSettingsManager.saveSettings();
+    // Save to Disk via Manifest (ProjectManager)
+    const { ProjectManager } = await import('../../managers/ProjectManager');
+    await ProjectManager.saveProject();
+
     ui.showToast({ title: 'Settings Saved', description: 'Project configuration updated.', type: 'success' });
     store.applySettings();
     emit('update:open', false);
