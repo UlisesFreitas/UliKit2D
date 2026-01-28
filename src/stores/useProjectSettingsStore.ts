@@ -86,15 +86,15 @@ const DEFAULT_SETTINGS: IProjectSettings = {
     },
     tags: ['Player', 'Enemy', 'Ground'],
     layers: [
-        'Default', 
-        'TransparentFX', 
-        'Ignore Raycast', 
-        '', '', 
-        'UI', 
-        '', '', 
-        'Player', 
-        'Background'
-        // Slots 10-31 empty available
+        'Base Layer',  // 0: Immortal/Bottom
+        'Ground',      // 1
+        'Objects',     // 2
+        '', '', '', '', '', '', '', // 3-9
+        'Player',      // 10
+        '', '', '', '', '', '', '', '', '', // 11-19
+        '', '', '', '', '', '', '', '', '', '', // 20-29
+        'Particles',   // 30
+        'UI'           // 31: Top Most
     ],
     layouts: {},
     editor: {

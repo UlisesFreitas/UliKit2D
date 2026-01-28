@@ -56,16 +56,26 @@ export class ProjectManager {
                     projectState.projectName = (pathOrHandle as FileSystemDirectoryHandle).name;
                  }
 
-                 // 1. Load Initial Manifest (Created by Main Process)
+                 // 1. Load Initial Manifest (Created by Main Process / WebFileSystem)
                  const { ProjectManifestManager } = await import('./ProjectManifestManager');
                  
                  // Try to load the manifest that main.ts just wrote (populated with default assets)
-                 const loaded = await ProjectManifestManager.loadProject('project.json');
+                 let loaded = await ProjectManifestManager.loadProject('project.json');
                  
                  if (!loaded) {
-                     console.warn('[ProjectManager] project.json missing after creation? Fallback to default.');
+                     console.error('[ProjectManager] CRITICAL: project.json missing after creation. Forcing recreation.');
+                     
+                     // FORCE CREATE
                      ProjectManifestManager.createDefault(projectState.projectName);
                      await ProjectManifestManager.saveProject('project.json');
+                     
+                     // Verify again
+                     loaded = await ProjectManifestManager.loadProject('project.json');
+                     if (!loaded) {
+                         throw new Error('Failed to create and persist project.json. File system may be broken.');
+                     }
+                 } else {
+                     console.log('[ProjectManager] project.json verified successfully.');
                  }
 
                  // 2. Hydrate DB (Already handled by loadProject, but ensuring)
@@ -219,6 +229,21 @@ export class ProjectManager {
                 // 4. Initialize Watcher
                 await this.initProjectWatcher(fs, projectState.currentProjectPath as any);
 
+            } catch (e: any) {
+                console.error('[ProjectManager] Failed to open project:', e);
+                ui.showToast({ title: 'Open Failed', description: e.message || 'Unknown Error', type: 'error' });
+                
+                // If it was a pinned/recent path (string), remove it if it failed
+                if (typeof pathOrHandle === 'string') {
+                    const recents = this.getRecents().filter(r => r.path !== pathOrHandle && r.name !== pathOrHandle);
+                    localStorage.setItem('ulikit_recents', JSON.stringify(recents));
+                    alert(`Project "${pathOrHandle}" not found. Removed from Recents.`);
+                }
+                
+                // Reset State
+                projectState.currentProjectPath = null;
+                projectState.projectName = 'Untitled';
+                
             } finally {
                 // @ts-ignore
                 if (ui.setLoading) ui.setLoading(false);

@@ -314,27 +314,35 @@ const onDrop = (_e: DragEvent, dropIndex: number) => { // dropIndex is visual in
     if (fromIndex === null || fromIndex === dropIndex) return;
     
     // We are operating on the visual list (reversedLayers).
+    // Visual Order: [Top Layer, ..., Base Layer] (Base Layer is last)
     const visualOrder = [...reversedLayers.value];
-
-    // Check if we are trying to accidentally move Base Layer (visual last) or drop below it?
-    // Base Layer is last item in visualOrder.
     const baseVisualIndex = visualOrder.length - 1;
     
-    // Validate drag (should generally not happen if I hid the handle for Base Layer)
-    if (fromIndex === baseVisualIndex) return; // Can't move Base Layer
-
-    // Validate drop
-    if (dropIndex === baseVisualIndex || dropIndex >= visualOrder.length) {
-        // Handle logic handled by splicing below + fix
+    // 1. Prevent moving Base Layer (Handle hidden, but safety check)
+    if (fromIndex === baseVisualIndex) {
+        console.warn('Cannot move Base Layer');
+        return;
     }
+
+    // 2. Prevent dropping below Base Layer (Visual Index >= Last)
+    if (dropIndex >= baseVisualIndex) {
+        // Correct drop index to be explicitly 'above' Base Layer
+        dropIndex = baseVisualIndex - 1; 
+        if (dropIndex < 0) dropIndex = 0; // Sanity check
+    }
+
+    // 3. Prevent dropping ON Base Layer (Replace it? No.)
+    // Logic will insert AT dropIndex, shifting others.
+    // If dropIndex == baseVisualIndex, it would push Base Layer down (impossible if it's last)
+    // or push it up. We want Base Layer to stay LAST.
     
     const item = visualOrder.splice(fromIndex, 1)[0];
     if (!item) return;
     visualOrder.splice(dropIndex, 0, item);
     
-    // FIX: Ensure Base Layer is strictly LAST visually.
+    // 4. CRITICAL: Force Base Layer to be strictly LAST again just in case
     const currentBaseIndex = visualOrder.findIndex(l => l.id === 'Base Layer');
-    if (currentBaseIndex !== visualOrder.length - 1) {
+    if (currentBaseIndex !== -1 && currentBaseIndex !== visualOrder.length - 1) {
         const base = visualOrder.splice(currentBaseIndex, 1)[0];
         if (base) visualOrder.push(base);
     }
@@ -344,6 +352,17 @@ const onDrop = (_e: DragEvent, dropIndex: number) => { // dropIndex is visual in
     // Visual Order: [L2, L1, Base]
     // So Model = Visual.reverse()
     const newModelLayers = [...visualOrder].reverse();
+
+    // Double check Model Index 0 is Base Layer
+    if (newModelLayers[0]?.id !== 'Base Layer') {
+        console.warn('Integrity Check Failed: Base Layer not at index 0');
+         // Force fix
+         const baseIndex = newModelLayers.findIndex(l => l.id === 'Base Layer');
+         if (baseIndex > 0) {
+             const base = newModelLayers.splice(baseIndex, 1)[0];
+             if (base) newModelLayers.unshift(base);
+         }
+    }
 
     // Map to Names for Store
     const newLayerNames = newModelLayers.map(l => l.name);

@@ -15,9 +15,21 @@ export class WebFileSystem implements IFileSystem {
 
     private async init() {
         if (this.initialized) return;
+        
         try {
             if (!navigator.storage || !navigator.storage.getDirectory) {
-                throw new Error('OPFS is not supported in this browser');
+                console.error('[WebFileSystem] OPFS not supported');
+                return;
+            }
+
+            // check if already accessible (HMR case)
+            try {
+                await fs.promises.stat('/');
+                console.log('[WebFileSystem] OPFS Root already accessible (HMR). Skipping configure.');
+                this.initialized = true;
+                return;
+            } catch (ignore) {
+                // Not ready, proceed to configure
             }
 
             const rootHandle = await navigator.storage.getDirectory();
@@ -30,34 +42,16 @@ export class WebFileSystem implements IFileSystem {
             this.initialized = true;
             console.log('[WebFileSystem] ZenFS initialized with WebAccess (OPFS) backend');
         } catch (e: any) {
-             // ... existing error catch ...
-            if (e.message && e.message.includes('Mount point is already in use')) {
-                console.log('[WebFileSystem] ZenFS already configured (HMR re-init detected)');
+            console.warn('[WebFileSystem] Initialization warning:', e);
+            
+            // Final check: did it work?
+            try {
+                await fs.promises.stat('/');
+                console.log('[WebFileSystem] Verified: Root is accessible despite warning.');
                 this.initialized = true;
-            } else if (e.name === 'InvalidStateError' || (e.message && e.message.includes('InvalidStateError'))) {
-                 console.warn('[WebFileSystem] ZenFS state error. Verifying actual mount status...');
-                 
-                 try {
-                     // Check if it's actually working despite the error (False Positive?)
-                     await fs.promises.stat('/');
-                     console.log('[WebFileSystem] Verified: Root is accessible. Assuming operational.');
-                     this.initialized = true;
-                     return;
-                 } catch (statError) {
-                     console.error('[WebFileSystem] Verification failed: Root inaccessible.', statError);
-                 }
-
-                 console.error('[WebFileSystem] Critical State Error. Reloading to recover OPFS handle...');
-                 // Prevent infinite reload loop if possible?
-                 if (!window.location.search.includes('recovered=true')) {
-                     const url = new URL(window.location.href);
-                     url.searchParams.set('recovered', 'true');
-                     window.location.href = url.toString();
-                 } else {
-                     console.error('[WebFileSystem] Reload loop detected. Please manually refresh.');
-                 }
-            } else {
-                console.error('[WebFileSystem] ZenFS config error:', e);
+            } catch (statError) {
+                console.error('[WebFileSystem] Initialization FAILED. Please refresh manually.', statError);
+                // We do NOT auto-reload here to avoid loops.
             }
         }
     }
@@ -112,6 +106,19 @@ export class WebFileSystem implements IFileSystem {
 
     async openProject(path: string): Promise<void> {
         await this.ensureInit();
+
+        // Validate existence before setting context
+        const projectPath = `/${path}`;
+        try {
+            const stat = await fs.promises.stat(projectPath);
+            if (!stat.isDirectory()) {
+                throw new Error('Path exists but is not a directory');
+            }
+        } catch (e) {
+            console.warn(`[WebFileSystem] Project not found: ${path}`);
+            throw new Error(`Project "${path}" not found in storage.`);
+        }
+
         this.currentProject = path;
         console.log(`[WebFileSystem] Context set to project: ${path}`);
     }
@@ -202,7 +209,17 @@ export class WebFileSystem implements IFileSystem {
                 created: Date.now(),
                 lastModified: Date.now(),
                 settings: {
-                     layers: ['Background', 'Base Layer', 'Player', 'UI'],
+                     layers: [
+                        'Base Layer',  // 0: Immortal/Bottom
+                        'Ground',      // 1
+                        'Objects',     // 2
+                        '', '', '', '', '', '', '', // 3-9
+                        'Player',      // 10
+                        '', '', '', '', '', '', '', '', '', // 11-19
+                        '', '', '', '', '', '', '', '', '', '', // 20-29
+                        'Particles',   // 30
+                        'UI'           // 31: Top Most
+                     ],
                      physics: { gravity: { x: 0, y: 9.8 } }
                 },
                 scenes: [

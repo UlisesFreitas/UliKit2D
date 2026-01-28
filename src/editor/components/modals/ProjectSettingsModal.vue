@@ -418,14 +418,23 @@ const toggleCollision = (rowIdx: number, colIdx: number) => {
                                      <button @click="store.addLayer('NewLayer')" class="text-xs bg-bg-hover hover:bg-accent hover:text-white px-2 py-1 rounded transition">+</button>
                                 </div>
                                  <div class="flex flex-col gap-2">
-                                    <div v-for="(_layer, index) in store.settings.layers" :key="index" class="flex items-center bg-bg-panel border border-border rounded px-2 py-1 text-xs">
+                                     <div v-for="(_layer, index) in store.settings.layers" :key="index" class="flex items-center bg-bg-panel border border-border rounded px-2 py-1 text-xs">
                                         <span class="mr-2 text-text-disabled">{{ index }}:</span>
                                         <input 
                                             :value="store.settings.layers[index]" 
                                             @change="(e) => store.renameLayer(index, (e.target as HTMLInputElement).value)"
-                                            class="bg-transparent outline-none flex-1" 
+                                            class="bg-transparent outline-none flex-1"
+                                            :disabled="index === 0"
+                                            :class="{'text-text-disabled': index === 0}"
                                         />
-                                         <button @click="store.removeLayer(index)" class="ml-2 text-red-500 hover:text-red-400">×</button>
+                                         <button 
+                                            v-if="index !== 0"
+                                            @click="store.removeLayer(index)" 
+                                            class="ml-2 text-red-500 hover:text-red-400"
+                                        >
+                                            ×
+                                        </button>
+                                        <div v-else class="ml-2 w-3"></div> <!-- Spacer -->
                                     </div>
                                 </div>
                             </div>

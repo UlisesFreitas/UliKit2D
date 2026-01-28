@@ -151,7 +151,17 @@ ipcMain.handle('project:create', async (_event, folderPath: string) => {
             lastModified: Date.now(),
             settings: {
                  // Minimal defaults, Manager will handle rest
-                 layers: ['Background', 'Base Layer', 'Player', 'UI'],
+                 layers: [
+                    'Base Layer',  // 0: Immortal/Bottom
+                    'Ground',      // 1
+                    'Objects',     // 2
+                    '', '', '', '', '', '', '', // 3-9
+                    'Player',      // 10
+                    '', '', '', '', '', '', '', '', '', // 11-19
+                    '', '', '', '', '', '', '', '', '', '', // 20-29
+                    'Particles',   // 30
+                    'UI'           // 31: Top Most
+                 ],
                  physics: { gravity: { x: 0, y: 9.8 } }
             },
             scenes: [

@@ -115,7 +115,9 @@ onMounted(async () => {
         const pixiObserver = new ResizeObserver(() => {
             engine.resize();
         });
-        pixiObserver.observe(pixiRoot.value);
+        if (pixiRoot.value) {
+            pixiObserver.observe(pixiRoot.value);
+        }
     }
     
     // 2. Initialize Dockview (UI)
@@ -165,13 +167,7 @@ onMounted(async () => {
                             type: 'branch',
                             data: [
                                 { type: 'leaf', data: { views: ['scene'], id: 'group-scene' }, size: 600 },
-                                {
-                                    type: 'branch',
-                                    data: [
-                                        { type: 'leaf', data: { views: ['assets'], id: 'group-assets' }, size: 200 },
-                                    ],
-                                    size: 200
-                                }
+                                { type: 'leaf', data: { views: ['assets'], id: 'group-assets' }, size: 250 },
                             ],
                             size: 850
                         },
