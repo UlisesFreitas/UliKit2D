@@ -1,5 +1,5 @@
 <template>
-  <div class="assets-panel flex flex-col h-full bg-bg-base text-text-primary w-full">
+  <div class="assets-panel flex flex-col h-full bg-bg-base text-text-primary w-full overflow-hidden relative">
     <!-- HEADER -->
     <AssetsHeader />
 
