@@ -46,7 +46,12 @@ export class SceneManager {
 
     static get layers() { return this._layers; }
     static get activeSceneName() { return this._activeSceneName; }
-    static set activeSceneName(value: string) { this._activeSceneName = value; }
+    static set activeSceneName(value: string) { 
+        if (this._activeSceneName !== value) {
+            this._activeSceneName = value; 
+            eventBus.emit('active-scene-changed', value);
+        }
+    }
     static get isDirty() { return this._isDirty; }
 
     static setDirty(dirty: boolean) {
@@ -142,6 +147,7 @@ export class SceneManager {
                  name: entity.name,
                  layer: entity.layer || 'Base Layer', // Ensure layer is saved
                  visible: entity.visible,
+                 sortIndex: entity.sortIndex,
                  transform: entity.transform ? { ...entity.transform } : undefined,
                  sprite: entity.sprite ? { ...entity.sprite } : undefined,
                  camera: entity.camera ? { ...entity.camera } : undefined,

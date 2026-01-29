@@ -13,29 +13,119 @@ const activeSceneName = ref(SceneManager.activeSceneName);
 const collapsedScene = ref(false);
 
 const updateList = () => {
-    console.log('[HierarchyPanel] updateList called. World Count:', world.entities.length);
+    // console.log('[HierarchyPanel] updateList called. World Count:', world.entities.length);
     // Sync Scene Name
     activeSceneName.value = SceneManager.activeSceneName;
     
-    // Create shallow copies to force Vue reactivity update since entity objects are not reactive
-    entities.value = world.entities.map(e => ({ ...e }));
+    // Force Normalize if missing (Self-Healing) to ensure stability
+    const raw = [...world.entities];
+    let needsSort = false;
+    raw.forEach((e, i) => {
+        if (typeof e.sortIndex !== 'number') {
+            e.sortIndex = i; // Assign default index if missing
+            needsSort = true;
+        }
+    });
+
+    // Create shallow copies to force Vue reactivity update
+    // SORT BY EXPLICIT INDEX (Stability Fix)
+    entities.value = raw.sort((a, b) => (a.sortIndex ?? 0) - (b.sortIndex ?? 0));
 };
 
-const focus = (id: string | undefined) => {
-    if (!id) return;
-    const entity = world.where(e => e.id === id).first;
-    if (entity && entity.transform) {
-         // Focus Logic: Center Camera on Entity
-         // Assuming engine.app.stage controls the view transform
-         const screenW = engine.app.screen.width;
-         const screenH = engine.app.screen.height;
-         const scale = engine.app.stage.scale.x;
+// --- DRAG & DROP ---
+import { projectState } from '../managers/ProjectManager';
+const draggedId = ref<string | null>(null);
 
-         engine.app.stage.position.set(
-             (screenW / 2) - (entity.transform.x * scale),
-             (screenH / 2) - (entity.transform.y * scale)
-         );
+const onDragStart = (e: DragEvent, id: string) => {
+    draggedId.value = id;
+    if (e.dataTransfer) {
+        e.dataTransfer.effectAllowed = 'move';
+        e.dataTransfer.dropEffect = 'move';
+        e.dataTransfer.setData('text/plain', id);
     }
+};
+
+const onDrop = (e: DragEvent, targetId: string) => {
+    e.preventDefault();
+    const sourceId = draggedId.value;
+    if (!sourceId || sourceId === targetId) return;
+
+    // We operate on the SORTED list to determine visual position
+    const currentList = [...entities.value];
+    const sourceIdx = currentList.findIndex(e => e.id === sourceId);
+    const targetIdx = currentList.findIndex(e => e.id === targetId);
+
+    if (sourceIdx === -1 || targetIdx === -1) return;
+
+    // Move Source to Target Index
+    const [moved] = currentList.splice(sourceIdx, 1);
+    
+    // Safety check for TS (splice could theoretically return empty if bounds wrong, though we checked index)
+    if (moved) {
+        currentList.splice(targetIdx, 0, moved);
+        
+        // RE-INDEX EVERYTHING (Normalization) to ensure stability
+        // This updates the Source of Truth (Entity Components) directly
+        currentList.forEach((entity, index) => {
+            if (entity) {
+                entity.sortIndex = index;
+            }
+        });
+
+        projectState.isDirty = true;
+        updateList(); // Re-fetch and re-sort
+    }
+    draggedId.value = null;
+};
+
+// Focus Logic moved to context menu or double click rename replaces it
+// const focus = (id: string | undefined) => { ... }
+
+// Renaming State
+const renamingEntityId = ref<string | null>(null);
+const renameValue = ref('');
+const renameInputRef = ref<HTMLInputElement | null>(null);
+
+const startRename = (id: string, currentName: string) => {
+    renamingEntityId.value = id;
+    renameValue.value = currentName || 'Unnamed Entity';
+    menuState.value.visible = false;
+    
+    // Auto-focus next tick
+    setTimeout(() => {
+        const input = Array.isArray(renameInputRef.value) ? renameInputRef.value[0] : renameInputRef.value;
+        input?.focus();
+        input?.select();
+    }, 0);
+};
+
+const cancelRename = () => {
+    renamingEntityId.value = null;
+    renameValue.value = '';
+};
+
+const confirmRename = () => {
+    if (!renamingEntityId.value) return;
+    
+    // Explicitly check and cast if necessary (though 'if' should suffice)
+    const entity = world.where(e => e.id === renamingEntityId.value).first;
+    if (entity) {
+        const newName = renameValue.value.trim();
+        if (newName && newName !== entity.name) {
+            entity.name = newName;
+            
+            // Notify changes
+            eventBus.emit('entity-updated'); 
+        }
+    }
+    cancelRename();
+};
+
+const toggleVisibility = (entity: Entity) => {
+    if (entity.visible === undefined) entity.visible = true;
+    entity.visible = !entity.visible;
+    // Force update maybe? components are not deep reactive usually in ECS unless wrapped
+    eventBus.emit('entity-updated');
 };
 
 let unsubAdd: any;
@@ -46,7 +136,7 @@ import { eventBus } from '../../engine/core/EventBus';
 // ... (existing imports)
 
 onMounted(() => {
-    updateList();
+     updateList();
     
     // Subscribe to changes
     unsubAdd = world.onEntityAdded.subscribe(updateList);
@@ -59,6 +149,9 @@ onMounted(() => {
     // Listen for scene changes (Load/New)
     eventBus.on('scene-loaded', updateList);
     eventBus.on('scene-cleared', updateList);
+    // Listen for metadata changes (Rename)
+    eventBus.on('scene-list-changed', updateList);
+    eventBus.on('active-scene-changed', updateList);
 });
 
 onUnmounted(() => {
@@ -201,6 +294,13 @@ const duplicateEntity = () => {
         </button>
     </div>
     
+    <!-- DEBUG OVERLAY (AGENT) -->
+    <div style="font-size: 8px; font-family: monospace; padding: 4px; background: rgba(0,0,0,0.8); color: lime; position: absolute; bottom: 0; left: 0; width: 100%; max-height: 100px; overflow-y: auto; pointer-events: none; z-index: 9999;">
+        [DEBUG-AGENT]<br>
+        Scenes: {{ activeSceneName }}<br>
+        Entities: {{ entities.map(e => `${e.name}:${e.sortIndex}`).join(', ') }}
+    </div>
+    
     <!-- List -->
     <div class="content flex-1 overflow-y-auto p-1 font-mono">
         <!-- Scene Root -->
@@ -221,28 +321,72 @@ const duplicateEntity = () => {
                     v-for="entity in entities" 
                     :key="entity.id"
                     :id="`hierarchy-item-${entity.id}`"
-                    @click.stop="select(entity.id)"
-                    @dblclick="focus(entity.id)"
-                    @contextmenu.stop.prevent="showContextMenu($event, entity.id || '')"
+                    class="group relative flex items-center justify-between px-2 py-1 rounded text-xs transition-colors border border-transparent hover:bg-bg-hover"
                     :class="[
-                        'cursor-pointer px-2 py-0.5 rounded text-xs transition-colors flex items-center border',
                         editorStore.selectedEntityId === entity.id 
-                            ? 'bg-accent-color text-text-accent border-accent-color font-bold shadow-sm' 
-                            : 'border-transparent hover:bg-bg-hover text-text-primary'
+                            ? 'bg-accent-color/10 border-accent-color text-text-primary' 
+                            : 'text-text-primary',
+                        draggedId === entity.id ? 'opacity-50 border-white border-dashed' : ''
                     ]"
+                    @click.stop="select(entity.id)"
+                    @dragover.prevent.stop
+                    @drop.stop="onDrop($event, entity.id!)"
+                    @contextmenu.stop.prevent="showContextMenu($event, entity.id || '')"
                 >
-                    <!-- Icon based on components -->
-                    <span class="mr-1.5 opacity-70">
-                        <span v-if="entity.camera">📷</span>
-                        <span v-else-if="entity.sprite">🖼️</span>
-                        <span v-else-if="entity.nineSliceSprite">🍱</span>
-                        <span v-else-if="entity.animator">🎬</span>
-                        <span v-else-if="entity.label">📝</span>
-                        <span v-else-if="entity.bitmapText">🔤</span>
+                    <!-- Left: Handle + Icon + Name -->
+                    <div class="flex items-center gap-2 flex-1 overflow-hidden">
+                        <!-- Drag Handle -->
+                        <div 
+                            class="cursor-grab text-text-disabled hover:text-text-primary opacity-0 group-hover:opacity-100 transition-opacity"
+                            draggable="true"
+                            @dragstart.stop="onDragStart($event, entity.id!)"
+                            title="Drag to Reorder"
+                        >
+                            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
+                        </div>
 
-                        <span v-else>📦</span>
-                    </span>
-                    <span class="truncate">{{ entity.name || 'Unnamed Entity' }}</span>
+                        <!-- Entity Icon -->
+                        <div class="flex-shrink-0 w-4 text-center select-none" @dblclick="startRename(entity.id!, entity.name || 'Entity')">
+                            <span v-if="entity.camera" title="Camera">📷</span>
+                            <span v-else-if="entity.sprite" title="Sprite">🖼️</span>
+                            <span v-else-if="entity.nineSliceSprite" title="NineSlice">🍱</span>
+                            <span v-else-if="entity.animator" title="Animator">🎬</span>
+                            <span v-else-if="entity.label" title="Text">📝</span>
+                            <span v-else-if="entity.bitmapText" title="BitmapText">🔤</span>
+                            <span v-else title="Entity">📦</span>
+                        </div>
+
+                        <!-- Rename Input or Name -->
+                        <input 
+                            v-if="renamingEntityId === entity.id"
+                            ref="renameInputRef"
+                            v-model="renameValue"
+                            class="flex-1 bg-bg-input text-text-primary px-1 rounded outline-none min-w-0 h-5"
+                            @click.stop
+                            @keyup.enter="confirmRename"
+                            @keyup.esc="cancelRename"
+                            @blur="confirmRename"
+                        />
+                        <span 
+                            v-else 
+                            class="truncate select-none flex-1"
+                            @dblclick="startRename(entity.id!, entity.name || 'Entity')"
+                        >
+                            {{ entity.name || 'Unnamed Entity' }}
+                        </span>
+                    </div>
+
+                    <!-- Right: Tools (Visibility) -->
+                    <div class="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity" :class="{'opacity-100': !entity.visible}">
+                        <button 
+                            class="p-1 hover:text-accent-color focus:outline-none text-text-disabled"
+                            @click.stop="toggleVisibility(entity)"
+                            :title="entity.visible ? 'Hide' : 'Show'"
+                        >
+                            <svg v-if="entity.visible !== false" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+                            <svg v-else xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path><line x1="1" y1="1" x2="23" y2="23"></line></svg>
+                        </button>
+                    </div>
                 </li>
                 <li v-if="entities.length === 0" class="text-text-secondary italic p-2 text-center text-xs opacity-50">
                     Empty Scene
@@ -255,6 +399,7 @@ const duplicateEntity = () => {
     <div v-if="menuState.visible" 
          class="fixed bg-bg-panel border border-border shadow-lg rounded z-50 py-1 min-w-[140px]"
          :style="{ top: menuState.y + 'px', left: menuState.x + 'px' }">
+        <button @click="startRename(menuState.entityId, entities.find(e => e.id === menuState.entityId)?.name || '')" class="w-full text-left px-3 py-1.5 hover:bg-bg-hover text-xs">Rename</button>
         <button @click="duplicateEntity" class="w-full text-left px-3 py-1.5 hover:bg-bg-hover text-xs">Duplicate</button>
         <div class="h-[1px] bg-border my-1"></div>
         <button @click="deleteEntity" class="w-full text-left px-3 py-1.5 hover:bg-red-900 hover:text-white text-xs text-red-400">Delete</button>

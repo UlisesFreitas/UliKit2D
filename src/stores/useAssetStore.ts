@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
+import { useStorage } from '@vueuse/core';
 import { AssetDatabase } from '../editor/managers/AssetDatabase';
 
 export interface FileNode {
@@ -15,10 +16,11 @@ export const useAssetStore = defineStore('assets', () => {
     const files = ref<FileNode[]>([]);
     
     // Default to 'assets' folder so user starts inside the Master Folder
-    const currentPath = ref<string>('assets'); 
-    const zoomLevel = ref<number>(1); 
+    // PERSISTED SETTINGS
+    const currentPath = useStorage<string>('assets-current-path', 'assets'); 
+    const zoomLevel = useStorage<number>('assets-zoom-level', 1); 
     const searchQuery = ref<string>('');
-    const sortOrder = ref<'asc' | 'desc'>('asc');
+    const sortOrder = useStorage<'asc' | 'desc'>('assets-sort-order', 'asc');
     const expandedFolders = ref<Set<string>>(new Set());
     
     // Selection State
@@ -71,7 +73,8 @@ export const useAssetStore = defineStore('assets', () => {
         selectedPaths.value.clear();
         
         for (let i = min; i <= max; i++) {
-            selectedPaths.value.add(visibleFiles.value[i].path);
+            const file = visibleFiles.value[i];
+            if (file) selectedPaths.value.add(file.path);
         }
     };
 

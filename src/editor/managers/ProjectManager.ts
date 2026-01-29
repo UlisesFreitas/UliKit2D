@@ -185,6 +185,15 @@ export class ProjectManager {
                 // Load Initial Scene
                 const { SceneManager } = await import('../../engine/managers/SceneManager');
                 const { ProjectManifestManager: PM } = await import('./ProjectManifestManager');
+                const { useProjectSettingsStore } = await import('../../stores/useProjectSettingsStore');
+
+                // SYNC PROJECT LAYERS TO SCENE MANAGER
+                // This ensures the SceneManager knows the layer templates before loading the scene,
+                // preventing the "Loading scene WITHOUT Templates" warning and duplicates.
+                const settingsStore = useProjectSettingsStore();
+                if (settingsStore.settings.layers) {
+                    SceneManager.setProjectLayers(settingsStore.settings.layers);
+                }
                 
                 const manifest = PM.manifest;
                 let sceneLoaded = false;
@@ -275,6 +284,10 @@ export class ProjectManager {
              
              await ProjectManifestManager.saveProject('project.json');
              
+             // EMIT EVENT so UI can refresh (ScenesPanel listener)
+             const { eventBus } = await import('../../engine/core/EventBus');
+             eventBus.emit('project-saved');
+
              projectState.isDirty = false;
              alert(`Project Saved.`);
         } else {

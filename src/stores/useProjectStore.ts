@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
 import { ProjectManifestManager } from '../editor/managers/ProjectManifestManager';
-// import type { ISceneEntry } from '../editor/managers/types'; // Removed unused
+import { eventBus } from '../engine/core/EventBus';
 
 export const useProjectStore = defineStore('project', () => {
     
@@ -10,7 +10,10 @@ export const useProjectStore = defineStore('project', () => {
     const lastSync = ref(Date.now()); // Used to trigger reactivity manually if needed
 
     // Computed
-    const scenes = computed(() => manifest.value?.scenes || []);
+    const scenes = computed(() => {
+        lastSync.value; // Dependency to force re-evaluation on sync()
+        return manifest.value?.scenes || [];
+    });
     const projectName = computed(() => manifest.value?.name || 'Untitled');
     // const projectPath = computed(() => ''); // Removed unused
 
@@ -23,6 +26,7 @@ export const useProjectStore = defineStore('project', () => {
     function sync() {
         manifest.value = ProjectManifestManager.manifest;
         lastSync.value = Date.now();
+        eventBus.emit('scene-list-changed');
     }
 
     async function addScene(name: string, path: string) {

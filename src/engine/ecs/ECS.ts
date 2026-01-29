@@ -6,6 +6,7 @@ export type Entity = {
   name?: string; // For Hierarchy
   layer?: string; // Layer ID
   visible?: boolean; // Visibility Flag
+  sortIndex?: number; // Explicit Sorting Order (0 = Top, N = Bottom)
   transform?: {
       x: number;
       y: number;
@@ -126,10 +127,29 @@ export type Entity = {
 export const world = new World<Entity>();
 
 export function createEntity(name: string = 'Entity') {
+    // 1. Strict Normalization: Re-index existing entities to eliminate gaps/ambiguities
+    // Sort by current sortIndex to preserve visual order
+    const existing = [...world.entities].sort((a, b) => (a.sortIndex ?? 0) - (b.sortIndex ?? 0));
+    
+    console.log('[ECS] Normalizing Sort Indices. Before:', existing.map(e => `${e.name}=${e.sortIndex}`));
+
+    existing.forEach((entity, index) => {
+        if (entity.sortIndex !== index) {
+            entity.sortIndex = index;
+        }
+    });
+
+    console.log('[ECS] After Normalization:', existing.map(e => `${e.name}=${e.sortIndex}`));
+
+    // 2. Append New Entity at the End
+    const nextIndex = existing.length;
+    console.log('[ECS] Creating Entity at Index:', nextIndex);
+
     return world.add({
         id: crypto.randomUUID(),
         name,
         layer: 'Base Layer',
+        sortIndex: nextIndex,
         transform: { x: 0, y: 0, rotation: 0, scale: { x: 1, y: 1 }, zIndex: 0 }
     });
 }

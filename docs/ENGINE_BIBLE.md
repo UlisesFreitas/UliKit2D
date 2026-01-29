@@ -86,3 +86,25 @@ All logical objects are **Entities** defined in `src/engine/ecs/ECS.ts`.
 5.  **NO NULLS**: Where possible, Fallback/Default values should safely handle missing components to prevent crashes (e.g., `Camera` gizmo crash).
 
 ---
+6.  **ZERO GHOSTS**: When fixing deletion bugs, always pre-calculate fallbacks. Moving from a deleted scene to `null` is a crash. Moving to "Untitled" is a user data panic. Moving to `Next Available` is UX gold.
+
+---
+
+## 6. NOTE TO FUTURE SELF (Architectural Learnings)
+*Added Jan 2026*
+
+### ⚠️ Project Loading Order is Non-Negotiable
+If you ever refactor `ProjectManager`, remember this sequence or die:
+1.  **Read Manifest**: Get the schema.
+2.  **Hydrate Settings**: Push Layers/Tags to Managers (`SceneManager.setProjectLayers`).
+3.  **Load Scene**: Now `SceneManager` knows what "Layer 1" is.
+*Fail this, and you get "Loading scene WITHOUT Templates" warnings and duplicate layers.*
+
+### ⚠️ Regex is Cheaper than Logic
+For duplication naming (`Scene` -> `Scene_Copy`), don't parse strings manually. Use Regex:
+`/^(.*)_Copy(_(\d+))?$/` handles `Base`, `Base_Copy`, and `Base_Copy_2` in one pass.
+
+### ⚠️ Sorting requires Strict Normalization
+Don't trust `sort((a,b) => a.index - b.index)`.
+*   **Problem**: Gaps (`0, 10, 20`) allow "insert at end" logic to fail if `length` is used as next index.
+*   **Fix**: "Clean Sweep" before creation. `0, 1, 2`. Next is `3`. Guaranteed.

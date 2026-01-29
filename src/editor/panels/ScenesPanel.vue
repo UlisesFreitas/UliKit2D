@@ -3,6 +3,7 @@ import { ref, nextTick, computed, onMounted, onUnmounted } from 'vue';
 import { getFileSystem } from '../../api/FileSystem';
 import { SceneManager } from '../../engine/managers/SceneManager';
 import { ProjectManager } from '../managers/ProjectManager';
+import { ProjectManifestManager } from '../managers/ProjectManifestManager';
 import { useUIStore } from '../../stores/useUIStore';
 import { useProjectStore } from '../../stores/useProjectStore';
 import { eventBus } from '../../engine/core/EventBus';
@@ -11,8 +12,26 @@ const fs = getFileSystem();
 const ui = useUIStore();
 const projectStore = useProjectStore();
 
-// Use Store as Source of Truth
-const scenes = computed(() => projectStore.scenes);
+// Use Store as Source of Truth, sorted alphabetically
+// REVISION PATTERN: Force re-eval on signals
+const revision = ref(0);
+
+const scenes = computed(() => {
+    revision.value; // Dependency
+    const all = [...projectStore.scenes];
+    
+    // Deduplicate by path to prevent UI duplication if Store gets dirty
+    const unique = all.filter((s, index, self) => 
+        index === self.findIndex((t) => (
+            t.path === s.path
+        ))
+    );
+    
+    console.log('[ScenesPanel] Raw Scenes:', all.map(s => s.path));
+    console.log('[ScenesPanel] Unique Scenes:', unique.map(s => s.path));
+
+    return unique.sort((a, b) => a.name.localeCompare(b.name));
+});
 
 // Reactive Active Scene Tracker
 const activeSceneName = ref(SceneManager.activeSceneName);
@@ -21,12 +40,21 @@ const updateActiveScene = (name: string) => {
     activeSceneName.value = name;
 };
 
+const handleRefresh = () => {
+    revision.value++;
+};
+
 onMounted(() => {
     eventBus.on('scene-loaded', updateActiveScene);
+    // Listen to generic project/scene events to force list refresh if needed
+    eventBus.on('project-saved', handleRefresh);
+    eventBus.on('scene-list-changed', handleRefresh);
 });
 
 onUnmounted(() => {
     eventBus.off('scene-loaded', updateActiveScene);
+    eventBus.off('project-saved', handleRefresh);
+    eventBus.off('scene-list-changed', handleRefresh);
 });
 
 const isLoading = ref(false);
@@ -132,6 +160,7 @@ const confirmRename = async () => {
         // 4. Update Active Scene Runtime
         if (wasActive) {
             SceneManager.activeSceneName = newName;
+            activeSceneName.value = newName; // FORCE UI UPDATE
         }
 
         await ProjectManager.saveProject(); // Persist manifest AND Save Active Scene (now with new name)
@@ -156,18 +185,31 @@ const onDeleteScene = async () => {
         isDanger: true
     })) {
         try {
-            // 1. Delete File
+            // 1. Pre-calculate Fallback if we are about to delete the active scene
+            let fallbackScenePath: string | null = null;
+            if (scene.name === SceneManager.activeSceneName) {
+                const allScenes = ProjectManifestManager.manifest?.scenes || [];
+                // Find a scene that is NOT the one we are deleting
+                const other = allScenes.find(s => s.path !== scene.path);
+                if (other) {
+                    fallbackScenePath = other.path;
+                }
+            }
+
+            // 2. Delete File & Update Manifest
             await fs.deleteFile(scene.path);
-            
-            // 2. Update Manifest
             await projectStore.removeScene(scene.path);
             await ProjectManager.saveProject();
 
-            // 3. Handle Runtime
+            // 3. Switch Scene (Runtime)
             if (scene.name === SceneManager.activeSceneName) {
-                SceneManager.createDefaultScene();
-                // We should probably save "NewScene" immediately or leave it as transient until user saves?
-                // For now, let's leave it transient.
+                if (fallbackScenePath) {
+                    await SceneManager.loadSceneFromFile(fallbackScenePath);
+                } else {
+                     // Only if NO scenes left, reset to empty
+                    SceneManager.createDefaultScene();
+                    activeSceneName.value = SceneManager.activeSceneName; // Sync UI
+                }
             }
             
             ui.showToast({ title: 'Deleted', description: `Scene ${scene.name} deleted.`, type: 'success' });
@@ -184,16 +226,50 @@ const onDuplicateScene = async () => {
     
     try {
         const content = await fs.readFile(scene.path);
-        const newName = `${scene.name}_Copy`;
-        const newPath = `assets/scenes/${newName}.json`;
         
-        await fs.writeFile(newPath, content);
+        let newName = `${scene.name}_Copy`;
+        
+        // Regex to parse existing "Name_Copy_X" pattern
+        // Matches: BaseName_Copy(_Numbers)?
+        const copyRegex = /^(.*)_Copy(_(\d+))?$/;
+        const match = scene.name.match(copyRegex);
+        
+        if (match) {
+            const base = match[1]; // "SceneA"
+            const numStr = match[3]; // "1" or undefined
+            const num = numStr ? parseInt(numStr) : 0;
+            // If it was "Copy", next is "Copy_1". If "Copy_1", next is "Copy_2"
+            // Wait, standard behavior: Copy -> Copy 1 -> Copy 2?
+            // User requested: SceneA -> SceneA_Copy. SceneA_Copy -> SceneA_Copy_1.
+            if (numStr === undefined) {
+                 newName = `${base}_Copy_1`;
+            } else {
+                 newName = `${base}_Copy_${num + 1}`;
+            }
+        } else {
+             newName = `${scene.name}_Copy`;
+        }
+        
+        // Determine collision safety (just in case loop)
+        let finalName = newName;
+        let counter = 1;
+        while (scenes.value.some(s => s.name === finalName)) {
+            // Fallback collision handling
+             finalName = `${newName}_${counter++}`;
+        }
+        
+        const newPath = `assets/scenes/${finalName}.json`;
+        
+        const sceneData = JSON.parse(content);
+        // sceneData.name = finalName; 
+        
+        await fs.writeFile(newPath, JSON.stringify(sceneData, null, 2));
         
         // Add to Manifest
-        await projectStore.addScene(newName, newPath);
+        await projectStore.addScene(finalName, newPath);
         await ProjectManager.saveProject();
 
-        ui.showToast({ title: 'Duplicated', description: `Scene duplicated as ${newName}`, type: 'success' });
+        ui.showToast({ title: 'Duplicated', description: `Scene duplicated as ${finalName}`, type: 'success' });
     } catch (e: any) {
         ui.showToast({ title: 'Error', description: 'Failed to duplicate scene: ' + e.message, type: 'error' });
     }
@@ -299,6 +375,13 @@ const onRefresh = () => {
             <button class="hover:bg-bg-hover p-1 rounded text-text-tertiary" @click="onRefresh" title="Refresh List">
                 ↻
             </button>
+        </div>
+        
+        <!-- DEBUG OVERLAY (AGENT) -->
+        <div style="font-size: 8px; font-family: monospace; padding: 4px; background: rgba(0,0,0,0.8); color: cyan; position: absolute; bottom: 0; left: 0; width: 100%; max-height: 100px; overflow-y: auto; pointer-events: none; z-index: 9999;">
+             [DEBUG-AGENT]<br>
+             Scenes Count: {{ scenes.length }}<br>
+             Paths: {{ scenes.map(s => s.path).join(', ') }}
         </div>
 
         <!-- Create Input -->

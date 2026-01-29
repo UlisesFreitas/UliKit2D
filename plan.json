@@ -121,7 +121,12 @@
         "Implement 'Live Mode' for Inspectors (Poll values if Game Running)",
         "Add Script Parameter Parsing (AST based properties in Inspector)",
         "Standardize all Inspectors to emit Commands (Undoable)",
-        "Refactor Color Pickers and Input Fields for UX"
+        "Refactor Color Pickers and Input Fields for UX",
+        "Implement Scene Sorting in ScenesPanel",
+        "Implement Entity Sorting & Renaming in Hierarchy",
+        "Verify Layer Sorting in LayersPanel",
+        "Implement AssetsPanel Settings Persistence (Zoom, Order)",
+        "Hide Internal Components (LayerIndex) in Inspector"
       ]
     },
     {
