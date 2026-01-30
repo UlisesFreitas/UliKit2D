@@ -4,6 +4,7 @@ import { projectState } from '../../editor/managers/ProjectManager';
 import { getFileSystem, type FileChangeEvent } from '../../api/FileSystem';
 
 import { SceneManager } from '../managers/SceneManager';
+import { eventBus } from '../core/EventBus';
 
 export class ScriptSystem {
     private scriptCache: Map<string, any> = new Map();
@@ -19,10 +20,20 @@ export class ScriptSystem {
             (window as any).SceneManager = SceneManager;
             console.log('[ScriptSystem] Exposed SceneManager to window');
         }
+
+        // Listen for Collision Events from PhysicsSystem
+        eventBus.on('collision-start', (payload: any) => {
+            this.handleCollisionEvent('onCollisionStart', payload.entityA, payload.entityB);
+            this.handleCollisionEvent('onCollisionStart', payload.entityB, payload.entityA);
+        });
+
+        eventBus.on('collision-end', (payload: any) => {
+            this.handleCollisionEvent('onCollisionEnd', payload.entityA, payload.entityB);
+            this.handleCollisionEvent('onCollisionEnd', payload.entityB, payload.entityA);
+        });
         
         // Listen for file changes (Hot Reload)
-        // Note: ProjectManager or useAssetStore normally starts the watch.
-        // We just need to handle the events.
+        // ... (rest of constructor)
         if (projectState.currentProjectPath) {
             fs.watchProject(projectState.currentProjectPath, (event: FileChangeEvent) => {
                 if (event.event === 'change' || event.event === 'add') {
@@ -42,6 +53,30 @@ export class ScriptSystem {
                      }
                 }
             });
+        }
+    }
+
+    private async handleCollisionEvent(functionName: string, entity: any, other: any) {
+        if (!entity || !other || !entity.script) return;
+
+        for (const scriptData of entity.script) {
+            if (!scriptData.path) continue;
+            
+            // Check cache (assume loaded if running)
+            // If not in cache, maybe it hasn't loaded yet? 
+            // We can try to load, but typically Update loop handles loading. 
+            // We'll skip if not ready to avoid async race conditions in event handlers.
+            const cacheKey = scriptData.path; 
+            const scriptModule = this.scriptCache.get(cacheKey);
+
+            if (scriptModule && typeof scriptModule[functionName] === 'function') {
+                try {
+                    const params = scriptData.parameters || {};
+                    scriptModule[functionName](entity, other, params);
+                } catch (e) {
+                     console.error(`[ScriptSystem] Error in ${functionName} for ${scriptData.path}:`, e);
+                }
+            }
         }
     }
 

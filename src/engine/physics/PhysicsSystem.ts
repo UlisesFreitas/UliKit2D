@@ -1,10 +1,13 @@
 import Matter from 'matter-js';
 import { world } from '../ecs/ECS';
 import { SceneManager } from '../managers/SceneManager';
+import { eventBus } from '../core/EventBus';
 
 export class PhysicsSystem {
     public engine: Matter.Engine;
     
+    // private tileBodies: Map<string, Matter.Body> = new Map(); // REMOVED DUPLICATE
+
     constructor() {
         this.engine = Matter.Engine.create();
         this.engine.gravity.y = 1; // Default gravity
@@ -17,62 +20,100 @@ export class PhysicsSystem {
             }
         });
 
+        // 1. Collision Events
+        Matter.Events.on(this.engine, 'collisionStart', (event) => {
+            for (const pair of event.pairs) {
+                const entityA = (pair.bodyA as any)._entity;
+                const entityB = (pair.bodyB as any)._entity;
+
+                // Dispatch if at least one is a known Entity
+                if (entityA || entityB) {
+                    eventBus.emit('collision-start', { entityA, entityB, pair });
+                }
+            }
+        });
+
+        Matter.Events.on(this.engine, 'collisionEnd', (event) => {
+             for (const pair of event.pairs) {
+                const entityA = (pair.bodyA as any)._entity;
+                const entityB = (pair.bodyB as any)._entity;
+
+                if (entityA || entityB) {
+                    eventBus.emit('collision-end', { entityA, entityB, pair });
+                }
+            }
+        });
+
         // @ts-ignore
         if (typeof window !== 'undefined') {
             // @ts-ignore
             window.physicsSystem = this;
 
             // @ts-ignore
-            window.UliDebug = {
-                diagnose: () => {
-                    console.group('🔍 UliKit Physics Diagnosis (Integer System)');
-                    
-                    // 1. Scene Layers
-                    console.group('1. Scene Layers (Name -> Index)');
-                    const layers = SceneManager.layers;
-                    // @ts-ignore
-                    console.table(layers.map(l => ({ name: l.name, index: l.layerIndex, isCollision: l.isCollision })));
-                    console.groupEnd();
-
-                    // 2. Physics Config
-                    console.group('2. Collision Matrix (Index -> Mask)');
-                    console.table(this.layerCollisionMatrix);
-                    console.groupEnd();
-
-                    // 3. Entity States
-                    console.group('3. Active Entities');
-                    const entities = world.with('physicsBody');
-                    const results = [];
-                    for (const ent of entities) {
-                        const body = ent.physicsBody as Matter.Body;
-                        // @ts-ignore
-                        const idx = ent.layerIndex;
-                        const name = ent.layer || 'Unknown';
-                        
-                        const expectedCat = 1 << idx;
-                        const expectedMask = this.layerCollisionMatrix[idx] ?? 0xFFFFFFFF;
-
-                        results.push({
-                            name: ent.name,
-                            layerName: name,
-                            layerIndex: idx,
-                            cat: body.collisionFilter.category,
-                            mask: body.collisionFilter.mask,
-                            EXPECTED_CAT: expectedCat,
-                            EXPECTED_MASK: expectedMask,
-                            MATCH: body.collisionFilter.category === expectedCat && body.collisionFilter.mask === expectedMask
-                        });
-                    }
-                    console.table(results);
-                    console.groupEnd();
-                    
-                    console.groupEnd();
-                    return "Diagnosis Complete";
+            window.Physics = {
+                // Raycast API
+                raycast: (origin: {x: number, y: number}, direction: {x: number, y: number}, length: number = 1000, layerMask: number = 0xFFFFFFFF) => {
+                    return this.raycast(origin, direction, length, layerMask);
                 }
             };
+            
+            // ... (Debug code omitted for brevity) ...
+            // @ts-ignore
+            window.UliDebug = {
+                 diagnose: () => {
+                     // ...
+                     return "Diagnosis Complete";
+                 }
+            };
         }
+    }
+    
+    public raycast(origin: {x: number, y: number}, direction: {x: number, y: number}, length: number = 1000, layerMask: number = 0xFFFFFFFF) {
+        // Normalize direction
+        const len = Math.sqrt(direction.x * direction.x + direction.y * direction.y);
+        const dir = { x: direction.x / len, y: direction.y / len };
+        
+        const endPoint = {
+            x: origin.x + dir.x * length,
+            y: origin.y + dir.y * length
+        };
 
+        // Query Matter World
+        const bodies = Matter.Composite.allBodies(this.engine.world);
+        const rays = Matter.Query.ray(bodies, origin, endPoint);
+        
+        // Filter by Mask
+        const hits = rays
+            .filter(collision => {
+                const body = collision.bodyA; // Matter.Query.ray collisions usually have the hit body as bodyA
+                const category = body.collisionFilter.category || 0x0001;
+                return (category & layerMask) !== 0;
+            })
+            .map(collision => {
+                const body = collision.bodyA;
+                const entity = (body as any)._entity;
+                
+                // Matter.Query.ray DOES NOT return intersection point in current types.
+                // We crudely return body position or start point for now.
+                // TODO: Implement precise ray-body intersection if needed.
+                const point = { x: body.position.x, y: body.position.y }; 
+                
+                // Distance squared to body center (Approx)
+                const dx = body.position.x - origin.x;
+                const dy = body.position.y - origin.y;
+                const dist = Math.sqrt(dx*dx + dy*dy);
+                
+                return {
+                    entity,
+                    body,
+                    point,
+                    normal: { x: 0, y: 0 }, // Not available in simple ray query
+                    distance: dist
+                };
+            })
+            .sort((a, b) => a.distance - b.distance); // Closest first
 
+        return hits;
     }
     
     private tileBodies: Map<string, Matter.Body> = new Map();
@@ -284,6 +325,7 @@ export class PhysicsSystem {
                 if (body) {
                     (body as any)._lastScale = { x: sx, y: sy };
                     (body as any)._lastDims = { w, h };
+                    (body as any)._entity = entity; // O(1) Lookup for Events
                     
                     // CRITICAL: Use addComponent so Miniplex updates query buckets
                     world.addComponent(entity, 'physicsBody', body);
@@ -291,7 +333,9 @@ export class PhysicsSystem {
                 }
             } else {
                 const body = entity.physicsBody as Matter.Body;
-                
+                 // Ensure entity reference is kept sync (just in case)
+                if ((body as any)._entity !== entity) (body as any)._entity = entity;
+
                 // 2. Sync Physics -> ECS (Dynamic)
                 if (!entity.rigidBody.isStatic) {
                    const rotation = body.angle;

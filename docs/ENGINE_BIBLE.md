@@ -108,3 +108,12 @@ For duplication naming (`Scene` -> `Scene_Copy`), don't parse strings manually. 
 Don't trust `sort((a,b) => a.index - b.index)`.
 *   **Problem**: Gaps (`0, 10, 20`) allow "insert at end" logic to fail if `length` is used as next index.
 *   **Fix**: "Clean Sweep" before creation. `0, 1, 2`. Next is `3`. Guaranteed.
+
+### ⚠️ Physics O(1) Lookup is Critical
+When integrating Physics with ECS:
+1.  **Back-References**: Always attach `body._entity = entity` to the Matter.js body.
+    *   *Why?* Collision Events give you two bodies. Querying ECS for "Who owns this body?" is O(N). `body._entity` is O(1).
+2.  **State Sync**: Physics is the source of truth for Dynamic bodies. ECS is the source for Static. Don't mix them up or you get jitter.
+3.  **Event Bus Decoupling**: We use `EventBus` to bridge Matter events to Scripts.
+    *   *Pro*: Decoupled.
+    *   *Con*: Garbage generation per collision. **Optimization target** for the future if we have 1000s of bullets.

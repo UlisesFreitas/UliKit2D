@@ -131,6 +131,38 @@
     },
     {
       "id": "10",
+      "name": "Physics Engine Implementation",
+      "status": "completed",
+      "description": "Full integration of Matter.js with ECS and Runtime.",
+      "tasks": [
+        "Integrate Matter.js World into Engine Loop",
+        "Implement RigidBody Component (Dynamic, Static, Kinematic)",
+        "Implement Collider Components (Box, Circle, Polygon)",
+        "Create PhysicsSystem (Sync Transform <-> Body)",
+        "Implement Collision Events (onCollisionStart, onCollisionEnd) in Scripting",
+        "Implement Physics Material (Friction, Restitution)",
+        "Implement Runtime Raycasting API",
+        "Implement Debug/Wireframe Rendering for Physics"
+      ]
+    },
+    {
+      "id": "11",
+      "name": "Tilemap System 2.0",
+      "status": "pending",
+      "description": "High-performance Tilemap rendering and editing.",
+      "tasks": [
+        "Design Tilemap Data Structure (Layers, Chunks, sparse arrays)",
+        "Implement Tilemap Components (TilemapRenderer, TilemapCollider)",
+        "Implement Auto-Tiling Logic (Rule Tiles)",
+        "Implement Tile Palette Editor UI",
+        "Implement Brush/Bucket/Eraser Tools in Scene View",
+        "Integrate Tilemaps with Physics (Composite Bodies for optimization)",
+        "Implement Animated Tiles",
+        "Implement Tilemap Serialization/Deserialization (JSON)"
+      ]
+    },
+    {
+      "id": "12",
       "name": "Advanced Scripting System (Scripting 2.0)",
       "status": "pending",
       "tasks": [
@@ -141,7 +173,7 @@
       ]
     },
     {
-      "id": "11",
+      "id": "13",
       "name": "Visual Scripting System (Event Sheets)",
       "status": "pending",
       "tasks": [
@@ -152,13 +184,13 @@
       ]
     },
     {
-      "id": "12",
-      "name": "Advanced Features",
+      "id": "14",
+      "name": "Advanced Features & Polish",
       "status": "pending",
       "tasks": [
-        "Tilemap Chunking & Optimization",
         "Prefabs / Templates System",
-        "Build/Export System (Electron Builder)"
+        "Build/Export System (Electron Builder)",
+        "Performance Profiler"
       ]
     }
   ]
