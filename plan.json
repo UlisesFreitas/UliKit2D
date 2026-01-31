@@ -114,23 +114,6 @@
     },
     {
       "id": "9",
-      "name": "Inspector Overhaul (Live Mode)",
-      "status": "in-progress",
-      "description": "Make the editor feel alive and reactive.",
-      "tasks": [
-        "Implement 'Live Mode' for Inspectors (Poll values if Game Running)",
-        "Add Script Parameter Parsing (AST based properties in Inspector)",
-        "Standardize all Inspectors to emit Commands (Undoable)",
-        "Refactor Color Pickers and Input Fields for UX",
-        "Implement Scene Sorting in ScenesPanel",
-        "Implement Entity Sorting & Renaming in Hierarchy",
-        "Verify Layer Sorting in LayersPanel",
-        "Implement AssetsPanel Settings Persistence (Zoom, Order)",
-        "Hide Internal Components (LayerIndex) in Inspector"
-      ]
-    },
-    {
-      "id": "10",
       "name": "Physics Engine Implementation",
       "status": "completed",
       "description": "Full integration of Matter.js with ECS and Runtime.",
@@ -146,19 +129,37 @@
       ]
     },
     {
-      "id": "11",
-      "name": "Tilemap System 2.0",
-      "status": "pending",
-      "description": "High-performance Tilemap rendering and editing.",
+      "id": "10",
+      "name": "Tilemap System 2.0 (Manifest & Physics)",
+      "status": "completed",
+      "description": "High-performance Tilemap rendering, editing, and serialization.",
       "tasks": [
-        "Design Tilemap Data Structure (Layers, Chunks, sparse arrays)",
-        "Implement Tilemap Components (TilemapRenderer, TilemapCollider)",
-        "Implement Auto-Tiling Logic (Rule Tiles)",
-        "Implement Tile Palette Editor UI",
+        "Audit & Cleanup Legacy Tilemap Workflows (.agent/workflows)",
+        "Design JSON Schema for Tilemaps in `project.json` / Scene Files",
+        "Implement `TilemapSerializer` (Sparse Array / RLE for storage efficiency)",
+        "Refactor `EditorTilemapSystem` to hydrate from new Scene Architecture",
+        "Implement `TilemapCollider` (Composite Body Generator for Physics)",
+        "Implement Auto-Tiling Logic (Rule Tiles) with JSON configuration",
+        "Implement Tile Palette Editor UI (Drag & Drop to set Collision/Rules)",
         "Implement Brush/Bucket/Eraser Tools in Scene View",
-        "Integrate Tilemaps with Physics (Composite Bodies for optimization)",
-        "Implement Animated Tiles",
-        "Implement Tilemap Serialization/Deserialization (JSON)"
+        "Implement Animated Tiles Support"
+      ]
+    },
+    {
+      "id": "11",
+      "name": "Inspector Overhaul (Live Mode)",
+      "status": "in-progress",
+      "description": "Make the editor feel alive and reactive.",
+      "tasks": [
+        "Implement 'Live Mode' for Inspectors (Poll values if Game Running)",
+        "Add Script Parameter Parsing (AST based properties in Inspector)",
+        "Standardize all Inspectors to emit Commands (Undoable)",
+        "Refactor Color Pickers and Input Fields for UX",
+        "Implement Scene Sorting in ScenesPanel",
+        "Implement Entity Sorting & Renaming in Hierarchy",
+        "Verify Layer Sorting in LayersPanel",
+        "Implement AssetsPanel Settings Persistence (Zoom, Order)",
+        "Hide Internal Components (LayerIndex) in Inspector"
       ]
     },
     {

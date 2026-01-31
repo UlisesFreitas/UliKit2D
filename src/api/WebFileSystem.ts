@@ -568,6 +568,8 @@ export class WebFileSystem implements IFileSystem {
         }
 
         const fullPath = `/${this.currentProject}/${cleanPath}`;
+        
+        console.log(`[WebFS] getAssetURL: '${relPath}' -> '${fullPath}'`);
 
         try {
             const stat = await fs.promises.stat(fullPath);
@@ -578,20 +580,6 @@ export class WebFileSystem implements IFileSystem {
                 // Convert Buffer to Uint8Array for Blob compatibility
                 const bufferContent = new Uint8Array(content as any);
                 
-                // Debug Header
-                const header = Array.from(bufferContent.slice(0, 8)).map(b => b.toString(16).padStart(2,'0')).join(' ');
-                console.log(`[WebFS Debug] Header: ${header}`);
-
-                // If small, log as text to see if it's an error
-                if (bufferContent.length < 500) {
-                    try {
-                        const text = new TextDecoder().decode(bufferContent);
-                        // Using text to suppress warning if needed, or just let it compile out
-                        if (false) console.log(text); 
-                        // console.log(`[WebFS Debug] Small Content Text: ${text}`);
-                    } catch (e) { /* ignore */ }
-                }
-
                 // Assume image or octet-stream?
                 // We can guess mime type from extension
                 const ext = cleanPath.split('.').pop()?.toLowerCase();
@@ -606,8 +594,14 @@ export class WebFileSystem implements IFileSystem {
                 const blob = new Blob([bufferContent], params);
                 return URL.createObjectURL(blob);
             }
-        } catch (e) {
-             console.warn(`[WebFileSystem] Failed to get URL for ${fullPath}`, e);
+        } catch (e: any) {
+             console.warn(`[WebFileSystem] Failed to get URL for ${fullPath}. Error: ${e.message}`);
+             // Try listing parent to see what is there
+             try {
+                const parent = fullPath.substring(0, fullPath.lastIndexOf('/'));
+                const siblings = await fs.promises.readdir(parent);
+                console.log(`[WebFS] Siblings in ${parent}:`, siblings);
+             } catch (err) { /* ignore */ }
         }
         
         return relPath;

@@ -93,7 +93,7 @@ const inspectorItems = computed(() => {
         // - transform: Handled explicitly above (always first).
         // - script: Handled explicitly below (special array handling).
         // - layer: Handled by the Layer Dropdown at the top (redundant as generic).
-        if (['id', 'name', 'visible', 'transform', 'script', 'layer', 'LayerIndex', 'layerIndex'].includes(key)) continue;
+        if (['id', 'name', 'visible', 'transform', 'script', 'layer', 'LayerIndex', 'layerIndex', 'sortIndex'].includes(key)) continue;
         
         items.push({ type: 'component', key, data: ent[key] });
     }

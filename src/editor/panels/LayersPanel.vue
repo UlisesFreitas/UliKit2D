@@ -22,9 +22,12 @@
             'opacity-50 dashed-border': draggingIndex === index
         }"
         @click="selectLayer(layer.id)"
-        @dragover.prevent.stop
+        @dragover.prevent="onDragOver($event, index)"
         @drop.stop="onDrop($event, index)"
       >
+        <!-- Drop Indicator -->
+        <div v-if="dropIndex === index" class="drop-indicator"></div>
+
         <!-- LEFT: Handle + Radio + Name -->
         <div class="flex items-center gap-2 overflow-hidden flex-1">
              <!-- Drag Handle (Hidden for Base Layer) -->
@@ -157,7 +160,7 @@ const editorStore = useEditorStore();
 const settingsStore = useProjectSettingsStore();
 
 const selectedLayerId = ref<string | null>(null);
-const draggingIndex = ref<number | null>(null);
+// draggingIndex moved below
 
 // Reactive reference to SceneManager layers
 const layers = ref<SceneLayer[]>([]);
@@ -289,18 +292,20 @@ const updateBaseLayerColor = (e: Event, layer: SceneLayer) => {
     SceneManager.setDirty(true);
 };
 
+// ... (previous imports)
+
+const draggingIndex = ref<number | null>(null);
+const dropIndex = ref<number | null>(null); // Visual indicator index
+
+// ... (previous code)
+
 // Drag and Drop
 const onDragStart = (e: DragEvent, index: number) => {
-    // This 'index' comes from v-for over `reversedLayers`.
-    // It is the visual index (0 = Top Layer).
-    
     if (e.stopPropagation) e.stopPropagation();
-
     draggingIndex.value = index;
     if (e.dataTransfer) {
         e.dataTransfer.effectAllowed = 'move';
         e.dataTransfer.setData('text/plain', index.toString());
-        
         const target = e.target as HTMLElement;
         const row = target.closest('.layer-item');
         if (row && 'setDragImage' in e.dataTransfer) {
@@ -309,73 +314,105 @@ const onDragStart = (e: DragEvent, index: number) => {
     }
 };
 
-const onDrop = (_e: DragEvent, dropIndex: number) => { // dropIndex is visual index
+const onDragOver = (e: DragEvent, index: number) => {
+    e.preventDefault(); // Necessary to allow dropping
     const fromIndex = draggingIndex.value;
-    if (fromIndex === null || fromIndex === dropIndex) return;
+    if (fromIndex === null || fromIndex === index) return;
     
-    // We are operating on the visual list (reversedLayers).
-    // Visual Order: [Top Layer, ..., Base Layer] (Base Layer is last)
+    // Prevent dropping below Base Layer
+    const baseVisualIndex = reversedLayers.value.length - 1;
+    if (index >= baseVisualIndex) return;
+
+    dropIndex.value = index;
+};
+
+const onDragLeave = (e: DragEvent) => {
+    // Optional: only clear if leaving the list entirely? 
+    // Usually simpler to just let dragOver update it. 
+    // But if we leave a valid target, we might want to clear.
+    // However, dragleave fires when entering children, so be careful.
+};
+
+const onDrop = (_e: DragEvent, targetIndex: number) => { 
+    // Clean up
+    dropIndex.value = null;
+    
+    // ... (existing drop logic) ...
+    // Note: Use targetIndex directly as it was passed in
+    
+    const fromIndex = draggingIndex.value;
+    if (fromIndex === null || fromIndex === targetIndex) return;
+    
+    // ... (rest of onDrop implementation from previous file) ...
+    // We need to re-include the rest of onDrop logic here since we are replacing the block
+    
     const visualOrder = [...reversedLayers.value];
     const baseVisualIndex = visualOrder.length - 1;
     
-    // 1. Prevent moving Base Layer (Handle hidden, but safety check)
     if (fromIndex === baseVisualIndex) {
-        console.warn('Cannot move Base Layer');
-        return;
+         console.warn('Cannot move Base Layer');
+         return;
     }
 
-    // 2. Prevent dropping below Base Layer (Visual Index >= Last)
-    if (dropIndex >= baseVisualIndex) {
-        // Correct drop index to be explicitly 'above' Base Layer
-        dropIndex = baseVisualIndex - 1; 
-        if (dropIndex < 0) dropIndex = 0; // Sanity check
+    if (targetIndex >= baseVisualIndex) {
+        targetIndex = baseVisualIndex - 1; 
+        if (targetIndex < 0) targetIndex = 0; 
     }
 
-    // 3. Prevent dropping ON Base Layer (Replace it? No.)
-    // Logic will insert AT dropIndex, shifting others.
-    // If dropIndex == baseVisualIndex, it would push Base Layer down (impossible if it's last)
-    // or push it up. We want Base Layer to stay LAST.
-    
     const item = visualOrder.splice(fromIndex, 1)[0];
     if (!item) return;
-    visualOrder.splice(dropIndex, 0, item);
+    visualOrder.splice(targetIndex, 0, item);
     
-    // 4. CRITICAL: Force Base Layer to be strictly LAST again just in case
+    // Base Layer check
     const currentBaseIndex = visualOrder.findIndex(l => l.id === 'Base Layer');
     if (currentBaseIndex !== -1 && currentBaseIndex !== visualOrder.length - 1) {
-        const base = visualOrder.splice(currentBaseIndex, 1)[0];
-        if (base) visualOrder.push(base);
+        const spliced = visualOrder.splice(currentBaseIndex, 1);
+        if (spliced.length > 0 && spliced[0]) {
+            visualOrder.push(spliced[0]);
+        }
     }
     
-    // Convert Visual Order back to Model Order (Reverse it back)
-    // Model Order: [Base, L1, L2]
-    // Visual Order: [L2, L1, Base]
-    // So Model = Visual.reverse()
     const newModelLayers = [...visualOrder].reverse();
 
-    // Double check Model Index 0 is Base Layer
     if (newModelLayers[0]?.id !== 'Base Layer') {
-        console.warn('Integrity Check Failed: Base Layer not at index 0');
-         // Force fix
          const baseIndex = newModelLayers.findIndex(l => l.id === 'Base Layer');
          if (baseIndex > 0) {
-             const base = newModelLayers.splice(baseIndex, 1)[0];
-             if (base) newModelLayers.unshift(base);
+             const spliced = newModelLayers.splice(baseIndex, 1);
+             if (spliced.length > 0 && spliced[0]) {
+                 newModelLayers.unshift(spliced[0]);
+             }
          }
     }
 
-    // Map to Names for Store
-    const newLayerNames = newModelLayers.map(l => l.name);
+    const newLayerConfigs = newModelLayers.map(l => ({
+        name: l.name,
+        type: l.type,
+        gridSize: l.gridSize
+    }));
     
-    // Push to Store via Action
-    settingsStore.reorderLayers(newLayerNames);
+    // @ts-ignore
+    settingsStore.reorderLayers(newLayerConfigs);
 
     draggingIndex.value = null;
 };
 </script>
 
-
 <style scoped>
+.layer-item {
+    position: relative; /* Context for indicator */
+}
+
+.drop-indicator {
+    height: 34px; /* Matches approximate layer row height */
+    border: 2px dashed var(--accent-color);
+    border-radius: 4px;
+    margin-bottom: 4px;
+    background-color: rgba(59, 130, 246, 0.1); /* Light blue transparent */
+    pointer-events: none;
+    /* Static position to take space and push content down */
+    position: static; 
+}
+
 .layer-item:hover .fa-grip-vertical {
   opacity: 1; 
 }

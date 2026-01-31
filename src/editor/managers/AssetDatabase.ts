@@ -171,6 +171,7 @@ export class AssetDatabase {
     }
 
     private detectType(path: string): AssetType {
+        if (!path) return 'unknown';
         const ext = path.split('.').pop()?.toLowerCase();
         if (['png', 'jpg', 'jpeg', 'webp', 'bmp', 'gif'].includes(ext!)) return 'texture';
         if (['mp3', 'wav', 'ogg', 'caf'].includes(ext!)) return 'audio';

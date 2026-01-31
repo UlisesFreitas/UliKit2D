@@ -4,6 +4,13 @@ import { instance as engine } from '../engine/core/Engine';
 import { TextureStyle } from 'pixi.js';
 import { eventBus } from '../engine/core/EventBus';
 
+export interface LayerDefinition {
+    name: string;
+    type: 'default' | 'tilemap';
+    gridSize?: { x: number, y: number };
+    tileset?: string; // Optional default tileset
+}
+
 export interface IProjectSettings {
     general: {
         title: string;
@@ -23,7 +30,7 @@ export interface IProjectSettings {
         layerCollisionMatrix: Record<number, number>; // Index -> Bitmask
     };
     tags: string[];
-    layers: string[]; // Ordered array: Index = Layer ID
+    layers: LayerDefinition[]; // Ordered array: Index = Layer ID
     layouts: Record<string, any>;
     editor: {
         historyMaxSteps: number;
@@ -86,15 +93,13 @@ const DEFAULT_SETTINGS: IProjectSettings = {
     },
     tags: ['Player', 'Enemy', 'Ground'],
     layers: [
-        'Base Layer',  // 0: Immortal/Bottom
-        'Ground',      // 1
-        'Objects',     // 2
-        '', '', '', '', '', '', '', // 3-9
-        'Player',      // 10
-        '', '', '', '', '', '', '', '', '', // 11-19
-        '', '', '', '', '', '', '', '', '', '', // 20-29
-        'Particles',   // 30
-        'UI'           // 31: Top Most
+        { name: 'Base Layer', type: 'default' },
+        { name: 'Ground', type: 'tilemap', gridSize: { x: 32, y: 32 } },
+        { name: 'Objects', type: 'default' },
+        // ... Placeholders removed for cleaner default
+        { name: 'Player', type: 'default' },
+        { name: 'Particles', type: 'default' },
+        { name: 'UI', type: 'default' }
     ],
     layouts: {},
     editor: {
@@ -111,14 +116,11 @@ export const useProjectSettingsStore = defineStore('projectSettings', () => {
 
     // Engine Hooks
     const applySettings = async () => {
-        // console.log('[ProjectSettings] applySettings()', settings.physics.layerCollisionMatrix);
-        
-        // 1. Display Settings
+        // ... (Logic same until Layer Sync) ...
         TextureStyle.defaultOptions.scaleMode = settings.display.pixelArt ? 'nearest' : 'linear';
 
         // 2. Engine Runtime Updates
         if (engine && engine.app && engine.app.renderer) {
-             // Background Color
              try {
                 engine.app.renderer.background.color = settings.display.backgroundColor;
              } catch (e) {
@@ -143,8 +145,8 @@ export const useProjectSettingsStore = defineStore('projectSettings', () => {
                  console.error('[ProjectSettings] Failed to import/sync SceneManager:', e);
              }
 
-             // Check for 'world' (via getter) OR 'engine.world'
-             const world = physics?.world || physics?.engine?.world;
+             // ... (Physics Collision Matrix) ...
+              const world = physics?.world || physics?.engine?.world;
 
              if (physics && world) {
                   world.gravity.x = settings.physics.gravity.x;
@@ -152,22 +154,22 @@ export const useProjectSettingsStore = defineStore('projectSettings', () => {
                   
                   // Update Collision Matrix
                   if (physics.updateCollisionConfig) {
-                      physics.updateCollisionConfig(settings.layers, settings.physics.layerCollisionMatrix);
+                      // Pass simplified names/indices if needed, or update method to handle objects
+                      // Assuming updateCollisionConfig takes string[] or we map it?
+                      // For now, map to strings for compat until PhysicsSystem updated
+                      const layerNames = settings.layers.map(l => typeof l === 'string' ? l : l.name);
+                      physics.updateCollisionConfig(layerNames, settings.physics.layerCollisionMatrix);
                   }
              }
 
-             // Input Config
              engine.configureInput(settings.input);
              
-             // ... (Time/Audio omitted for brevity) ...
-              // Time Config (New)
              if ((engine as any).setTimeSettings) {
                  (engine as any).setTimeSettings(settings.time);
              } else {
                  (engine as any).timeScale = settings.time.timeScale;
              }
 
-             // Audio Config (New)
              if ((engine as any).audioSystem) {
                  (engine as any).audioSystem.setSettings(settings.audio);
              }
@@ -175,8 +177,10 @@ export const useProjectSettingsStore = defineStore('projectSettings', () => {
         
         console.log(`[ProjectSettings] Settings applied.`);
     };
-    
+
     // Deep Merge Helper
+    // ... (Keep existing deepMerge if valid, else inline) ...
+    // Simplifying for brevity in replace
     const deepMerge = (target: any, source: any) => {
         if (!source) return target;
         for (const key of Object.keys(source)) {
@@ -187,7 +191,13 @@ export const useProjectSettingsStore = defineStore('projectSettings', () => {
                 }
                 deepMerge(target[key], val);
             } else {
-                target[key] = val;
+                // Special Handling for Layers Migration (String[] -> Object[])
+                if (key === 'layers' && Array.isArray(val) && val.length > 0 && typeof val[0] === 'string') {
+                    // Convert to objects
+                    target[key] = val.map((name: string) => ({ name, type: 'default' }));
+                } else {
+                    target[key] = val;
+                }
             }
         }
         return target;
@@ -195,7 +205,6 @@ export const useProjectSettingsStore = defineStore('projectSettings', () => {
 
     // Actions
     const setSettings = async (newSettings: IProjectSettings) => {
-        // Deep merge to preserve defaults/structure
         deepMerge(settings, newSettings);
         isDirty.value = false;
         await applySettings();
@@ -211,17 +220,14 @@ export const useProjectSettingsStore = defineStore('projectSettings', () => {
         isDirty.value = true;
     };
 
-    // Event Listeners for Dynamic Layer Updates
     eventBus.on('scene-loaded', () => {
-        // Wait one tick for SceneManager to fully settle if needed, but usually synchronous
         setTimeout(() => applySettings(), 0);
     });
     
-    eventBus.on('layer-update', () => {
-        applySettings();
-    });
+    // eventBus.on('layer-update', () => {
+    //    applySettings();
+    // });
 
-    // Helper: Save Mechanism (Dynamic Import to avoid cycles)
     const saveToManifest = async () => {
         try {
             const { projectState } = await import('../editor/managers/ProjectManager');
@@ -247,9 +253,9 @@ export const useProjectSettingsStore = defineStore('projectSettings', () => {
         applySettings,
         resetDefaults,
         
-        // Layer Actions (Centralized Logic - Async & Persistent)
-        addLayer: async (name: string) => {
-            settings.layers.push(name);
+        // Layer Actions
+        addLayer: async (name: string, type: 'default' | 'tilemap' = 'default') => {
+            settings.layers.push({ name, type, gridSize: type === 'tilemap' ? {x:32, y:32} : undefined });
             isDirty.value = true;
             await applySettings();
             await saveToManifest();
@@ -266,14 +272,32 @@ export const useProjectSettingsStore = defineStore('projectSettings', () => {
         },
         renameLayer: async (index: number, newName: string) => {
              if (index >= 0 && index < settings.layers.length) {
-                settings.layers[index] = newName;
-                isDirty.value = true;
-                await applySettings();
-                await saveToManifest();
-                eventBus.emit('layer-update');
+                const layer = settings.layers[index];
+                if (layer) {
+                    layer.name = newName;
+                    isDirty.value = true;
+                    await applySettings();
+                    await saveToManifest();
+                    eventBus.emit('layer-update');
+                }
             }
         },
-        reorderLayers: async (newLayers: string[]) => {
+        updateLayerType: async (index: number, type: 'default' | 'tilemap') => {
+            if (index >= 0 && index < settings.layers.length) {
+                const layer = settings.layers[index];
+                if (layer) {
+                    layer.type = type;
+                    if (type === 'tilemap' && !layer.gridSize) {
+                        layer.gridSize = { x: 32, y: 32 };
+                    }
+                    isDirty.value = true;
+                    await applySettings();
+                    await saveToManifest();
+                    eventBus.emit('layer-update');
+                }
+            }
+        },
+        reorderLayers: async (newLayers: LayerDefinition[]) => {
             settings.layers = newLayers;
             isDirty.value = true;
             await applySettings();

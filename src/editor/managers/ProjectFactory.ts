@@ -146,7 +146,9 @@ export class ProjectFactory {
                     updated: Date.now()
                 }
             ],
-            resources: [] // Will be populated by Watcher/Scan
+            resources: [
+                initialScenePath 
+            ] // Will be populated by Watcher/Scan, but we seed the critical scene first
         };
 
         await fs.writeFile(`${projectPath}/project.json`, JSON.stringify(manifest, null, 4));

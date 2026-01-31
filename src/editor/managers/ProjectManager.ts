@@ -201,11 +201,44 @@ export class ProjectManager {
                 if (manifest && manifest.scenes && manifest.scenes.length > 0) {
                      // Try loading first scene
                      if (manifest.scenes[0]) {
-                        sceneLoaded = await SceneManager.loadSceneByPath(manifest.scenes[0].path);
+                        const scenePath = manifest.scenes[0].path;
+                        
+                        // SAFEQUARD 1: Explicitly Hydrate DB with resources (if missing)
+                        const { AssetDatabase } = await import('./AssetDatabase');
+                        if (manifest.resources && manifest.resources.length > 0) {
+                            // Merge with existing to avoid blowing away watcher updates if they happened
+                            manifest.resources.forEach(r => {
+                                if (r && r.path) {
+                                    AssetDatabase.instance.registerAsset(r.path, r.type as any);
+                                } else {
+                                    console.warn('[ProjectManager] Skipping invalid resource in manifest:', r);
+                                }
+                            });
+                        } else {
+                            AssetDatabase.instance.registerAsset(scenePath, 'scene');
+                        }
+
+                        // SAFEQUARD 2: Validate File Existence BEFORE passing to Manager
+                        // This helps diagnosis: Is it FS failure or Parse failure?
+                        try {
+                             // Use raw FS to check existence by attempting to read it
+                             await fs.readFile(scenePath);
+                             
+                             console.log(`[ProjectManager] Verified Scene File exists: ${scenePath}`);
+                             sceneLoaded = await SceneManager.loadSceneByPath(scenePath);
+                        } catch (fsError) {
+                             console.error(`[ProjectManager] CRITICAL: Initial Scene File NOT FOUND or Unreadable: ${scenePath}`, fsError);
+                             ui.showToast({ title: 'Scene Missing', description: `Could not read ${scenePath}.`, type: 'error' });
+                        }
                      }
                 }
                 
                 if (!sceneLoaded) {
+                    console.warn('[ProjectManager] Scene load failed or no scenes. Creating default.');
+                    // If we failed to load the expected scene, we should probably ALERT the user rather than silently creating Untitled
+                    if (manifest && manifest.scenes && manifest.scenes.length > 0) {
+                         ui.showToast({ title: 'Load Error', description: 'Failed to load initial scene. Created "Untitled" fallback.', type: 'warning' });
+                    }
                     SceneManager.createDefaultScene();
                 }
 

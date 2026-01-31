@@ -346,14 +346,14 @@ const toggleCollision = (rowIdx: number, colIdx: number) => {
                                             <tr>
                                                 <th class="p-1"></th>
                                                 <template v-for="(layer, cIndex) in store.settings.layers" :key="'h-'+cIndex">
-                                                    <th v-if="layer" class="p-1 text-center font-normal text-text-secondary rotate-45 h-16 w-8">{{ layer }}</th>
+                                                    <th v-if="layer" class="p-1 text-center font-normal text-text-secondary rotate-45 h-16 w-8">{{ layer.name }}</th>
                                                 </template>
                                             </tr>
                                         </thead>
                                         <tbody>
                                             <template v-for="(rowLayer, rIndex) in store.settings.layers" :key="'r-'+rIndex">
                                                 <tr v-if="rowLayer">
-                                                    <td class="p-1 text-right font-bold text-text-primary px-2 whitespace-nowrap">{{ rowLayer }}</td>
+                                                    <td class="p-1 text-right font-bold text-text-primary px-2 whitespace-nowrap">{{ rowLayer.name }}</td>
                                                     <template v-for="(colLayer, cIndex) in store.settings.layers" :key="'c-'+cIndex">
                                                         <td v-if="colLayer" class="p-1 text-center">
                                                             <input 
@@ -417,26 +417,67 @@ const toggleCollision = (rowIdx: number, colIdx: number) => {
                             <div>
                                 <div class="flex justify-between items-center mb-2">
                                     <label class="text-sm font-bold">Collision Layers</label>
-                                     <button @click="store.addLayer('NewLayer')" class="text-xs bg-bg-hover hover:bg-accent hover:text-white px-2 py-1 rounded transition">+</button>
+                                     <button @click="store.addLayer('NewLayer')" class="text-xs bg-bg-hover hover:bg-accent hover:text-white px-2 py-1 rounded transition">+ Add Layer</button>
                                 </div>
                                  <div class="flex flex-col gap-2">
-                                     <div v-for="(_layer, index) in store.settings.layers" :key="index" class="flex items-center bg-bg-panel border border-border rounded px-2 py-1 text-xs">
-                                        <span class="mr-2 text-text-disabled">{{ index }}:</span>
-                                        <input 
-                                            :value="store.settings.layers[index]" 
-                                            @change="(e) => store.renameLayer(index, (e.target as HTMLInputElement).value)"
-                                            class="bg-transparent outline-none flex-1"
-                                            :disabled="index === 0"
-                                            :class="{'text-text-disabled': index === 0}"
-                                        />
-                                         <button 
-                                            v-if="index !== 0"
-                                            @click="store.removeLayer(index)" 
-                                            class="ml-2 text-red-500 hover:text-red-400"
-                                        >
-                                            ×
-                                        </button>
-                                        <div v-else class="ml-2 w-3"></div> <!-- Spacer -->
+                                     <div v-for="(layer, index) in store.settings.layers" :key="index" class="bg-bg-panel border border-border rounded p-2 text-xs flex flex-col gap-2">
+                                        <div class="flex items-center gap-2">
+                                            <span class="text-text-disabled w-4 text-center">{{ index }}:</span>
+                                            
+                                            <!-- Layer Name -->
+                                            <input 
+                                                :value="layer.name" 
+                                                @change="(e) => store.renameLayer(index, (e.target as HTMLInputElement).value)"
+                                                class="bg-transparent outline-none flex-1 font-bold border-b border-white/10 focus:border-accent"
+                                                :disabled="index === 0"
+                                                :class="{'text-text-disabled': index === 0}"
+                                                placeholder="Layer Name"
+                                            />
+                                            
+                                            <!-- Type Select -->
+                                            <select 
+                                                :value="layer.type" 
+                                                @change="(e) => store.updateLayerType(index, (e.target as HTMLSelectElement).value as any)"
+                                                class="bg-bg-input border border-border rounded px-1 py-0.5 text-[10px] w-20"
+                                                :disabled="index === 0"
+                                            >
+                                                <option value="default">Default</option>
+                                                <option value="tilemap">Tilemap</option>
+                                            </select>
+
+                                             <button 
+                                                v-if="index !== 0"
+                                                @click="store.removeLayer(index)" 
+                                                class="ml-2 text-red-500 hover:text-red-400"
+                                                title="Remove Layer"
+                                            >
+                                                ×
+                                            </button>
+                                            <div v-else class="ml-2 w-3"></div> <!-- Spacer -->
+                                        </div>
+                                        
+                                        <!-- Tilemap Settings (Grid) -->
+                                        <div v-if="layer.type === 'tilemap' && layer.gridSize" class="pl-6 flex items-center gap-2">
+                                            <span class="text-text-secondary text-[10px]">Grid:</span>
+                                            <div class="flex items-center gap-1">
+                                                <span class="text-[10px] text-text-secondary">X</span>
+                                                <input 
+                                                    v-model.number="layer.gridSize.x"
+                                                    type="number" 
+                                                    class="bg-bg-input border border-border rounded w-10 text-center text-[10px]"
+                                                    @change="store.isDirty = true" 
+                                                />
+                                            </div>
+                                            <div class="flex items-center gap-1">
+                                                <span class="text-[10px] text-text-secondary">Y</span>
+                                                <input 
+                                                    v-model.number="layer.gridSize.y"
+                                                    type="number" 
+                                                    class="bg-bg-input border border-border rounded w-10 text-center text-[10px]"
+                                                    @change="store.isDirty = true"
+                                                />
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
